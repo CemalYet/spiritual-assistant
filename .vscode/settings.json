@@ -1,0 +1,16 @@
+{
+    "python.languageServer": "Pylance",
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.autocomplete": "default",
+    "C_Cpp.suggestSnippets": true,
+    "editor.suggestSelection": "first",
+    "editor.snippetSuggestions": "top",
+    "editor.formatOnSave": true,
+    "files.associations": {
+        "*.tcc": "cpp",
+        "*.h": "cpp",
+        "*.hpp": "cpp"
+    },
+    "tts.deactivateTtsTestExplorer": true,
+    "tts.runner": ""
+}
