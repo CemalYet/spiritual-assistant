@@ -1,0 +1,136 @@
+name: Build & Test
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+env:
+  BOARD_ENV: esp32-s3-devkitc-1
+  ADHAN_REPO: https://github.com/radcheb/Adhan.git
+
+jobs:
+  build:
+    name: 🔨 Build Firmware
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 💾 Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+      
+      - name: 📚 Install libraries
+        run: pio pkg install
+
+      - name: 🔧 Fix Adhan library (use C version)
+        run: |
+          ADHAN_DIR=".pio/libdeps/${{ env.BOARD_ENV }}/Adhan"
+          rm -rf "$ADHAN_DIR"/*
+          git clone --depth 1 --quiet ${{ env.ADHAN_REPO }} /tmp/Adhan
+          cp -r /tmp/Adhan/C/adhan/* "$ADHAN_DIR/"
+          cat > "$ADHAN_DIR/library.json" << 'EOF'
+          {
+            "name": "Adhan",
+            "version": "1.0.0",
+            "build": {
+              "srcDir": "src",
+              "includeDir": "src/include",
+              "srcFilter": ["+<*.c>", "-<example.c>"]
+            }
+          }
+          EOF
+
+      - name: 🔨 Build Firmware
+        run: pio run
+
+      - name: 📁 Build Filesystem
+        run: pio run --target buildfs
+      
+      - name: 📊 Build Summary
+        run: |
+          FIRMWARE=".pio/build/${{ env.BOARD_ENV }}/firmware.bin"
+          FILESYSTEM=".pio/build/${{ env.BOARD_ENV }}/littlefs.bin"
+          
+          FIRMWARE_SIZE=$(stat -c%s "$FIRMWARE" 2>/dev/null || echo "0")
+          FS_SIZE=$(stat -c%s "$FILESYSTEM" 2>/dev/null || echo "0")
+          
+          # Convert to human readable
+          FIRMWARE_KB=$((FIRMWARE_SIZE / 1024))
+          FS_KB=$((FS_SIZE / 1024))
+          
+          echo "## 📊 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔧 Firmware | ${FIRMWARE_KB} KB |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📁 Filesystem | ${FS_KB} KB |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Board:** \`${{ env.BOARD_ENV }}\`" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 📤 Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: |
+            .pio/build/${{ env.BOARD_ENV }}/firmware.bin
+            .pio/build/${{ env.BOARD_ENV }}/littlefs.bin
+            .pio/build/${{ env.BOARD_ENV }}/partitions.bin
+            .pio/build/${{ env.BOARD_ENV }}/bootloader.bin
+          retention-days: 30
+
+  code-quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📏 Check for large files
+        run: |
+          echo "## 📏 File Size Check" >> $GITHUB_STEP_SUMMARY
+          LARGE_FILES=$(find . -type f -size +1M -not -path "./.git/*" 2>/dev/null)
+          if [ -z "$LARGE_FILES" ]; then
+            echo "✅ No files larger than 1MB" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Large files found:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$LARGE_FILES" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      - name: 🌐 Check web assets
+        run: |
+          echo "## 🌐 Web Assets" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          for file in index.html success.html style.css script.js; do
+            if [ -f "data/$file" ]; then
+              SIZE=$(stat -c%s "data/$file")
+              echo "| $file | ✅ ${SIZE} bytes |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| $file | ❌ Missing |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
