@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <LittleFS.h>
 #include "config.h"
 #include "prayer_types.h"
 #include "daily_prayers.h"
@@ -10,6 +11,7 @@
 #include "prayer_calculator.h"
 #include "test_mode.h"
 #include "wifi_credentials.h"
+#include "audio_player.h"
 #include <time.h>
 
 // TEMPORARY: Set to true to clear stored WiFi credentials for testing portal
@@ -59,7 +61,20 @@ void checkAndPlayAdhan()
 
     Serial.printf("\n\n🕌 === ADHAN TIME: %s === 🕌\n\n",
                   getPrayerName(*cachedNextPrayer).data());
-    // TODO: Play adhan audio here
+
+    // Play adhan audio and wait for it to finish
+    if (playAudioFile("/azan.mp3"))
+    {
+        Serial.println("[Adhan] Playing...");
+
+        // Wait for playback to complete (callback sets audioFinished)
+        while (!isAudioFinished())
+        {
+            audioPlayerLoop();
+            delay(1); // Small delay, audio.loop() does the work
+        }
+        Serial.println("[Adhan] Finished");
+    }
 
     // Check if this was the last prayer of the day
     const auto now = CurrentTime::now();
@@ -106,6 +121,25 @@ void setup()
     Serial.println(String('=', 40) + "\n");
 
     display.init();
+
+    // Initialize LittleFS for audio files (portal may have unmounted it)
+    if (!LittleFS.begin(true))
+    {
+        Serial.println("[Error] LittleFS mount failed!");
+    }
+
+    // Initialize audio player
+    audioPlayerInit();
+
+    // Verify audio file exists
+    if (!LittleFS.exists("/azan.mp3"))
+    {
+        Serial.println("[Audio] WARNING: azan.mp3 not found!");
+    }
+    else
+    {
+        Serial.println("[Audio] azan.mp3 found - ready for adhan");
+    }
 
 #if CLEAR_WIFI_CREDENTIALS
     // TEMPORARY: Clear WiFi credentials to test portal
@@ -228,6 +262,9 @@ void setup()
 
 void loop()
 {
+    // Keep audio playing
+    audioPlayerLoop();
+
     // Handle WiFi portal if active
     if (Network::isPortalActive())
     {
