@@ -157,9 +157,26 @@ void setup()
     // If portal mode, handle it in main loop (don't proceed with normal setup)
     if (!Network::isConnected())
     {
-        Serial.println("[Setup] Portal mode - waiting for configuration");
-        display.showMessage("WiFi Setup", "Connect to AP");
-        return; // Continue to loop for portal handling
+        if (!Network::isRetryConnection())
+        {
+            // First time setup
+            Serial.println("[Setup] Portal mode - waiting for configuration");
+            display.showMessage("WiFi Setup", "Connect to AP");
+            return;
+        }
+
+        // Connection failed - show error before opening portal
+        Serial.println("[Setup] Connection failed - retry required");
+        int attempts = Network::getConnectionAttempts();
+
+        // Show error message for 5 seconds
+        display.showError("Connection Failed",
+                          attempts > 1 ? "Check Credentials" : "Retry Setup");
+        delay(5000);
+
+        Serial.printf("[Setup] Opening reconfiguration portal (attempt #%d)\n", attempts);
+        display.showMessage("WiFi Setup", "Reconnect to AP");
+        return;
     }
 
     // Only sync time if actually connected to WiFi

@@ -274,7 +274,6 @@
     <div class="container">
         <h1>🕌 Spiritual Assistant</h1>
         <p class="subtitle">Configure WiFi Connection</p>
-        <div id="message" class="message"></div>
         <div class="scan-section">
             <button id="scanBtn" class="scan-button" onclick="scanNetworks()">📡 Scan WiFi Networks</button>
             <div id="scanStatus" class="scan-status"></div>
@@ -294,11 +293,19 @@
                     <button type="button" class="toggle-password" onclick="togglePassword()">SHOW</button>
                 </div>
             </div>
+            <div id="message" class="message"></div>
             <button type="submit" class="submit-button" id="submitBtn">✓ Connect to WiFi</button>
         </form>
     </div>
     <script>
         let isScanning = false;
+
+        // Prevent mobile auto-scroll to first input on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            // Blur any auto-focused elements and scroll to top
+            document.activeElement.blur();
+            window.scrollTo(0, 0);
+        });
 
         function getSignalIcon(rssi) {
             if (rssi >= -50) return '📶';
@@ -379,6 +386,80 @@
             msg.style.display = 'block';
         }
 
+        function pollStatus(pollCount) {
+            if (pollCount > 60) {
+                // Timeout after 60 seconds of polling (3 attempts x 15s + buffer)
+                showMessage('✗ Connection test timeout. Please try again.', 'error');
+                enableForm();
+                return;
+            }
+
+            fetch('/status', { cache: 'no-cache' })
+                .then(r => r.json())
+                .then(data => {
+                    const submitBtn = document.getElementById('submitBtn');
+
+                    if (data.state === 'connecting') {
+                        const attempt = data.attempt || 1;
+                        const maxAttempts = data.maxAttempts || 3;
+                        submitBtn.textContent = '⏳ Attempt ' + attempt + '/' + maxAttempts + ' (' + pollCount + 's)';
+                        showMessage('🔄 Testing WiFi connection - attempt ' + attempt + ' of ' + maxAttempts + '...', 'success');
+                        setTimeout(() => pollStatus(pollCount + 1), 1000);
+                        return;
+                    }
+
+                    if (data.state === 'success') {
+                        submitBtn.textContent = '✓ Connected!';
+                        submitBtn.style.background = '#10b981';
+                        showMessage('✓ WiFi connection successful! Device will restart...', 'success');
+                        return;
+                    }
+
+                    if (data.state === 'failed') {
+                        showMessage('✗ ' + (data.error || 'Connection failed'), 'error');
+                        submitBtn.textContent = '↻ Try Again';
+                        submitBtn.disabled = false;
+                        submitBtn.onclick = resetAndRetry;
+                        return;
+                    }
+
+                    // Default: keep polling
+                    setTimeout(() => pollStatus(pollCount + 1), 1000);
+                })
+                .catch(err => {
+                    // If we can't reach the device, it might have restarted (success case)
+                    showMessage('Device may have restarted. Check your WiFi connection.', 'success');
+                });
+        }
+
+        function resetAndRetry() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.textContent = '⏳ Resetting...';
+            submitBtn.disabled = true;
+
+            fetch('/reset', { method: 'POST', cache: 'no-cache' })
+                .then(r => r.json())
+                .then(data => {
+                    enableForm();
+                    document.getElementById('message').style.display = 'none';
+                    document.getElementById('password').value = '';
+                    // Scroll to top so user can see scan button and form
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                })
+                .catch(err => {
+                    enableForm();
+                    showMessage('Reset failed. Please refresh the page.', 'error');
+                });
+        }
+
+        function enableForm() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✓ Connect to WiFi';
+            submitBtn.onclick = null;
+            submitBtn.style.background = '';
+        }
+
         function submitForm(event) {
             event.preventDefault();
             const ssid = document.getElementById('ssid').value.trim();
@@ -395,30 +476,29 @@
 
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Connecting...';
+            submitBtn.textContent = '⏳ Sending credentials...';
+            document.getElementById('message').style.display = 'none';
 
             fetch('/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'ssid=' + encodeURIComponent(ssid) + '&password=' + encodeURIComponent(password)
             })
-                .then(r => {
-                    if (r.redirected) {
-                        window.location.href = r.url;
-                    } else {
-                        return r.text();
-                    }
-                })
+                .then(r => r.json())
                 .then(data => {
-                    if (data) {
-                        submitBtn.textContent = '✓ Saved!';
-                        showMessage('✓ Credentials saved!', 'success');
+                    if (data.status === 'connecting') {
+                        submitBtn.textContent = '⏳ Testing connection...';
+                        showMessage('🔄 Testing WiFi connection - please wait...', 'success');
+                        // Start polling for status
+                        setTimeout(() => pollStatus(1), 1000);
+                    } else {
+                        showMessage('Unexpected response. Please try again.', 'error');
+                        enableForm();
                     }
                 })
                 .catch(err => {
-                    showMessage('✗ Failed to save. Please try again.', 'error');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = '✓ Connect to WiFi';
+                    showMessage('✗ Failed to send credentials. Please try again.', 'error');
+                    enableForm();
                 });
         }
     </script>
