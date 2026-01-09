@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <string_view>
+#include <cstdint>
 
 enum class PrayerType : uint8_t
 {

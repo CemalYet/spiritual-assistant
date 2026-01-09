@@ -92,7 +92,7 @@ namespace WiFiCredentials
 
         preferences.end();
 
-        if (ssidLen == 0)
+        if (ssidLen == 0 || passLen == 0)
         {
             Serial.println("[WiFiCreds] Failed to load credentials");
             return false;

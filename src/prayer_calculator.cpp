@@ -2,6 +2,8 @@
 #include "config.h"
 #include <Arduino.h>
 #include <time.h>
+#include <algorithm>
+#include <iterator>
 
 extern "C"
 {
@@ -64,14 +66,10 @@ namespace
 
     static const MethodSpec *findMethodSpec(int method)
     {
-        for (const auto &spec : kMethodSpecs)
-        {
-            if (spec.id == method)
-            {
-                return &spec;
-            }
-        }
-        return nullptr;
+        auto it = std::find_if(std::begin(kMethodSpecs), std::end(kMethodSpecs),
+                               [method](const MethodSpec &spec)
+                               { return spec.id == method; });
+        return (it != std::end(kMethodSpecs)) ? &(*it) : nullptr;
     }
 
     static const MethodSpec &defaultMethodSpec()

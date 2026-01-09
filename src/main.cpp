@@ -201,9 +201,9 @@ void setup()
     DailyPrayers tempPrayers;
     bool needTomorrow = false;
 
-    const bool wantDiyanet = (Config::PRAYER_METHOD == 13);
+    constexpr bool wantDiyanet = (Config::PRAYER_METHOD == 13);
 
-    if (wantDiyanet)
+    if constexpr (wantDiyanet)
     {
         // Load today first to check if Isha passed
         if (PrayerAPI::getCachedPrayerTimes(tempPrayers, false))
@@ -220,14 +220,14 @@ void setup()
 
         // Now load the correct day
         prayersFetched = PrayerAPI::getCachedPrayerTimes(currentPrayers, needTomorrow);
-    }
 
-    // If cache miss/expired, try to fetch fresh data
-    if (wantDiyanet && !prayersFetched && wifiOk)
-    {
-        if (PrayerAPI::fetchMonthlyPrayerTimes())
+        // If cache miss/expired, try to fetch fresh data
+        if (!prayersFetched && wifiOk)
         {
-            prayersFetched = PrayerAPI::getCachedPrayerTimes(currentPrayers, needTomorrow);
+            if (PrayerAPI::fetchMonthlyPrayerTimes())
+            {
+                prayersFetched = PrayerAPI::getCachedPrayerTimes(currentPrayers, needTomorrow);
+            }
         }
     }
 

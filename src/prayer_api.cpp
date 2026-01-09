@@ -1,6 +1,7 @@
 #include "prayer_api.h"
 #include "config.h"
 #include "current_time.h"
+#include "diyanet_parser.h"
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
@@ -10,8 +11,6 @@ namespace
 {
     constexpr uint32_t CACHE_VALID_DAYS = 25; // Refresh before 30 days expire
     constexpr size_t HTTP_TIMEOUT_MS = 8000;
-    constexpr time_t SECONDS_PER_DAY = 86400;
-    constexpr size_t TIME_STRING_LENGTH = 5; // "HH:MM" format
 
     struct DiyanetCache
     {
@@ -115,26 +114,13 @@ namespace
             return false;
 
         const time_t now = time(nullptr);
-        const time_t age = now - s_cache.fetchedAt;
-        const int daysOld = age / SECONDS_PER_DAY;
-
-        if (daysOld >= CACHE_VALID_DAYS)
+        if (DiyanetParser::isCacheExpired(s_cache.fetchedAt, now, CACHE_VALID_DAYS))
         {
-            Serial.printf("[Cache] Expired: %d days old\n", daysOld);
+            Serial.println("[Cache] Expired");
             return false;
         }
 
         return true;
-    }
-
-    static void parseDiyanetTime(const char *hhMM, PrayerTime &out)
-    {
-        if (!hhMM || strlen(hhMM) < TIME_STRING_LENGTH)
-            return;
-
-        // Diyanet format: "06:42"
-        memcpy(out.value.data(), hhMM, TIME_STRING_LENGTH);
-        out.value[TIME_STRING_LENGTH] = '\0';
     }
 }
 
@@ -209,12 +195,10 @@ bool PrayerAPI::fetchMonthlyPrayerTimes(int ilceId)
             break;
 
         const char *dateStr = day["MiladiTarihKisaIso8601"]; // "31.12.2025"
-        if (!dateStr)
-            continue;
 
         // Parse DD.MM.YYYY -> Unix timestamp
         int d, m, y;
-        if (sscanf(dateStr, "%d.%d.%d", &d, &m, &y) != 3)
+        if (!DiyanetParser::parseDate(dateStr, d, m, y))
             continue;
 
         struct tm t = {};
@@ -231,12 +215,12 @@ bool PrayerAPI::fetchMonthlyPrayerTimes(int ilceId)
 
         DailyPrayers &prayers = s_cache.days[s_cache.totalDays];
 
-        parseDiyanetTime(day["Imsak"], prayers[PrayerType::Fajr]);
-        parseDiyanetTime(day["Gunes"], prayers[PrayerType::Sunrise]);
-        parseDiyanetTime(day["Ogle"], prayers[PrayerType::Dhuhr]);
-        parseDiyanetTime(day["Ikindi"], prayers[PrayerType::Asr]);
-        parseDiyanetTime(day["Aksam"], prayers[PrayerType::Maghrib]);
-        parseDiyanetTime(day["Yatsi"], prayers[PrayerType::Isha]);
+        DiyanetParser::parseTime(day["Imsak"], prayers[PrayerType::Fajr]);
+        DiyanetParser::parseTime(day["Gunes"], prayers[PrayerType::Sunrise]);
+        DiyanetParser::parseTime(day["Ogle"], prayers[PrayerType::Dhuhr]);
+        DiyanetParser::parseTime(day["Ikindi"], prayers[PrayerType::Asr]);
+        DiyanetParser::parseTime(day["Aksam"], prayers[PrayerType::Maghrib]);
+        DiyanetParser::parseTime(day["Yatsi"], prayers[PrayerType::Isha]);
 
         s_cache.totalDays++;
     }
@@ -278,7 +262,7 @@ bool PrayerAPI::getCachedPrayerTimes(DailyPrayers &prayers, bool forTomorrow)
         timeinfo.tm_sec = 0;
         time_t targetDate = mktime(&timeinfo);
 
-        dayOffset = (targetDate - s_cache.fetchedAt) / SECONDS_PER_DAY;
+        dayOffset = DiyanetParser::calculateDayOffset(s_cache.fetchedAt, targetDate);
     }
     else
     {
@@ -287,7 +271,7 @@ bool PrayerAPI::getCachedPrayerTimes(DailyPrayers &prayers, bool forTomorrow)
         Serial.println("[Cache] RTC not synced, using relative offset");
     }
 
-    if (dayOffset < 0 || dayOffset >= s_cache.totalDays)
+    if (!DiyanetParser::isDayOffsetValid(dayOffset, s_cache.totalDays))
     {
         Serial.printf("[Cache] Date out of range: offset=%d, total=%d\n",
                       dayOffset, s_cache.totalDays);
