@@ -8,9 +8,16 @@
 
 namespace Network
 {
+    constexpr int WIFI_CONNECT_TIMEOUT_MS = 15000;
+    constexpr int WIFI_MAX_RETRIES = 3;
+    constexpr int WIFI_RESET_DELAY_MS = 500;
+    constexpr int NTP_SYNC_TIMEOUT_ATTEMPTS = 60; // 60 * 500ms = 30 seconds
+
     static bool portalMode = false;
-    static char currentSSID[33] = "";     // Max SSID: 32 chars + null terminator
-    static char currentPassword[65] = ""; // Max WPA2: 64 chars + null terminator
+    static char currentSSID[33] = "";     // Max SSID: 32 + null
+    static char currentPassword[65] = ""; // Max WPA2: 64 + null
+    static int connectionAttempts = 0;
+    static bool isRetryPortal = false; // True if portal opened after failed connection
 
     void init()
     {
@@ -18,14 +25,12 @@ namespace Network
 
         WiFiCredentials::init();
 
-        // Try to load stored credentials directly into stack buffers
         if (WiFiCredentials::load(currentSSID, sizeof(currentSSID), currentPassword, sizeof(currentPassword)))
         {
             Serial.println("[Network] Found stored WiFi credentials");
             return;
         }
 
-        // Check if hardcoded credentials exist (from config.h)
         size_t hardcodedSSIDLen = strlen(Config::WIFI_SSID.data());
         if (hardcodedSSIDLen == 0)
         {
@@ -34,8 +39,9 @@ namespace Network
         }
 
         Serial.println("[Network] Using hardcoded credentials from config.h");
+        Serial.println("[Network] Note: These will only be saved after successful connection");
 
-        // Direct copy with bounds checking
+        // Copy but DON'T save to NVS - only save after verified connection
         size_t copyLen = (hardcodedSSIDLen < sizeof(currentSSID) - 1) ? hardcodedSSIDLen : sizeof(currentSSID) - 1;
         memcpy(currentSSID, Config::WIFI_SSID.data(), copyLen);
         currentSSID[copyLen] = '\0';
@@ -44,13 +50,10 @@ namespace Network
         copyLen = (hardcodedPassLen < sizeof(currentPassword) - 1) ? hardcodedPassLen : sizeof(currentPassword) - 1;
         memcpy(currentPassword, Config::WIFI_PASS.data(), copyLen);
         currentPassword[copyLen] = '\0';
-
-        WiFiCredentials::save(currentSSID, currentPassword);
     }
 
     bool connectWiFi()
     {
-        // If no credentials available, start portal
         if (strlen(currentSSID) == 0)
         {
             Serial.println("[Network] No credentials - starting configuration portal");
@@ -70,37 +73,46 @@ namespace Network
         // Full WiFi reset before first attempt
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
-        delay(500); // Let WiFi chip fully reset
+        delay(WIFI_RESET_DELAY_MS);
 
         WiFi.mode(WIFI_STA);
         WiFi.persistent(false);      // Don't write to flash (faster, less wear)
         WiFi.setAutoReconnect(true); // Auto-reconnect if connection drops
-        WiFi.setSleep(false);        // Disable sleep mode for stable connection
+        WiFi.setSleep(false);        // Disable sleep for stable connection
 
-        // Try up to 3 times with full reset between attempts
-        for (int retry = 0; retry < 3; retry++)
+        for (int retry = 0; retry < WIFI_MAX_RETRIES; retry++)
         {
             if (retry > 0)
             {
                 Serial.println("\n[WiFi] Retrying...");
-                WiFi.disconnect(true); // true = full reset (wifioff)
-                delay(500);            // Increased delay for retry
+                WiFi.disconnect(true);
+                delay(WIFI_RESET_DELAY_MS);
                 WiFi.mode(WIFI_STA);
                 WiFi.setSleep(false);
             }
 
             WiFi.begin(currentSSID, currentPassword);
 
-            // Wait up to 15 seconds, checking every 100ms
-            for (int i = 0; i < 150; ++i)
+            constexpr int pollIntervalMs = 100;
+            constexpr int maxPolls = WIFI_CONNECT_TIMEOUT_MS / pollIntervalMs;
+            for (int i = 0; i < maxPolls; ++i)
             {
                 if (WiFi.status() == WL_CONNECTED)
                 {
                     Serial.printf("\n[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+
+                    if (!WiFiCredentials::hasCredentials())
+                    {
+                        Serial.println("[WiFi] Saving verified credentials to NVS");
+                        WiFiCredentials::save(currentSSID, currentPassword);
+                    }
+
                     portalMode = false;
+                    isRetryPortal = false;
+                    connectionAttempts = 0;
                     return true;
                 }
-                delay(100);
+                delay(pollIntervalMs);
                 if (i % 5 == 0)
                     Serial.print(".");
             }
@@ -108,10 +120,39 @@ namespace Network
             Serial.printf("\n[WiFi] Attempt %d failed (status: %d)\n", retry + 1, WiFi.status());
         }
 
-        Serial.println("[WiFi] Connection failed after 3 attempts");
+        // Log detailed failure information
+        wl_status_t status = WiFi.status();
+        Serial.println("\n═════════════════════════════════════════");
+        Serial.println("[WiFi] ❌ CONNECTION FAILED");
+        Serial.printf("[WiFi] Attempts: %d\n", connectionAttempts + 1);
+        Serial.printf("[WiFi] Status Code: %d - ", status);
 
-        // If connection failed, start portal for reconfiguration
-        Serial.println("[Network] Starting portal for reconfiguration...");
+        switch (status)
+        {
+        case WL_NO_SSID_AVAIL:
+            Serial.println("Network not found (out of range or wrong SSID)");
+            break;
+        case WL_CONNECT_FAILED:
+            Serial.println("Connection failed (wrong password or router blocked)");
+            break;
+        case WL_CONNECTION_LOST:
+            Serial.println("Connection lost");
+            break;
+        case WL_DISCONNECTED:
+            Serial.println("Disconnected (general failure)");
+            break;
+        default:
+            Serial.println("Unknown error");
+            break;
+        }
+        Serial.println("═════════════════════════════════════════\n");
+
+        connectionAttempts++;
+        isRetryPortal = true;
+
+        Serial.println("[Network] Opening portal for reconfiguration...");
+        Serial.println("[Network] Please reconnect to the AP and enter credentials again\n");
+
         portalMode = true;
         WiFiPortal::start();
 
@@ -125,15 +166,14 @@ namespace Network
 
         WiFiPortal::handle();
 
-        if (!WiFiPortal::hasNewCredentials())
+        if (!WiFiPortal::isConnectionSuccess())
             return;
 
         char newSSID[33];
         char newPassword[65];
-
         WiFiPortal::getNewCredentials(newSSID, sizeof(newSSID), newPassword, sizeof(newPassword));
 
-        Serial.println("[Network] New credentials received from portal");
+        Serial.println("[Network] ✓ Connection test passed!");
 
         if (!WiFiCredentials::save(newSSID, newPassword))
         {
@@ -142,19 +182,20 @@ namespace Network
             return;
         }
 
-        // Direct copy to current buffers
         size_t ssidLen = strlen(newSSID);
         size_t passLen = strlen(newPassword);
-
         memcpy(currentSSID, newSSID, ssidLen + 1);
         memcpy(currentPassword, newPassword, passLen + 1);
 
-        // Keep portal running for 3 seconds so browser can load success page
-        Serial.println("[Network] Allowing success page to load...");
+        isRetryPortal = false;
+        connectionAttempts = 0;
+
+        // Keep portal running so browser can see success status
+        Serial.println("[Network] Allowing browser to show success...");
         unsigned long startWait = millis();
-        while (millis() - startWait < 3000)
+        while (millis() - startWait < 5000)
         {
-            WiFiPortal::handle(); // Keep serving requests
+            WiFiPortal::handle();
             delay(10);
         }
 
@@ -177,6 +218,16 @@ namespace Network
         return portalMode;
     }
 
+    bool isRetryConnection()
+    {
+        return isRetryPortal;
+    }
+
+    int getConnectionAttempts()
+    {
+        return connectionAttempts;
+    }
+
     void syncTime()
     {
 
@@ -190,10 +241,11 @@ namespace Network
         configTzTime(Config::TIMEZONE, Config::NTP_SERVER);
 
         // Wait up to 30 seconds for NTP sync
+        constexpr int ntpPollIntervalMs = 500;
         struct tm timeinfo;
-        for (int i = 0; i < 60; ++i)
+        for (int i = 0; i < NTP_SYNC_TIMEOUT_ATTEMPTS; ++i)
         {
-            if (getLocalTime(&timeinfo, 500))
+            if (getLocalTime(&timeinfo, ntpPollIntervalMs))
             {
                 Serial.printf("[NTP] Time synced: %02d:%02d:%02d\n",
                               timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
@@ -201,7 +253,7 @@ namespace Network
                               Config::TIMEZONE, timeinfo.tm_isdst ? "Active" : "Inactive");
                 return;
             }
-            delay(500);
+            delay(ntpPollIntervalMs);
         }
 
         Serial.println("[NTP] Failed to sync time");

@@ -19,4 +19,10 @@ namespace Network
 
     // Check if portal is active
     bool isPortalActive();
+
+    // Returns true if portal opened after failed connection
+    bool isRetryConnection();
+
+    // Returns number of failed connection attempts
+    int getConnectionAttempts();
 }

@@ -17,6 +17,22 @@ namespace WiFiPortal
     static unsigned long portalStartTime = 0;
     static int lastClientCount = 0;
 
+    // Connection test state machine
+    enum class ConnectState
+    {
+        IDLE,       // No connection attempt in progress
+        PENDING,    // Credentials received, waiting to start connection test
+        CONNECTING, // Currently trying to connect
+        SUCCESS,    // Connection successful - ready for restart
+        FAILED      // Connection failed - user can retry
+    };
+    static ConnectState connectState = ConnectState::IDLE;
+    static char connectError[64] = "";
+    static unsigned long connectStartTime = 0;
+    static int connectRetryCount = 0;                // Track retry attempts
+    constexpr unsigned long CONNECT_TIMEOUT = 15000; // 15 seconds per attempt
+    constexpr int MAX_CONNECT_RETRIES = 3;           // 3 attempts total (matches boot)
+
     // Rate limiting for /save endpoint
     static unsigned long lastSaveAttempt = 0;
     static int saveAttemptCount = 0;
@@ -287,15 +303,16 @@ namespace WiFiPortal
         savedPassword[passLen] = '\0';
 
         credentialsReceived = true;
+        connectState = ConnectState::PENDING; // Signal to start connection test
 
         Serial.println("[Portal] Credentials received:");
         Serial.printf("[Portal] SSID: %s\n", savedSSID);
         Serial.printf("[Portal] Password: ******** (hidden for security)\n");
 
-        // Redirect to success page for better UX
-        Serial.println("[Portal] Redirecting to success page");
-        server->sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/success.html", true);
-        server->send(HTTP_FOUND, "text/plain", "");
+        // Return JSON response - page will poll /status for result
+        Serial.println("[Portal] Starting connection test (page will poll /status)");
+        server->sendHeader("Cache-Control", "no-cache");
+        server->send(HTTP_OK, "application/json", "{\"status\":\"connecting\"}");
     }
 
     bool start()
@@ -320,7 +337,8 @@ namespace WiFiPortal
         WiFi.mode(WIFI_OFF);
         delay(100);
 
-        WiFi.mode(WIFI_AP);
+        // Use AP_STA mode to allow WiFi scanning while AP is active
+        WiFi.mode(WIFI_AP_STA);
 
         // CRITICAL FIX FOR 2026: Define explicit IP identity
         IPAddress apIP(192, 168, 4, 1);
@@ -388,6 +406,62 @@ namespace WiFiPortal
         server->on("/save", HTTP_POST, handleSave);
         server->on("/success.html", HTTP_GET, handleSuccess);
 
+        // Connection status endpoint - polled by the page after /save
+        server->on("/status", HTTP_GET, []()
+                   {
+            if (!server) return;
+            
+            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            
+            String json = "{";
+            switch (connectState) {
+                case ConnectState::IDLE:
+                    json += "\"state\":\"idle\"";
+                    break;
+                case ConnectState::PENDING:
+                case ConnectState::CONNECTING:
+                    json += "\"state\":\"connecting\",\"attempt\":";
+                    json += String(connectRetryCount + 1);
+                    json += ",\"maxAttempts\":";
+                    json += String(MAX_CONNECT_RETRIES);
+                    break;
+                case ConnectState::SUCCESS:
+                    json += "\"state\":\"success\"";
+                    break;
+                case ConnectState::FAILED:
+                    json += "\"state\":\"failed\",\"error\":\"";
+                    // Escape any quotes in error message
+                    for (size_t i = 0; i < strlen(connectError); i++) {
+                        if (connectError[i] == '"') json += "\\\"";
+                        else json += connectError[i];
+                    }
+                    json += "\"";
+                    break;
+            }
+            json += "}";
+            
+            server->send(HTTP_OK, "application/json", json); });
+
+        // Reset endpoint - allows user to try again with new credentials
+        server->on("/reset", HTTP_POST, []()
+                   {
+            if (!server) return;
+            
+            Serial.println("[Portal] Reset requested - clearing state for retry");
+            connectState = ConnectState::IDLE;
+            connectRetryCount = 0;
+            memset(connectError, 0, sizeof(connectError));
+            memset(savedSSID, 0, sizeof(savedSSID));
+            memset(savedPassword, 0, sizeof(savedPassword));
+            credentialsReceived = false;
+            
+            // Reset WiFi back to AP_STA mode (allows scanning)
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_AP_STA);
+            
+            server->sendHeader("Cache-Control", "no-cache");
+            server->send(HTTP_OK, "application/json", "{\"status\":\"reset\"}"); });
+
         // WiFi scan endpoint - returns JSON array of networks
         server->on("/scan", HTTP_GET, []()
                    {
@@ -395,7 +469,14 @@ namespace WiFiPortal
             
             Serial.println("[Portal] Starting WiFi scan...");
             
+            // Ensure we're in AP_STA mode for scanning (AP stays active)
+            if (WiFi.getMode() != WIFI_AP_STA) {
+                WiFi.mode(WIFI_AP_STA);
+                delay(100);
+            }
+            
             // Scan for networks (this blocks for 1-3 seconds)
+            // Using async=false, show_hidden=false, passive=false, max_ms_per_chan=300
             int n = WiFi.scanNetworks(false, false, false, 300);
             
             // Build JSON response
@@ -585,7 +666,10 @@ namespace WiFiPortal
         // Clear sensitive credentials from memory
         memset(savedSSID, 0, sizeof(savedSSID));
         memset(savedPassword, 0, sizeof(savedPassword));
+        memset(connectError, 0, sizeof(connectError));
         credentialsReceived = false;
+        connectState = ConnectState::IDLE;
+        connectRetryCount = 0;
 
         portalActive = false;
         Serial.println("[Portal] Portal stopped");
@@ -596,17 +680,141 @@ namespace WiFiPortal
         return portalActive;
     }
 
+    bool isConnectionSuccess()
+    {
+        return connectState == ConnectState::SUCCESS;
+    }
+
+    // Helper: Start a new connection attempt
+    void startConnectionAttempt()
+    {
+        WiFi.disconnect(true);
+        delay(500);
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.setSleep(false);
+        delay(100);
+        WiFi.begin(savedSSID, savedPassword);
+        connectStartTime = millis();
+    }
+
+    // Helper: Handle connection success
+    void handleConnectionSuccess()
+    {
+        Serial.printf("[Portal] ✓ Connection successful! IP: %s\n", WiFi.localIP().toString().c_str());
+        connectState = ConnectState::SUCCESS;
+        connectRetryCount = 0;
+        WiFi.disconnect(false); // Keep AP for status polling
+    }
+
+    // Helper: Handle connection failure
+    void handleConnectionFailure(const char *reason)
+    {
+        Serial.printf("[Portal] ✗ %s\n", reason);
+        strncpy(connectError, reason, sizeof(connectError) - 1);
+        connectError[sizeof(connectError) - 1] = '\0';
+        connectState = ConnectState::FAILED;
+        connectRetryCount = 0;
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_AP_STA);
+    }
+
+    // Helper: Get error message for WiFi status code
+    const char *getWiFiErrorMessage(wl_status_t status)
+    {
+        switch (status)
+        {
+        case WL_NO_SSID_AVAIL:
+            return "Network not found - check SSID";
+        case WL_CONNECT_FAILED:
+            return "Connection rejected - wrong password?";
+        case WL_DISCONNECTED:
+            return "Could not connect - check password";
+        default:
+            return nullptr; // Caller will format with status code
+        }
+    }
+
+    void processConnectingState()
+    {
+        wl_status_t status = WiFi.status();
+        unsigned long elapsed = elapsedTime(connectStartTime, millis());
+
+        if (status == WL_CONNECTED)
+        {
+            handleConnectionSuccess();
+            return;
+        }
+
+        // Immediate rejection - fail fast
+        if (status == WL_NO_SSID_AVAIL || status == WL_CONNECT_FAILED)
+        {
+            const char *reason = (status == WL_NO_SSID_AVAIL) ? "Network not found" : "Wrong password";
+            handleConnectionFailure(reason);
+            return;
+        }
+
+        if (elapsed <= CONNECT_TIMEOUT)
+            return;
+
+        connectRetryCount++;
+        Serial.printf("[Portal] Attempt %d/%d timed out (status: %d)\n",
+                      connectRetryCount, MAX_CONNECT_RETRIES, status);
+
+        if (connectRetryCount < MAX_CONNECT_RETRIES)
+        {
+            startConnectionAttempt();
+            return;
+        }
+
+        Serial.printf("[Portal] ✗ Connection failed after %d attempts\n", MAX_CONNECT_RETRIES);
+
+        const char *errorMsg = getWiFiErrorMessage(status);
+        if (errorMsg)
+        {
+            handleConnectionFailure(errorMsg);
+            return;
+        }
+
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Connection failed (code: %d)", status);
+        handleConnectionFailure(buf);
+    }
+
     void handle()
     {
         if (!portalActive || !server)
             return;
 
         if (dnsServer)
-        {
             dnsServer->processNextRequest();
-        }
 
         server->handleClient();
+
+        // Connection test state machine
+        switch (connectState)
+        {
+        case ConnectState::PENDING:
+            connectRetryCount = 0;
+            Serial.println("[Portal] Starting WiFi connection test...");
+            Serial.printf("[Portal] Testing connection to: %s\n", savedSSID);
+            startConnectionAttempt();
+            connectState = ConnectState::CONNECTING;
+            break;
+
+        case ConnectState::CONNECTING:
+            processConnectingState();
+            break;
+
+        default:
+            // IDLE, SUCCESS, FAILED - check portal timeout
+            if (elapsedTime(portalStartTime, millis()) > PORTAL_TIMEOUT)
+            {
+                Serial.printf("[Portal] Timeout after %lu seconds\n", elapsedTime(portalStartTime, millis()) / 1000);
+                stop();
+                return;
+            }
+            break;
+        }
 
         // Log client connection changes
         int currentClientCount = WiFi.softAPgetStationNum();
@@ -614,15 +822,6 @@ namespace WiFiPortal
         {
             Serial.printf("[Portal] Connected clients: %d\n", currentClientCount);
             lastClientCount = currentClientCount;
-        }
-
-        // Check for timeout (overflow-safe)
-        unsigned long elapsed = elapsedTime(portalStartTime, millis());
-        if (elapsed > PORTAL_TIMEOUT)
-        {
-            unsigned long activeTime = elapsed / 1000; // Convert to seconds
-            Serial.printf("[Portal] Timeout reached after %lu seconds (%lu minutes)\n", activeTime, activeTime / 60);
-            stop();
         }
     }
 
