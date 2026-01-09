@@ -28,6 +28,7 @@ namespace WiFiPortal
     };
     static ConnectState connectState = ConnectState::IDLE;
     static char connectError[64] = "";
+    static char connectedIP[16] = ""; // Store IP when connection succeeds
     static unsigned long connectStartTime = 0;
     static int connectRetryCount = 0;                // Track retry attempts
     constexpr unsigned long CONNECT_TIMEOUT = 15000; // 15 seconds per attempt
@@ -333,12 +334,14 @@ namespace WiFiPortal
         }
         Serial.println("[Portal] LittleFS mounted successfully");
 
+        // Full WiFi radio reset before starting AP
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
-        delay(100);
+        delay(500); // Longer delay to ensure radio fully resets
 
         // Use AP_STA mode to allow WiFi scanning while AP is active
         WiFi.mode(WIFI_AP_STA);
+        delay(100); // Let mode change settle
 
         // CRITICAL FIX FOR 2026: Define explicit IP identity
         IPAddress apIP(192, 168, 4, 1);
@@ -353,12 +356,12 @@ namespace WiFiPortal
         if (!apStarted)
         {
             Serial.println("[Portal] Failed to start Access Point!");
-            LittleFS.end(); // Clean up filesystem
-            WiFi.mode(WIFI_OFF);
-            return false;
+            Serial.println("[Portal] Restarting device to clear WiFi state...");
+            delay(1000);
+            ESP.restart();
         }
 
-        delay(100);
+        delay(500); // Let AP stabilize before checking IP
 
         IPAddress IP = WiFi.softAPIP();
 
@@ -366,10 +369,9 @@ namespace WiFiPortal
         if (IP[0] == 0)
         {
             Serial.println("[Portal] ERROR: Failed to get valid AP IP address!");
-            WiFi.softAPdisconnect(true);
-            WiFi.mode(WIFI_OFF);
-            LittleFS.end();
-            return false;
+            Serial.println("[Portal] Restarting device to clear WiFi state...");
+            delay(1000);
+            ESP.restart();
         }
 
         Serial.printf("[Portal] Access Point started: %s\n", AP_SSID);
@@ -426,7 +428,9 @@ namespace WiFiPortal
                     json += String(MAX_CONNECT_RETRIES);
                     break;
                 case ConnectState::SUCCESS:
-                    json += "\"state\":\"success\"";
+                    json += "\"state\":\"success\",\"ip\":\"";
+                    json += connectedIP;
+                    json += "\"";
                     break;
                 case ConnectState::FAILED:
                     json += "\"state\":\"failed\",\"error\":\"";
@@ -700,7 +704,12 @@ namespace WiFiPortal
     // Helper: Handle connection success
     void handleConnectionSuccess()
     {
-        Serial.printf("[Portal] ✓ Connection successful! IP: %s\n", WiFi.localIP().toString().c_str());
+        // Store IP before disconnecting
+        String ip = WiFi.localIP().toString();
+        strncpy(connectedIP, ip.c_str(), sizeof(connectedIP) - 1);
+        connectedIP[sizeof(connectedIP) - 1] = '\0';
+
+        Serial.printf("[Portal] ✓ Connection successful! IP: %s\n", connectedIP);
         connectState = ConnectState::SUCCESS;
         connectRetryCount = 0;
         WiFi.disconnect(false); // Keep AP for status polling

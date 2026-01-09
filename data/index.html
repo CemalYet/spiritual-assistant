@@ -411,7 +411,11 @@
                     if (data.state === 'success') {
                         submitBtn.textContent = '✓ Connected!';
                         submitBtn.style.background = '#10b981';
-                        showMessage('✓ WiFi connection successful! Device will restart...', 'success');
+                        const ip = data.ip || '192.168.x.x';
+                        showMessage('✓ Connected! Connect your phone to your home WiFi, then visit: http://' + ip, 'success');
+                        // Store IP for success page
+                        sessionStorage.setItem('deviceIP', ip);
+                        setTimeout(() => { window.location.href = '/success.html?ip=' + ip; }, 2000);
                         return;
                     }
 
@@ -427,8 +431,8 @@
                     setTimeout(() => pollStatus(pollCount + 1), 1000);
                 })
                 .catch(err => {
-                    // If we can't reach the device, it might have restarted (success case)
-                    showMessage('Device may have restarted. Check your WiFi connection.', 'success');
+                    // If we can't reach the device, portal may have stopped
+                    showMessage('Connection complete. Open spiritualassistantsettings.local for settings.', 'success');
                 });
         }
 

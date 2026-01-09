@@ -116,6 +116,27 @@
             font-weight: 500;
         }
 
+        .settings-btn {
+            display: block;
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .settings-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
         .spin {
             width: 16px;
             height: 16px;
@@ -161,41 +182,37 @@
         <div id="main">
             <div class="icon">✓</div>
             <h1>WiFi Configured!</h1>
-            <p class="msg">Your credentials have been saved.</p>
-            <p class="msg">Device is restarting...</p>
+            <p class="msg">Your device is now connected to WiFi.</p>
             <div class="info">
-                <strong>📡 What happens next?</strong>
-                • Device restarts automatically<br>
-                • Connects to your WiFi network<br>
-                • Portal closes when done<br>
-                • If it fails, portal reopens
+                <strong>📱 Next Step:</strong>
+                1. Connect your phone to your home WiFi<br>
+                2. Then access settings using the link below
             </div>
             <div class="status">
-                <div class="spin"></div>
-                <span>Restarting...</span>
+                <span>✓ Connected</span>
             </div>
-        </div>
-        <div id="done" class="done">
-            <div class="emoji">🎉</div>
-            <h1>Setup Complete!</h1>
-            <p class="msg" style="font-size:17px;color:#059669;font-weight:600;">Device restarted successfully</p>
-            <p class="msg" style="margin-top:15px;">You can close this page now.<br>Your Spiritual Assistant is ready!
+            <a id="settingsLink" href="http://spiritualassistantsettings.local" class="settings-btn">
+                Go to Settings →
+            </a>
+            <p id="ipInfo" style="margin-top: 15px; font-size: 13px; color: #666; text-align: center;">
+                Or use IP: <strong id="ipAddress">loading...</strong>
+            </p>
+            <p style="margin-top: 10px; font-size: 11px; color: #999; text-align: center;">
+                (mDNS .local domains may not work on all devices)
             </p>
         </div>
     </div>
     <script>
-        let c = 0;
-        function check() {
-            c++;
-            fetch('/', { method: 'HEAD', cache: 'no-cache' })
-                .catch(() => {
-                    document.getElementById('main').style.display = 'none';
-                    document.getElementById('done').style.display = 'block';
-                    document.getElementById('done').style.animation = 'fadeIn 0.5s ease-out';
-                });
-            if (c < 10) setTimeout(check, 1000);
+        // Get IP from URL parameter
+        const params = new URLSearchParams(window.location.search);
+        const ip = params.get('ip') || sessionStorage.getItem('deviceIP') || '';
+
+        if (ip) {
+            document.getElementById('ipAddress').textContent = 'http://' + ip;
+            document.getElementById('settingsLink').href = 'http://' + ip;
+        } else {
+            document.getElementById('ipInfo').style.display = 'none';
         }
-        setTimeout(check, 2000);
     </script>
 </body>
 
