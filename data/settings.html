@@ -97,6 +97,113 @@
             border-color: #667eea;
         }
 
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .volume-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: #e0e0e0;
+            outline: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+        }
+
+        .volume-value {
+            min-width: 45px;
+            text-align: right;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .toggle-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f7f9fc;
+            border-radius: 8px;
+        }
+
+        .toggle-label {
+            font-size: 15px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
         .btn {
             display: inline-block;
             padding: 14px 28px;
@@ -209,23 +316,92 @@
             <div id="currentMethod" class="current-value">Loading current setting...</div>
         </div>
 
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">🔊</span>
+                Adhan Volume
+            </div>
+            <div class="volume-container">
+                <input type="range" id="volume" class="volume-slider" min="0" max="100" value="80">
+                <span id="volumeValue" class="volume-value">80%</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">🔔</span>
+                Adhan Notifications
+            </div>
+            <label>Enable or disable adhan for each prayer time:</label>
+            <div class="toggle-list">
+                <div class="toggle-item">
+                    <span class="toggle-label">🌅 Sabah (Fajr)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adhanFajr" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">☀️ Öğle (Dhuhr)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adhanDhuhr" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">🌤️ İkindi (Asr)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adhanAsr" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">🌆 Akşam (Maghrib)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adhanMaghrib" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">🌙 Yatsı (Isha)</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adhanIsha" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <button id="saveBtn" class="btn btn-primary">Save Settings</button>
 
         <div id="statusMessage" class="status-message"></div>
 
         <div class="info-box">
-            <strong>Note:</strong> After saving, prayer times will be recalculated using the new method.
-            The device will apply changes immediately.
+            <strong>Note:</strong> Güneş (Sunrise) is displayed for reference only - no adhan is played at sunrise.
+            Changes are applied immediately after saving.
         </div>
     </div>
 
     <script>
         const methodSelect = document.getElementById('prayerMethod');
+        const volumeSlider = document.getElementById('volume');
+        const volumeValue = document.getElementById('volumeValue');
         const saveBtn = document.getElementById('saveBtn');
         const statusMessage = document.getElementById('statusMessage');
         const currentMethodDiv = document.getElementById('currentMethod');
 
-        // Load current settings on page load
+        const adhanToggles = {
+            fajr: document.getElementById('adhanFajr'),
+            dhuhr: document.getElementById('adhanDhuhr'),
+            asr: document.getElementById('adhanAsr'),
+            maghrib: document.getElementById('adhanMaghrib'),
+            isha: document.getElementById('adhanIsha')
+        };
+
+        volumeSlider.addEventListener('input', () => {
+            volumeValue.textContent = volumeSlider.value + '%';
+        });
+
         async function loadSettings() {
             try {
                 const response = await fetch('/api/settings');
@@ -233,6 +409,15 @@
                     const data = await response.json();
                     methodSelect.value = data.prayerMethod;
                     currentMethodDiv.textContent = `Current: ${data.methodName}`;
+                    volumeSlider.value = data.volume || 80;
+                    volumeValue.textContent = volumeSlider.value + '%';
+                    if (data.adhanEnabled) {
+                        adhanToggles.fajr.checked = data.adhanEnabled.fajr !== false;
+                        adhanToggles.dhuhr.checked = data.adhanEnabled.dhuhr !== false;
+                        adhanToggles.asr.checked = data.adhanEnabled.asr !== false;
+                        adhanToggles.maghrib.checked = data.adhanEnabled.maghrib !== false;
+                        adhanToggles.isha.checked = data.adhanEnabled.isha !== false;
+                    }
                 } else {
                     currentMethodDiv.textContent = 'Could not load current setting';
                 }
@@ -241,24 +426,33 @@
             }
         }
 
-        // Save settings
         saveBtn.addEventListener('click', async () => {
-            const method = methodSelect.value;
-
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
             showStatus('Saving settings...', 'loading');
 
             try {
+                const payload = {
+                    prayerMethod: parseInt(methodSelect.value),
+                    volume: parseInt(volumeSlider.value),
+                    adhanEnabled: {
+                        fajr: adhanToggles.fajr.checked,
+                        dhuhr: adhanToggles.dhuhr.checked,
+                        asr: adhanToggles.asr.checked,
+                        maghrib: adhanToggles.maghrib.checked,
+                        isha: adhanToggles.isha.checked
+                    }
+                };
+
                 const response = await fetch('/api/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prayerMethod: parseInt(method) })
+                    body: JSON.stringify(payload)
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    showStatus('✓ Settings saved! Prayer times will be recalculated.', 'success');
+                    showStatus('✓ Settings saved successfully!', 'success');
                     currentMethodDiv.textContent = `Current: ${data.methodName}`;
                 } else {
                     showStatus('Failed to save settings. Please try again.', 'error');
@@ -279,7 +473,6 @@
             else if (type === 'loading') statusMessage.classList.add('status-loading');
         }
 
-        // Load settings when page loads
         loadSettings();
     </script>
 </body>

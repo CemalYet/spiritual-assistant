@@ -81,3 +81,21 @@ void audio_eof_mp3(const char *info)
     Serial.println(info);
     audioFinished = true;
 }
+
+bool playAudioFileBlocking(const char *filename, PlaybackCallback onLoop)
+{
+    if (!playAudioFile(filename))
+        return false;
+    
+    while (!isAudioFinished())
+    {
+        audioPlayerLoop();
+        
+        if (onLoop)
+            onLoop();
+        
+        delay(1);
+    }
+    
+    return true;
+}

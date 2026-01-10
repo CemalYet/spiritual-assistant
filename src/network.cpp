@@ -3,6 +3,7 @@
 #include "wifi_portal.h"
 #include "wifi_credentials.h"
 #include "settings_manager.h"
+#include "prayer_types.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
@@ -118,15 +119,25 @@ namespace Network
                            {
             int method = SettingsManager::getPrayerMethod();
             const char* methodName = SettingsManager::getMethodName(method);
+            uint8_t volume = SettingsManager::getVolume();
             
             JsonDocument doc;
             doc["prayerMethod"] = method;
             doc["methodName"] = methodName;
+            doc["volume"] = volume;
+            
+            // Adhan enabled for each prayer (excluding Sunrise)
+            JsonObject adhan = doc["adhanEnabled"].to<JsonObject>();
+            adhan["fajr"] = SettingsManager::getAdhanEnabled(PrayerType::Fajr);
+            adhan["dhuhr"] = SettingsManager::getAdhanEnabled(PrayerType::Dhuhr);
+            adhan["asr"] = SettingsManager::getAdhanEnabled(PrayerType::Asr);
+            adhan["maghrib"] = SettingsManager::getAdhanEnabled(PrayerType::Maghrib);
+            adhan["isha"] = SettingsManager::getAdhanEnabled(PrayerType::Isha);
             
             String response;
             serializeJson(doc, response);
             settingsServer->send(200, "application/json", response);
-            Serial.printf("[Settings API] GET - Method: %d (%s)\n", method, methodName); });
+            Serial.printf("[Settings API] GET - Method: %d, Volume: %d%%\n", method, volume); });
 
         // API: Update settings
         settingsServer->on("/api/settings", HTTP_POST, []()
@@ -147,11 +158,48 @@ namespace Network
             
             bool changed = false;
             
+            // Prayer method
             if (doc["prayerMethod"].is<int>()) {
                 int newMethod = doc["prayerMethod"];
                 if (SettingsManager::setPrayerMethod(newMethod)) {
                     changed = true;
-                    Serial.printf("[Settings API] POST - Method changed to: %d\n", newMethod);
+                    Serial.printf("[Settings API] Method changed to: %d\n", newMethod);
+                }
+            }
+            
+            // Volume
+            if (doc["volume"].is<int>()) {
+                int newVolume = doc["volume"];
+                if (newVolume >= 0 && newVolume <= 100) {
+                    if (SettingsManager::setVolume(static_cast<uint8_t>(newVolume))) {
+                        changed = true;
+                        Serial.printf("[Settings API] Volume changed to: %d%%\n", newVolume);
+                    }
+                }
+            }
+            
+            // Adhan enabled settings
+            if (doc["adhanEnabled"].is<JsonObject>()) {
+                JsonObject adhan = doc["adhanEnabled"];
+                if (adhan["fajr"].is<bool>()) {
+                    SettingsManager::setAdhanEnabled(PrayerType::Fajr, adhan["fajr"]);
+                    changed = true;
+                }
+                if (adhan["dhuhr"].is<bool>()) {
+                    SettingsManager::setAdhanEnabled(PrayerType::Dhuhr, adhan["dhuhr"]);
+                    changed = true;
+                }
+                if (adhan["asr"].is<bool>()) {
+                    SettingsManager::setAdhanEnabled(PrayerType::Asr, adhan["asr"]);
+                    changed = true;
+                }
+                if (adhan["maghrib"].is<bool>()) {
+                    SettingsManager::setAdhanEnabled(PrayerType::Maghrib, adhan["maghrib"]);
+                    changed = true;
+                }
+                if (adhan["isha"].is<bool>()) {
+                    SettingsManager::setAdhanEnabled(PrayerType::Isha, adhan["isha"]);
+                    changed = true;
                 }
             }
             
@@ -163,7 +211,8 @@ namespace Network
                 response["success"] = true;
                 response["prayerMethod"] = method;
                 response["methodName"] = methodName;
-                response["message"] = "Settings saved. Prayer times will be recalculated.";
+                response["volume"] = SettingsManager::getVolume();
+                response["message"] = "Settings saved successfully.";
                 
                 String responseStr;
                 serializeJson(response, responseStr);

@@ -1,6 +1,7 @@
 #include "lcd_display.h"
 #include "config.h"
 #include "prayer_types.h"
+#include "settings_manager.h"
 
 // Custom LCD characters
 
@@ -26,6 +27,28 @@ uint8_t CHAR_MOSQUE[8] = {
     0b11111, // *****
     0b00000};
 
+// Speaker: Sound on
+uint8_t CHAR_SPEAKER[8] = {
+    0b00001, //     *
+    0b00011, //    **
+    0b01111, //  ****
+    0b01111, //  ****
+    0b01111, //  ****
+    0b00011, //    **
+    0b00001, //     *
+    0b00000};
+
+// Muted: Speaker with X
+uint8_t CHAR_MUTED[8] = {
+    0b00001, //     *
+    0b10011, // *  **
+    0b01111, //  ****
+    0b00111, //   ***
+    0b01111, //  ****
+    0b10011, // *  **
+    0b00001, //     *
+    0b00000};
+
 LCDDisplay::LCDDisplay()
     : lcd(Config::LCD_ADDRESS, Config::LCD_COLS, Config::LCD_ROWS) {}
 
@@ -38,6 +61,8 @@ void LCDDisplay::init()
     lcd.backlight();
     lcd.createChar(0, CHAR_CLOCK);
     lcd.createChar(1, CHAR_MOSQUE);
+    lcd.createChar(2, CHAR_SPEAKER);
+    lcd.createChar(3, CHAR_MUTED);
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Initializing...");
@@ -92,6 +117,10 @@ void LCDDisplay::update(const CurrentTime &now,
         lcd.print(getPrayerName(PrayerType::Fajr).data());
         lcd.print(" ");
         lcd.print(fajrTime.value.data());
+        
+        // Show speaker icon for Fajr
+        lcd.print(" ");
+        lcd.write(SettingsManager::getAdhanEnabled(PrayerType::Fajr) ? (uint8_t)2 : (uint8_t)3);
         return;
     }
 
@@ -100,6 +129,10 @@ void LCDDisplay::update(const CurrentTime &now,
     lcd.print(getPrayerName(*nextPrayer).data());
     lcd.print(" ");
     lcd.print(nextTime.value.data());
+    
+    // Show speaker icon (muted icon for disabled or Sunrise)
+    lcd.print(" ");
+    lcd.write(SettingsManager::getAdhanEnabled(*nextPrayer) ? (uint8_t)2 : (uint8_t)3);
 }
 
 void LCDDisplay::showError(const char *line1, const char *line2)
