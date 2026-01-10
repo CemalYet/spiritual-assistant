@@ -9,6 +9,7 @@ class LCDDisplay
 {
 private:
     LiquidCrystal_I2C lcd;
+    bool needsRefresh = false;
 
 public:
     LCDDisplay();
@@ -18,4 +19,5 @@ public:
                 const DailyPrayers &prayers);
     void showError(const char *line1, const char *line2);
     void showMessage(const char *line1, const char *line2);
+    void forceRefresh(); // Force next update to refresh display
 };

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <LittleFS.h>
+#include <algorithm>
 #include "config.h"
 #include "prayer_types.h"
 #include "daily_prayers.h"
@@ -12,55 +13,160 @@
 #include "test_mode.h"
 #include "wifi_credentials.h"
 #include "audio_player.h"
+#include "settings_manager.h"
 #include <time.h>
 
 // TEMPORARY: Set to true to clear stored WiFi credentials for testing portal
 #define CLEAR_WIFI_CREDENTIALS false
 
-// --- GLOBAL STATE ---
-DailyPrayers currentPrayers;
-LCDDisplay display;
-bool prayersFetched = true;
+// --- APPLICATION STATE ---
+struct AppState
+{
+    DailyPrayers prayers;                 // Current day's prayer times
+    std::optional<PrayerType> nextPrayer; // Next upcoming prayer (nullopt if none today)
+    int nextPrayerSeconds = -1;           // Seconds since midnight for next prayer
+    bool prayersFetched = false;          // Whether prayer times are loaded
+    bool setupComplete = false;           // Whether setup finished successfully
+};
 
-// Cached next prayer
-std::optional<PrayerType> cachedNextPrayer = std::nullopt;
-int cachedNextPrayerSeconds = -1;
+AppState app;       // Global application state
+LCDDisplay display; // LCD display (separate - has its own state)
+
+// --- PRAYER LOADING (Single source of truth) ---
+// Loads prayer times based on method. Handles Diyanet cache/API and Adhan fallback.
+// Returns true if prayer times were loaded successfully.
+bool loadPrayerTimes(int method, int dayOffset = 0)
+{
+    const bool wantDiyanet = (method == 13);
+    const bool fetchTomorrow = (dayOffset > 0);
+
+    // For Diyanet, try cache first
+    if (wantDiyanet)
+    {
+        if (PrayerAPI::getCachedPrayerTimes(app.prayers, fetchTomorrow))
+        {
+            return true;
+        }
+
+        // Cache miss - try API fetch if connected
+        if (Network::isConnected())
+        {
+            Serial.println("[Prayer] Cache miss, fetching from API...");
+            if (PrayerAPI::fetchMonthlyPrayerTimes())
+            {
+                if (PrayerAPI::getCachedPrayerTimes(app.prayers, fetchTomorrow))
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Diyanet failed - fall through to Adhan
+        Serial.println("[Fallback] Diyanet unavailable, using Adhan calculation");
+    }
+
+    // Use Adhan library calculation (logging happens inside calculateTimes)
+    return PrayerCalculator::calculateTimes(app.prayers, method,
+                                            Config::LATITUDE, Config::LONGITUDE, dayOffset);
+}
+
+// Checks if we need tomorrow's prayer times (current time is past Isha)
+// Returns day offset: 0 for today, 1 for tomorrow
+int getDayOffset()
+{
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo))
+    {
+        return 0; // Default to today if time unavailable
+    }
+
+    const int currentMinutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
+    int method = SettingsManager::getPrayerMethod();
+
+    // For Diyanet, check cached Isha time
+    if (method == 13)
+    {
+        DailyPrayers tempPrayers;
+        if (PrayerAPI::getCachedPrayerTimes(tempPrayers, false))
+        {
+            const int ishaMinutes = tempPrayers[PrayerType::Isha].toMinutes();
+            if (currentMinutes > ishaMinutes)
+            {
+                Serial.printf("[Time] After Isha (%d > %d), using tomorrow\n",
+                              currentMinutes, ishaMinutes);
+                return 1;
+            }
+        }
+    }
+    else
+    {
+        // For Adhan methods, estimate: after 8pm likely after Isha
+        if (currentMinutes > 1200) // 20:00
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// Non-blocking delay that keeps settings server responsive
+// Returns true if settings changed (caller should handle recalculation)
+bool nonBlockingDelay(unsigned long ms)
+{
+    unsigned long start = millis();
+    while (millis() - start < ms)
+    {
+        // Handle settings server during wait
+        Network::handleSettingsServer();
+        audioPlayerLoop();
+
+        // Break early if settings changed - needs immediate recalculation
+        if (SettingsManager::needsRecalculation())
+        {
+            return true; // Signal that recalculation is needed
+        }
+
+        delay(10); // Small yield
+    }
+    return false; // Normal completion
+}
 
 // --- MAIN LOGIC ---
 void displayNextPrayer()
 {
-    if (!prayersFetched)
+    if (!app.prayersFetched)
         return;
 
     const auto now = CurrentTime::now();
-    cachedNextPrayer = currentPrayers.findNext(now._minutes);
+    app.nextPrayer = app.prayers.findNext(now._minutes);
 
-    if (!cachedNextPrayer)
+    if (!app.nextPrayer)
     {
         Serial.println("[Info] Next prayer: Tomorrow's Fajr");
-        cachedNextPrayerSeconds = -1;
-        display.update(now, cachedNextPrayer, currentPrayers);
+        app.nextPrayerSeconds = -1;
+        display.update(now, app.nextPrayer, app.prayers);
         return;
     }
 
     // Update cache for both display and loop logic
-    cachedNextPrayerSeconds = currentPrayers[*cachedNextPrayer].toSeconds();
+    app.nextPrayerSeconds = app.prayers[*app.nextPrayer].toSeconds();
 
-    const auto &nextTime = currentPrayers[*cachedNextPrayer];
+    const auto &nextTime = app.prayers[*app.nextPrayer];
     Serial.printf("[Info] Next prayer: %s at %s\n",
-                  getPrayerName(*cachedNextPrayer).data(),
+                  getPrayerName(*app.nextPrayer).data(),
                   nextTime.value.data());
 
-    display.update(now, cachedNextPrayer, currentPrayers);
+    display.update(now, app.nextPrayer, app.prayers);
 }
 
 void checkAndPlayAdhan()
 {
-    if (!prayersFetched)
+    if (!app.prayersFetched)
         return;
 
     Serial.printf("\n\n🕌 === ADHAN TIME: %s === 🕌\n\n",
-                  getPrayerName(*cachedNextPrayer).data());
+                  getPrayerName(*app.nextPrayer).data());
 
     // Play adhan audio and wait for it to finish
     if (playAudioFile("/azan.mp3"))
@@ -78,33 +184,23 @@ void checkAndPlayAdhan()
 
     // Check if this was the last prayer of the day
     const auto now = CurrentTime::now();
-    auto nextPrayer = currentPrayers.findNext(now._minutes);
+    auto nextPrayer = app.prayers.findNext(now._minutes);
 
     if (!nextPrayer)
     {
-        // Last prayer done - fetch new times
+        // Last prayer done - fetch tomorrow's times
         Serial.println("[Info] Last prayer of day - fetching new times...");
-        const bool fetchTomorrow = (now._minutes >= 720); // 12:00 PM
-        const int dayOffset = fetchTomorrow ? 1 : 0;
-
-        if (Config::PRAYER_METHOD == 13)
-        {
-            prayersFetched = PrayerAPI::getCachedPrayerTimes(currentPrayers, fetchTomorrow);
-        }
-
-        // Fallback to Adhan if cache fails
-        if (!prayersFetched)
-        {
-            Serial.println("[Fallback] Cache miss, using Adhan calculation");
-            prayersFetched = PrayerCalculator::calculateTimes(currentPrayers, Config::PRAYER_METHOD,
-                                                              Config::LATITUDE, Config::LONGITUDE, dayOffset);
-        }
+        int method = SettingsManager::getPrayerMethod();
+        app.prayersFetched = loadPrayerTimes(method, 1); // 1 = tomorrow
     }
 
     displayNextPrayer();
 }
 
-void setup()
+// --- HELPER FUNCTIONS ---
+
+// Initialize hardware and filesystems
+void initHardware()
 {
     Serial.begin(115200);
     delay(1000);
@@ -122,150 +218,44 @@ void setup()
 
     display.init();
 
-    // Initialize LittleFS for audio files (portal may have unmounted it)
     if (!LittleFS.begin(true))
     {
         Serial.println("[Error] LittleFS mount failed!");
     }
 
-    // Initialize audio player
     audioPlayerInit();
 
-    // Verify audio file exists
-    if (!LittleFS.exists("/azan.mp3"))
-    {
-        Serial.println("[Audio] WARNING: azan.mp3 not found!");
-    }
-    else
+    if (LittleFS.exists("/azan.mp3"))
     {
         Serial.println("[Audio] azan.mp3 found - ready for adhan");
     }
-
-#if CLEAR_WIFI_CREDENTIALS
-    // TEMPORARY: Clear WiFi credentials to test portal
-    Serial.println("[DEBUG] Clearing stored WiFi credentials...");
-    WiFiCredentials::clear();
-    Serial.println("[DEBUG] Credentials cleared - portal will open");
-#endif
-
-    // Initialize network subsystem (loads credentials or starts portal)
-    Network::init();
-
-    // Connect once for time sync
-    const bool wifiOk = Network::connectWiFi();
-
-    // If portal mode, handle it in main loop (don't proceed with normal setup)
-    if (!Network::isConnected())
+    else
     {
-        if (!Network::isRetryConnection())
-        {
-            // First time setup
-            Serial.println("[Setup] Portal mode - waiting for configuration");
-            display.showMessage("WiFi Setup", "Connect to AP");
-            return;
-        }
-
-        // Connection failed - show error before opening portal
-        Serial.println("[Setup] Connection failed - retry required");
-        int attempts = Network::getConnectionAttempts();
-
-        // Show error message for 5 seconds
-        display.showError("Connection Failed",
-                          attempts > 1 ? "Check Credentials" : "Retry Setup");
-        delay(5000);
-
-        Serial.printf("[Setup] Opening reconfiguration portal (attempt #%d)\n", attempts);
-        display.showMessage("WiFi Setup", "Reconnect to AP");
-        return;
+        Serial.println("[Audio] WARNING: azan.mp3 not found!");
     }
+}
 
-    // Only sync time if actually connected to WiFi
-    if (wifiOk && Network::isConnected())
-    {
-        Network::syncTime();
-    }
-
-#if TEST_MODE
-    // Run tests and exit
-    TestMode::runPrayerTimeTests();
-    return; // Tests will restart device
-#endif
-
-    // Check if RTC is synced - without it, we can't do anything
+// Complete the normal boot process (after WiFi + NTP are ready)
+// Returns true if successful
+bool finishSetup()
+{
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo))
     {
-        Serial.println("\n[ERROR] ═════════════════════════════════");
-        Serial.println("[ERROR] RTC NOT SYNCED - Cannot proceed");
-        Serial.println("[ERROR] Please ensure:");
-        Serial.println("[ERROR]   1. WiFi credentials are correct");
-        Serial.println("[ERROR]   2. NTP server is reachable");
-        Serial.println("[ERROR]   3. Or use external RTC module");
-        Serial.println("[ERROR] ═════════════════════════════════\n");
-        Serial.println("[System] Waiting for time sync...\n");
-
-        // Display error message on screen
-        display.showError("PLEASE RESET", "YOUR DEVICE");
-
-        return; // Don't proceed without time
+        Serial.println("[Error] RTC not synced - cannot proceed");
+        display.showError("TIME ERROR", "Please Reset");
+        return false;
     }
 
     Serial.printf("[RTC] System time: %04d-%02d-%02d %02d:%02d:%02d\n",
                   timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 
-    // Check if we need tomorrow's times (after Isha)
-    DailyPrayers tempPrayers;
-    bool needTomorrow = false;
+    // Load prayer times
+    int method = SettingsManager::getPrayerMethod();
+    app.prayersFetched = loadPrayerTimes(method, getDayOffset());
 
-    constexpr bool wantDiyanet = (Config::PRAYER_METHOD == 13);
-
-    if constexpr (wantDiyanet)
-    {
-        // Load today first to check if Isha passed
-        if (PrayerAPI::getCachedPrayerTimes(tempPrayers, false))
-        {
-            const int currentMinutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
-            const auto ishaTime = tempPrayers[PrayerType::Isha].toMinutes();
-            if (currentMinutes > ishaTime)
-            {
-                needTomorrow = true;
-                Serial.printf("[Setup] After Isha (%d > %d), loading tomorrow\n",
-                              currentMinutes, ishaTime);
-            }
-        }
-
-        // Now load the correct day
-        prayersFetched = PrayerAPI::getCachedPrayerTimes(currentPrayers, needTomorrow);
-
-        // If cache miss/expired, try to fetch fresh data
-        if (!prayersFetched && wifiOk)
-        {
-            if (PrayerAPI::fetchMonthlyPrayerTimes())
-            {
-                prayersFetched = PrayerAPI::getCachedPrayerTimes(currentPrayers, needTomorrow);
-            }
-        }
-    }
-
-    // Disconnect WiFi after boot work
-    if (wifiOk)
-    {
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
-        Serial.println("[WiFi] Disconnected to save power");
-    }
-
-    // If Diyanet cache/fetch failed, fallback to offline Adhan calculation
-    if (!prayersFetched)
-    {
-        Serial.println("[Fallback] Using offline Adhan calculation");
-        const int dayOffset = needTomorrow ? 1 : 0;
-        prayersFetched = PrayerCalculator::calculateTimes(currentPrayers, Config::PRAYER_METHOD,
-                                                          Config::LATITUDE, Config::LONGITUDE, dayOffset);
-    }
-
-    if (prayersFetched)
+    if (app.prayersFetched)
     {
         displayNextPrayer();
     }
@@ -274,78 +264,173 @@ void setup()
         Serial.println("[Error] Failed to load prayer times");
     }
 
+    app.setupComplete = true;
     Serial.println("\n[System] Ready!\n");
+    return true;
+}
+
+// Handle settings recalculation when method changes
+void handleSettingsChange()
+{
+    if (!SettingsManager::needsRecalculation() || !app.setupComplete)
+        return;
+
+    Serial.println("[Settings] Prayer method changed - recalculating...");
+    SettingsManager::clearRecalculationFlag();
+
+    int method = SettingsManager::getPrayerMethod();
+    app.prayersFetched = loadPrayerTimes(method, getDayOffset());
+
+    if (app.prayersFetched)
+    {
+        app.nextPrayer = std::nullopt;
+        app.nextPrayerSeconds = -1;
+        display.forceRefresh();
+        displayNextPrayer();
+        Serial.printf("[Settings] Recalculation complete - Method: %s\n",
+                      SettingsManager::getMethodName(method));
+    }
+}
+
+// Handle prayer time checking and adhan playback
+void handlePrayerTime(const CurrentTime &now)
+{
+    // Update cached next prayer if needed
+    if (app.nextPrayerSeconds == -1)
+    {
+        app.nextPrayer = app.prayers.findNext(now._minutes);
+        if (app.nextPrayer)
+        {
+            app.nextPrayerSeconds = app.prayers[*app.nextPrayer].toSeconds();
+            Serial.printf("[Cache] Next prayer: %s at %d seconds\n",
+                          getPrayerName(*app.nextPrayer).data(), app.nextPrayerSeconds);
+        }
+    }
+
+    // Check if it's time for adhan
+    if (app.nextPrayerSeconds > 0)
+    {
+        const int secondsUntil = app.nextPrayerSeconds - now._seconds;
+        if (secondsUntil <= 0)
+        {
+            checkAndPlayAdhan();
+            app.nextPrayer = std::nullopt;
+            app.nextPrayerSeconds = -1;
+        }
+    }
+}
+
+// Calculate optimal sleep time
+int calculateSleepTime(const CurrentTime &now)
+{
+    const int secondsToNextMinute = 60 - (now._seconds % 60);
+
+    if (app.nextPrayerSeconds <= 0)
+    {
+        return secondsToNextMinute;
+    }
+
+    const int secondsUntilPrayer = app.nextPrayerSeconds - now._seconds;
+    int sleepTime = std::min(secondsToNextMinute, secondsUntilPrayer);
+
+    return std::max(1, sleepTime);
+}
+
+// --- MAIN FUNCTIONS ---
+
+void setup()
+{
+    initHardware();
+
+#if CLEAR_WIFI_CREDENTIALS
+    Serial.println("[DEBUG] Clearing stored WiFi credentials...");
+    WiFiCredentials::clear();
+#endif
+
+    Network::init();
+    SettingsManager::init();
+
+    const bool wifiOk = Network::connectWiFi();
+
+    // Portal mode - handle in loop
+    if (!Network::isConnected())
+    {
+        const char *msg = Network::isRetryConnection() ? "Reconnect to AP" : "Connect to AP";
+        if (Network::isRetryConnection())
+        {
+            display.showError("Connection Failed", "Check Credentials");
+            delay(5000);
+        }
+        display.showMessage("WiFi Setup", msg);
+        return;
+    }
+
+    Network::syncTime();
+
+#if TEST_MODE
+    TestMode::runPrayerTimeTests();
+    return;
+#endif
+
+    if (!finishSetup())
+        return;
+
+    // Start settings server
+    if (wifiOk)
+    {
+        Network::startMDNS();
+        Network::startSettingsServer();
+        Serial.println("[WiFi] Staying connected for settings server");
+    }
+}
+
+// Complete setup after portal succeeds (called from loop when settings mode activates)
+static bool portalSetupAttempted = false;
+
+void completeSetupAfterPortal()
+{
+    if (portalSetupAttempted)
+        return;
+    portalSetupAttempted = true;
+
+    Serial.println("[Setup] Portal completed - finishing setup...");
+    finishSetup();
 }
 
 void loop()
 {
-    // Keep audio playing
     audioPlayerLoop();
 
     // Handle WiFi portal if active
     if (Network::isPortalActive())
     {
         Network::handlePortal();
-        delay(10); // Small yield for stability
-        return;    // Skip the rest of the loop to keep portal responsive
+        delay(10);
+        return;
     }
-    const auto currentTime = CurrentTime::now();
 
-    // Update display every loop
-    // LCDDisplay::update() internally checks if the minute changed, so this is safe and efficient
-    display.update(currentTime, cachedNextPrayer, currentPrayers);
+    Network::handleSettingsServer();
+    handleSettingsChange();
 
-    if (!prayersFetched)
+    // Complete setup after portal
+    if (Network::isSettingsActive() && !app.setupComplete)
+    {
+        completeSetupAfterPortal();
+    }
+
+    // Wait if setup incomplete
+    if (!app.setupComplete || !app.prayersFetched)
     {
         delay(5000);
         return;
     }
 
-    if (cachedNextPrayerSeconds == -1)
-    {
-        cachedNextPrayer = currentPrayers.findNext(currentTime._minutes);
-        if (cachedNextPrayer)
-        {
-            cachedNextPrayerSeconds = currentPrayers[*cachedNextPrayer].toSeconds();
-            Serial.printf("[Cache] Next prayer: %s at %d seconds\n",
-                          getPrayerName(*cachedNextPrayer).data(), cachedNextPrayerSeconds);
-        }
-    }
+    const auto now = CurrentTime::now();
+    display.update(now, app.nextPrayer, app.prayers);
 
-    // Calculate seconds until the next minute starts for aligned sleeping
-    const int secondsToNextMinute = 60 - (currentTime._seconds % 60);
+    handlePrayerTime(now);
 
-    if (cachedNextPrayerSeconds <= 0)
-    {
-        // No pending prayer, sleep until next minute to update clock
-        delay(secondsToNextMinute * 1000);
-        return;
-    }
-
-    const int secondsUntil = cachedNextPrayerSeconds - currentTime._seconds;
-
-    if (secondsUntil <= 0)
-    {
-        checkAndPlayAdhan();
-        cachedNextPrayer = std::nullopt;
-        cachedNextPrayerSeconds = -1;
-        delay(1000);
-        return;
-    }
-
-    // Sleep until the next minute starts, OR until the prayer time, whichever is sooner.
-    int sleepTime = secondsToNextMinute;
-    if (secondsUntil < sleepTime)
-    {
-        sleepTime = secondsUntil;
-    }
-
-    // Ensure we sleep at least 1 second
-    if (sleepTime < 1)
-        sleepTime = 1;
-
-    Serial.printf("[Sleep] Time: %s, Sleeping %ds (Next Minute: %ds, Prayer: %ds)\n",
-                  currentTime._hhMM.data(), sleepTime, secondsToNextMinute, secondsUntil);
-
-    delay(sleepTime * 1000);
+    const int sleepTime = calculateSleepTime(now);
+    Serial.printf("[Sleep] %s - %ds\n", now._hhMM.data(), sleepTime);
+    nonBlockingDelay(sleepTime * 1000);
 }

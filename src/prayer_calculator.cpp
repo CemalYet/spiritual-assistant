@@ -138,6 +138,116 @@ namespace
         params.adjustments.dhuhr = net.dhuhr - internalDhuhrOffsetMinutes(spec.calcMethod);
         params.adjustments.maghrib = net.maghrib - internalMaghribOffsetMinutes(spec.calcMethod);
     }
+
+    // Diyanet high-latitude rules (applies for latitude >= 45°)
+    // Based on official Diyanet KARAR (ruling) for prayer times at high latitudes
+    // 
+    // The KARAR solves the problem of "perpetual twilight" in SUMMER when
+    // astronomical calculations fail or produce extreme times.
+    // In WINTER, astronomical calculations work fine and should be used.
+    //
+    // Official rules from Diyanet document:
+    // a) For lat >= 45°: Isha = Maghrib + 1/3 of Islamic night (= 1/6 of full night)
+    // b) For lat >= 52°: Cap Isha offset at 80 minutes (1 hour 20 min)
+    // c) For March-September: Fajr = Sunrise - (Isha offset + 10 min)
+    // d) For lat >= 62°: Use 62° latitude for calculations
+    //
+    // Implementation: Use whichever gives EARLIER Isha time:
+    // - Winter: Astronomical is earlier → use it (karar not needed)
+    // - Summer: Night/6 is earlier or astro fails → apply karar
+    static constexpr double DIYANET_HIGH_LAT_THRESHOLD = 45.0;
+    static constexpr double DIYANET_ISHA_CAP_THRESHOLD = 52.0;  // Cap only applies above this
+    static constexpr double DIYANET_MAX_LAT_CLAMP = 62.0;
+    static constexpr int DIYANET_ISHA_CAP_MINUTES = 80;  // 1 hour 20 minutes
+    static constexpr int DIYANET_FAJR_EXTRA_MINUTES = 10;
+
+    static void applyDiyanetHighLatitudeRules(prayer_times_t &times, double latitude, int month)
+    {
+        if (latitude < DIYANET_HIGH_LAT_THRESHOLD)
+        {
+            return; // No adjustments needed for lower latitudes
+        }
+
+        // Get time components
+        const time_t maghrib = times.maghrib;
+        const time_t sunrise = times.sunrise;
+        const time_t fajr_astro = times.fajr;
+        const time_t isha_astro = times.isha;
+        
+        struct tm maghribTm, sunriseTm;
+        localtime_r(&maghrib, &maghribTm);
+        localtime_r(&sunrise, &sunriseTm);
+        
+        // Maghrib includes +7 min adjustment, so sunset is maghrib - 7 min
+        int sunsetSeconds = maghribTm.tm_hour * 3600 + maghribTm.tm_min * 60 + maghribTm.tm_sec - (7 * 60);
+        int sunriseSeconds = sunriseTm.tm_hour * 3600 + sunriseTm.tm_min * 60 + sunriseTm.tm_sec;
+        
+        // Full night = (24:00 - sunset) + sunrise
+        int nightDuration = (24 * 3600 - sunsetSeconds) + sunriseSeconds;
+
+        // Diyanet KARAR: 1/6 of full night (= 1/3 of Islamic half-night)
+        int ishaOffsetSeconds = nightDuration / 6;
+
+        // Rule b) Cap Isha at 80 minutes for latitudes >= 52°
+        if (latitude >= DIYANET_ISHA_CAP_THRESHOLD)
+        {
+            const int maxIshaOffset = DIYANET_ISHA_CAP_MINUTES * 60;
+            if (ishaOffsetSeconds > maxIshaOffset)
+            {
+                ishaOffsetSeconds = maxIshaOffset;
+            }
+        }
+
+        // Calculate astronomical Isha offset from sunset
+        struct tm ishaTm;
+        localtime_r(&isha_astro, &ishaTm);
+        int ishaAstroSeconds = ishaTm.tm_hour * 3600 + ishaTm.tm_min * 60 + ishaTm.tm_sec;
+        int astroIshaOffset = ishaAstroSeconds - sunsetSeconds;
+        
+        // Handle case where Isha crosses midnight
+        if (astroIshaOffset < 0)
+        {
+            astroIshaOffset += 24 * 3600;
+        }
+
+        // The KARAR applies when astronomical twilight fails or produces extreme times (summer)
+        // In winter, when astronomical offset is smaller, use it instead
+        // Logic: Use whichever gives the EARLIER Isha time
+        
+        if (astroIshaOffset <= ishaOffsetSeconds && astroIshaOffset > 0 && astroIshaOffset < 12 * 3600)
+        {
+            // Astronomical Isha is earlier (winter) - KARAR not needed
+            // Keep the astronomical times from the library
+            // (times.isha and times.fajr already set)
+        }
+        else
+        {
+            // Night/6 is earlier OR astronomical failed (summer) - apply KARAR
+            times.isha = maghrib + ishaOffsetSeconds;
+
+            // Rule c) Fajr = Sunrise - (Isha offset + 10 minutes) for March-September
+            if (month >= 3 && month <= 9)
+            {
+                int fajrOffsetSeconds = ishaOffsetSeconds + (DIYANET_FAJR_EXTRA_MINUTES * 60);
+                times.fajr = sunrise - fajrOffsetSeconds;
+            }
+            // Outside March-September, keep astronomical Fajr (already set by library)
+        }
+    }
+
+    static double clampLatitudeForDiyanet(double latitude)
+    {
+        // Rule d: For latitudes >= 62°, use 62° for calculation
+        if (latitude >= DIYANET_MAX_LAT_CLAMP)
+        {
+            return DIYANET_MAX_LAT_CLAMP;
+        }
+        if (latitude <= -DIYANET_MAX_LAT_CLAMP)
+        {
+            return -DIYANET_MAX_LAT_CLAMP;
+        }
+        return latitude;
+    }
 }
 
 const char *PrayerCalculator::getMethodName(int method)
@@ -200,6 +310,13 @@ bool PrayerCalculator::calculateTimes(DailyPrayers &prayers, int method, double 
     coordinates.latitude = latitude;
     coordinates.longitude = longitude;
 
+    // Check if using Diyanet method - apply latitude clamping for 62°+ rule
+    const bool isDiyanetMethod = (method == 13);
+    if (isDiyanetMethod)
+    {
+        coordinates.latitude = clampLatitudeForDiyanet(latitude);
+    }
+
     date_components_t date;
     date.year = timeinfo.tm_year + 1900;
     date.month = timeinfo.tm_mon + 1;
@@ -244,6 +361,12 @@ bool PrayerCalculator::calculateTimes(DailyPrayers &prayers, int method, double 
         times.asr += offset_seconds;
         times.maghrib += offset_seconds;
         times.isha += offset_seconds;
+    }
+
+    // Apply Diyanet high-latitude rules (for method 13 at latitudes >= 45°)
+    if (isDiyanetMethod)
+    {
+        applyDiyanetHighLatitudeRules(times, latitude, date.month);
     }
 
     // Format using local time (this is what you want to display on the device).

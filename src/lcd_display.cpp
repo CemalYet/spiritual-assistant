@@ -58,7 +58,7 @@ void LCDDisplay::update(const CurrentTime &now,
     const bool minuteChanged = (now._minutes != lastMinute);
     const bool prayerChanged = (nextPrayer && lastPrayer != *nextPrayer);
 
-    if (!minuteChanged && !prayerChanged)
+    if (!minuteChanged && !prayerChanged && !needsRefresh)
     {
         return;
     }
@@ -68,6 +68,7 @@ void LCDDisplay::update(const CurrentTime &now,
     {
         lastPrayer = *nextPrayer;
     }
+    needsRefresh = false;
 
     lcd.clear();
 
@@ -128,4 +129,9 @@ void LCDDisplay::showMessage(const char *line1, const char *line2)
 
     lcd.setCursor(0, 1);
     lcd.print(line2);
+}
+
+void LCDDisplay::forceRefresh()
+{
+    needsRefresh = true;
 }
