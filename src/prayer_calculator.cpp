@@ -1,5 +1,6 @@
 #include "prayer_calculator.h"
 #include "config.h"
+#include "settings_manager.h"
 #include <Arduino.h>
 #include <time.h>
 #include <algorithm>
@@ -141,7 +142,7 @@ namespace
 
     // Diyanet high-latitude rules (applies for latitude >= 45°)
     // Based on official Diyanet KARAR (ruling) for prayer times at high latitudes
-    // 
+    //
     // The KARAR solves the problem of "perpetual twilight" in SUMMER when
     // astronomical calculations fail or produce extreme times.
     // In WINTER, astronomical calculations work fine and should be used.
@@ -156,9 +157,9 @@ namespace
     // - Winter: Astronomical is earlier → use it (karar not needed)
     // - Summer: Night/6 is earlier or astro fails → apply karar
     static constexpr double DIYANET_HIGH_LAT_THRESHOLD = 45.0;
-    static constexpr double DIYANET_ISHA_CAP_THRESHOLD = 52.0;  // Cap only applies above this
+    static constexpr double DIYANET_ISHA_CAP_THRESHOLD = 52.0; // Cap only applies above this
     static constexpr double DIYANET_MAX_LAT_CLAMP = 62.0;
-    static constexpr int DIYANET_ISHA_CAP_MINUTES = 80;  // 1 hour 20 minutes
+    static constexpr int DIYANET_ISHA_CAP_MINUTES = 80; // 1 hour 20 minutes
     static constexpr int DIYANET_FAJR_EXTRA_MINUTES = 10;
 
     static void applyDiyanetHighLatitudeRules(prayer_times_t &times, double latitude, int month)
@@ -173,15 +174,15 @@ namespace
         const time_t sunrise = times.sunrise;
         const time_t fajr_astro = times.fajr;
         const time_t isha_astro = times.isha;
-        
+
         struct tm maghribTm, sunriseTm;
         localtime_r(&maghrib, &maghribTm);
         localtime_r(&sunrise, &sunriseTm);
-        
+
         // Maghrib includes +7 min adjustment, so sunset is maghrib - 7 min
         int sunsetSeconds = maghribTm.tm_hour * 3600 + maghribTm.tm_min * 60 + maghribTm.tm_sec - (7 * 60);
         int sunriseSeconds = sunriseTm.tm_hour * 3600 + sunriseTm.tm_min * 60 + sunriseTm.tm_sec;
-        
+
         // Full night = (24:00 - sunset) + sunrise
         int nightDuration = (24 * 3600 - sunsetSeconds) + sunriseSeconds;
 
@@ -203,7 +204,7 @@ namespace
         localtime_r(&isha_astro, &ishaTm);
         int ishaAstroSeconds = ishaTm.tm_hour * 3600 + ishaTm.tm_min * 60 + ishaTm.tm_sec;
         int astroIshaOffset = ishaAstroSeconds - sunsetSeconds;
-        
+
         // Handle case where Isha crosses midnight
         if (astroIshaOffset < 0)
         {
@@ -213,7 +214,7 @@ namespace
         // The KARAR applies when astronomical twilight fails or produces extreme times (summer)
         // In winter, when astronomical offset is smaller, use it instead
         // Logic: Use whichever gives the EARLIER Isha time
-        
+
         if (astroIshaOffset <= ishaOffsetSeconds && astroIshaOffset > 0 && astroIshaOffset < 12 * 3600)
         {
             // Astronomical Isha is earlier (winter) - KARAR not needed
@@ -252,11 +253,8 @@ namespace
 
 const char *PrayerCalculator::getMethodName(int method)
 {
-    const auto *spec = findMethodSpec(method);
-    if (spec)
-        return spec->name;
-
-    return "Unknown";
+    // Delegate to SettingsManager (single source of truth)
+    return SettingsManager::getMethodName(method);
 }
 
 bool PrayerCalculator::calculateTimes(DailyPrayers &prayers, int method, double latitude, double longitude, int day, bool verbose)

@@ -160,26 +160,52 @@ void displayNextPrayer()
     display.update(now, app.nextPrayer, app.prayers);
 }
 
+// Callback for handling volume updates during adhan playback
+static uint8_t s_currentVolume = 0;
+
+void onAdhanLoop()
+{
+    // Handle settings server for real-time volume changes
+    Network::handleSettingsServer();
+    
+    // Apply volume changes in real-time
+    uint8_t newVolume = SettingsManager::getVolume();
+    if (newVolume != s_currentVolume)
+    {
+        s_currentVolume = newVolume;
+        setVolume(SettingsManager::getHardwareVolume());
+        Serial.printf("[Adhan] Volume changed to %d%%\n", s_currentVolume);
+    }
+}
+
 void checkAndPlayAdhan()
 {
-    if (!app.prayersFetched)
+    if (!app.prayersFetched || !app.nextPrayer)
         return;
 
-    Serial.printf("\n\n🕌 === ADHAN TIME: %s === 🕌\n\n",
-                  getPrayerName(*app.nextPrayer).data());
+    PrayerType currentPrayer = *app.nextPrayer;
+    
+    Serial.printf("\n\n🕌 === PRAYER TIME: %s === 🕌\n\n",
+                  getPrayerName(currentPrayer).data());
 
-    // Play adhan audio and wait for it to finish
-    if (playAudioFile("/azan.mp3"))
+    // Check if adhan should play for this prayer
+    // Sunrise never plays adhan, and user can disable individual prayers
+    bool shouldPlayAdhan = SettingsManager::getAdhanEnabled(currentPrayer);
+    
+    if (shouldPlayAdhan)
     {
+        // Set initial volume
+        s_currentVolume = SettingsManager::getVolume();
+        setVolume(SettingsManager::getHardwareVolume());
+        
         Serial.println("[Adhan] Playing...");
-
-        // Wait for playback to complete (callback sets audioFinished)
-        while (!isAudioFinished())
-        {
-            audioPlayerLoop();
-            delay(1); // Small delay, audio.loop() does the work
-        }
+        playAudioFileBlocking("/azan.mp3", onAdhanLoop);
         Serial.println("[Adhan] Finished");
+    }
+    else
+    {
+        Serial.printf("[Adhan] Skipped for %s (disabled or sunrise)\n",
+                      getPrayerName(currentPrayer).data());
     }
 
     // Check if this was the last prayer of the day

@@ -23,3 +23,9 @@ bool isPlaying();
 bool isAudioFinished();
 void stopAudio();
 void setVolume(uint8_t vol); // 0-21
+
+// Callback type for work during playback (e.g., handle server, update volume)
+using PlaybackCallback = void (*)();
+
+// Play audio file and block until finished, calling callback each iteration
+bool playAudioFileBlocking(const char *filename, PlaybackCallback onLoop = nullptr);
