@@ -33,7 +33,7 @@ namespace SettingsManager
     // Volume (0-100 percent)
     uint8_t getVolume();
     bool setVolume(uint8_t volume);
-    
+
     // Get volume mapped to hardware range (0-21)
     uint8_t getHardwareVolume();
 

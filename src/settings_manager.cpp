@@ -51,7 +51,7 @@ namespace SettingsManager
         preferences.begin(NAMESPACE, true);
         cachedPrayerMethod = preferences.getInt(KEY_PRAYER_METHOD, Config::PRAYER_METHOD);
         cachedVolume = preferences.getUChar(KEY_VOLUME, 80); // Default 80%
-        
+
         // Load adhan enabled states (default: all enabled except Sunrise)
         cachedAdhanEnabled[idx(PrayerType::Fajr)] = preferences.getBool(KEY_ADHAN_FAJR, true) ? 1 : 0;
         cachedAdhanEnabled[idx(PrayerType::Sunrise)] = 0; // Sunrise never plays adhan
@@ -144,17 +144,23 @@ namespace SettingsManager
     }
 
     // --- Adhan Settings Implementation ---
-    
-    static const char* getAdhanKey(PrayerType prayer)
+
+    static const char *getAdhanKey(PrayerType prayer)
     {
         switch (prayer)
         {
-            case PrayerType::Fajr: return KEY_ADHAN_FAJR;
-            case PrayerType::Dhuhr: return KEY_ADHAN_DHUHR;
-            case PrayerType::Asr: return KEY_ADHAN_ASR;
-            case PrayerType::Maghrib: return KEY_ADHAN_MAGHRIB;
-            case PrayerType::Isha: return KEY_ADHAN_ISHA;
-            default: return nullptr;
+        case PrayerType::Fajr:
+            return KEY_ADHAN_FAJR;
+        case PrayerType::Dhuhr:
+            return KEY_ADHAN_DHUHR;
+        case PrayerType::Asr:
+            return KEY_ADHAN_ASR;
+        case PrayerType::Maghrib:
+            return KEY_ADHAN_MAGHRIB;
+        case PrayerType::Isha:
+            return KEY_ADHAN_ISHA;
+        default:
+            return nullptr;
         }
     }
 
@@ -163,15 +169,15 @@ namespace SettingsManager
         // Sunrise NEVER plays adhan
         if (prayer == PrayerType::Sunrise)
             return false;
-        
+
         uint8_t index = idx(prayer);
         if (index >= 6)
             return false;
-        
+
         if (cachedAdhanEnabled[index] < 0)
         {
             // Load from NVS
-            const char* key = getAdhanKey(prayer);
+            const char *key = getAdhanKey(prayer);
             if (key)
             {
                 preferences.begin(NAMESPACE, true);
@@ -179,7 +185,7 @@ namespace SettingsManager
                 preferences.end();
             }
         }
-        
+
         return cachedAdhanEnabled[index] == 1;
     }
 
@@ -188,28 +194,28 @@ namespace SettingsManager
         // Cannot enable Sunrise adhan
         if (prayer == PrayerType::Sunrise)
             return false;
-        
-        const char* key = getAdhanKey(prayer);
+
+        const char *key = getAdhanKey(prayer);
         if (!key)
             return false;
-        
+
         if (!preferences.begin(NAMESPACE, false))
         {
             Serial.println("[Settings] ERROR: Failed to open NVS namespace!");
             return false;
         }
-        
+
         bool success = preferences.putBool(key, enabled);
         preferences.end();
-        
+
         if (success)
         {
             cachedAdhanEnabled[idx(prayer)] = enabled ? 1 : 0;
-            Serial.printf("[Settings] Adhan %s: %s\n", 
-                          getPrayerName(prayer).data(), 
+            Serial.printf("[Settings] Adhan %s: %s\n",
+                          getPrayerName(prayer).data(),
                           enabled ? "enabled" : "disabled");
         }
-        
+
         return success;
     }
 
@@ -233,22 +239,22 @@ namespace SettingsManager
     {
         if (volume > 100)
             volume = 100;
-        
+
         if (!preferences.begin(NAMESPACE, false))
         {
             Serial.println("[Settings] ERROR: Failed to open NVS namespace!");
             return false;
         }
-        
+
         bool success = preferences.putUChar(KEY_VOLUME, volume) > 0;
         preferences.end();
-        
+
         if (success)
         {
             cachedVolume = volume;
             Serial.printf("[Settings] Volume saved: %d%%\n", volume);
         }
-        
+
         return success;
     }
 

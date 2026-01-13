@@ -8,6 +8,7 @@
 #include "current_time.h"
 #include "lcd_display.h"
 #include "network.h"
+#include "settings_server.h"
 #include "prayer_api.h"
 #include "prayer_calculator.h"
 #include "test_mode.h"
@@ -118,7 +119,7 @@ bool nonBlockingDelay(unsigned long ms)
     while (millis() - start < ms)
     {
         // Handle settings server during wait
-        Network::handleSettingsServer();
+        SettingsServer::handle();
         audioPlayerLoop();
 
         // Break early if settings changed - needs immediate recalculation
@@ -166,8 +167,8 @@ static uint8_t s_currentVolume = 0;
 void onAdhanLoop()
 {
     // Handle settings server for real-time volume changes
-    Network::handleSettingsServer();
-    
+    SettingsServer::handle();
+
     // Apply volume changes in real-time
     uint8_t newVolume = SettingsManager::getVolume();
     if (newVolume != s_currentVolume)
@@ -184,20 +185,20 @@ void checkAndPlayAdhan()
         return;
 
     PrayerType currentPrayer = *app.nextPrayer;
-    
+
     Serial.printf("\n\n🕌 === PRAYER TIME: %s === 🕌\n\n",
                   getPrayerName(currentPrayer).data());
 
     // Check if adhan should play for this prayer
     // Sunrise never plays adhan, and user can disable individual prayers
     bool shouldPlayAdhan = SettingsManager::getAdhanEnabled(currentPrayer);
-    
+
     if (shouldPlayAdhan)
     {
         // Set initial volume
         s_currentVolume = SettingsManager::getVolume();
         setVolume(SettingsManager::getHardwareVolume());
-        
+
         Serial.println("[Adhan] Playing...");
         playAudioFileBlocking("/azan.mp3", onAdhanLoop);
         Serial.println("[Adhan] Finished");
@@ -404,8 +405,7 @@ void setup()
     // Start settings server
     if (wifiOk)
     {
-        Network::startMDNS();
-        Network::startSettingsServer();
+        SettingsServer::start();
         Serial.println("[WiFi] Staying connected for settings server");
     }
 }
@@ -435,11 +435,11 @@ void loop()
         return;
     }
 
-    Network::handleSettingsServer();
+    SettingsServer::handle();
     handleSettingsChange();
 
     // Complete setup after portal
-    if (Network::isSettingsActive() && !app.setupComplete)
+    if (SettingsServer::isActive() && !app.setupComplete)
     {
         completeSetupAfterPortal();
     }

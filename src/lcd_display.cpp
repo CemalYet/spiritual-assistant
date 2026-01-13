@@ -117,7 +117,7 @@ void LCDDisplay::update(const CurrentTime &now,
         lcd.print(getPrayerName(PrayerType::Fajr).data());
         lcd.print(" ");
         lcd.print(fajrTime.value.data());
-        
+
         // Show speaker icon for Fajr
         lcd.print(" ");
         lcd.write(SettingsManager::getAdhanEnabled(PrayerType::Fajr) ? (uint8_t)2 : (uint8_t)3);
@@ -129,7 +129,7 @@ void LCDDisplay::update(const CurrentTime &now,
     lcd.print(getPrayerName(*nextPrayer).data());
     lcd.print(" ");
     lcd.print(nextTime.value.data());
-    
+
     // Show speaker icon (muted icon for disabled or Sunrise)
     lcd.print(" ");
     lcd.write(SettingsManager::getAdhanEnabled(*nextPrayer) ? (uint8_t)2 : (uint8_t)3);
