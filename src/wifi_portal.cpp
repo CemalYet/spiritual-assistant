@@ -1,9 +1,11 @@
 #include "wifi_portal.h"
+#include "http_helpers.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <LittleFS.h>
 #include <memory>
+#include <vector>
 
 namespace WiFiPortal
 {
@@ -20,19 +22,19 @@ namespace WiFiPortal
     // Connection test state machine
     enum class ConnectState
     {
-        IDLE,       // No connection attempt in progress
-        PENDING,    // Credentials received, waiting to start connection test
-        CONNECTING, // Currently trying to connect
-        SUCCESS,    // Connection successful - ready for restart
-        FAILED      // Connection failed - user can retry
+        IDLE,
+        PENDING,
+        CONNECTING,
+        SUCCESS,
+        FAILED
     };
     static ConnectState connectState = ConnectState::IDLE;
     static char connectError[64] = "";
-    static char connectedIP[16] = ""; // Store IP when connection succeeds
+    static char connectedIP[16] = "";
     static unsigned long connectStartTime = 0;
-    static int connectRetryCount = 0;                // Track retry attempts
-    constexpr unsigned long CONNECT_TIMEOUT = 15000; // 15 seconds per attempt
-    constexpr int MAX_CONNECT_RETRIES = 3;           // 3 attempts total (matches boot)
+    static int connectRetryCount = 0;
+    constexpr unsigned long CONNECT_TIMEOUT = 15000;
+    constexpr int MAX_CONNECT_RETRIES = 3;
 
     // Rate limiting for /save endpoint
     static unsigned long lastSaveAttempt = 0;
@@ -43,15 +45,14 @@ namespace WiFiPortal
 
     constexpr byte DNS_PORT = 53;
 
-    // HTTP status codes
-    constexpr int HTTP_OK = 200;
-    constexpr int HTTP_NO_CONTENT = 204;
-    constexpr int HTTP_FOUND = 302;
-    constexpr int HTTP_BAD_REQUEST = 400;
-    constexpr int HTTP_NOT_FOUND = 404;
-    constexpr int HTTP_TOO_MANY_REQUESTS = 429;
+    // Use HTTP constants from HttpHelpers
+    using HttpHelpers::HTTP_BAD_REQUEST;
+    using HttpHelpers::HTTP_FOUND;
+    using HttpHelpers::HTTP_NO_CONTENT;
+    using HttpHelpers::HTTP_NOT_FOUND;
+    using HttpHelpers::HTTP_OK;
+    using HttpHelpers::HTTP_TOO_MANY_REQUESTS;
 
-    // Helper function to safely calculate elapsed time (handles millis overflow)
     inline unsigned long elapsedTime(unsigned long start, unsigned long now)
     {
         // Unsigned arithmetic handles overflow correctly due to modulo 2^32
@@ -92,63 +93,19 @@ namespace WiFiPortal
         return true;
     }
 
-    // Serve file from LittleFS - NO GZIP (plain files only)
-    bool serveFile(const char *path, const char *contentType)
+    // Wrapper for shared serveFile with portal-specific logging
+    bool serveFile(const char *path, const char *contentType, int cacheSeconds = 3600)
     {
-        if (!server)
-            return false;
-
-        // Add security headers
-        server->sendHeader("X-Content-Type-Options", "nosniff");
-
-        // Add cache control for static files
-        server->sendHeader("Cache-Control", "public, max-age=3600"); // 1 hour cache
-
-        // Maximum file size for safety (100KB)
-        constexpr size_t MAX_FILE_SIZE = 102400;
-
-        // Open plain file directly (no gzip)
-        File file = LittleFS.open(path, "r");
-        if (!file)
-        {
-            Serial.printf("[Portal] File not found: %s\n", path);
-            server->send(HTTP_NOT_FOUND, "text/plain", "File not found");
-            return false;
-        }
-
-        size_t fileSize = file.size();
-        if (fileSize > MAX_FILE_SIZE)
-        {
-            Serial.printf("[Portal] File too large: %s (%u bytes)\n", path, fileSize);
-            file.close();
-            server->send(HTTP_NOT_FOUND, "text/plain", "File too large");
-            return false;
-        }
-
-        size_t sent = server->streamFile(file, contentType);
-        file.close();
-        return (sent > 0);
+        return HttpHelpers::serveFile(server.get(), path, contentType, cacheSeconds);
     }
 
-    // Check if a string is an IP address
-    bool isIp(const String &str)
+    // Use shared IP check
+    inline bool isIp(const String &str)
     {
-        // Protect against oversized input (max valid IP is 15 chars: 255.255.255.255)
-        if (str.length() > 15)
-            return false;
-
-        for (size_t i = 0; i < str.length(); i++)
-        {
-            int c = str.charAt(i);
-            if (c != '.' && (c < '0' || c > '9'))
-            {
-                return false;
-            }
-        }
-        return true;
+        return HttpHelpers::isIpAddress(str);
     }
 
-    // Captive portal redirect logic - FIXED
+    // Captive portal redirect logic
     bool captivePortal()
     {
         if (!server)
@@ -198,12 +155,8 @@ namespace WiFiPortal
         if (captivePortal())
             return;
 
-        // Serve the portal page with no-cache headers
-        server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        server->sendHeader("Pragma", "no-cache");
-        server->sendHeader("Expires", "-1");
-
-        if (!serveFile("/index.html", "text/html"))
+        // Serve the portal page with no-cache (cacheSeconds = 0)
+        if (!serveFile("/index.html", "text/html", 0))
         {
             Serial.println("[Portal] ERROR: Failed to serve index.html");
             // Fallback HTML if LittleFS fails
@@ -316,6 +269,246 @@ namespace WiFiPortal
         server->send(HTTP_OK, "application/json", "{\"status\":\"connecting\"}");
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // API Handlers (extracted from start() for clarity)
+    // ─────────────────────────────────────────────────────────────
+
+    void handleStatus()
+    {
+        if (!server)
+            return;
+
+        server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+        String json = "{";
+        switch (connectState)
+        {
+        case ConnectState::IDLE:
+            json += "\"state\":\"idle\"";
+            break;
+        case ConnectState::PENDING:
+        case ConnectState::CONNECTING:
+            json += "\"state\":\"connecting\",\"attempt\":";
+            json += String(connectRetryCount + 1);
+            json += ",\"maxAttempts\":";
+            json += String(MAX_CONNECT_RETRIES);
+            break;
+        case ConnectState::SUCCESS:
+            json += "\"state\":\"success\",\"ip\":\"";
+            json += connectedIP;
+            json += "\"";
+            break;
+        case ConnectState::FAILED:
+            json += "\"state\":\"failed\",\"error\":\"";
+            // Escape any quotes in error message
+            for (size_t i = 0; i < strlen(connectError); i++)
+            {
+                if (connectError[i] == '"')
+                    json += "\\\"";
+                else
+                    json += connectError[i];
+            }
+            json += "\"";
+            break;
+        }
+        json += "}";
+
+        server->send(HTTP_OK, "application/json", json);
+    }
+
+    void handleReset()
+    {
+        if (!server)
+            return;
+
+        Serial.println("[Portal] Reset requested - clearing state for retry");
+        connectState = ConnectState::IDLE;
+        connectRetryCount = 0;
+        memset(connectError, 0, sizeof(connectError));
+        memset(savedSSID, 0, sizeof(savedSSID));
+        memset(savedPassword, 0, sizeof(savedPassword));
+        credentialsReceived = false;
+
+        // Reset WiFi back to AP_STA mode (allows scanning)
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_AP_STA);
+
+        server->sendHeader("Cache-Control", "no-cache");
+        server->send(HTTP_OK, "application/json", "{\"status\":\"reset\"}");
+    }
+
+    void handleScan()
+    {
+        if (!server)
+            return;
+
+        Serial.println("[Portal] Starting WiFi scan...");
+
+        // Ensure we're in AP_STA mode for scanning (AP stays active)
+        if (WiFi.getMode() != WIFI_AP_STA)
+        {
+            WiFi.mode(WIFI_AP_STA);
+            delay(100);
+        }
+
+        // Scan for networks (this blocks for 1-3 seconds)
+        int n = WiFi.scanNetworks(false, false, false, 300);
+
+        // Build JSON response
+        String json = "[";
+
+        if (n > 0)
+        {
+            // Create index array for sorting by RSSI
+            std::vector<int> indices(n);
+            for (int i = 0; i < n; i++)
+                indices[i] = i;
+
+            // Sort indices by signal strength (strongest first)
+            for (int i = 0; i < n - 1; i++)
+            {
+                for (int j = i + 1; j < n; j++)
+                {
+                    if (WiFi.RSSI(indices[j]) > WiFi.RSSI(indices[i]))
+                    {
+                        int temp = indices[i];
+                        indices[i] = indices[j];
+                        indices[j] = temp;
+                    }
+                }
+            }
+
+            // Limit to 15 networks to save memory
+            int maxNetworks = (n > 15) ? 15 : n;
+            int addedCount = 0;
+
+            for (int i = 0; i < n && addedCount < maxNetworks; i++)
+            {
+                int idx = indices[i];
+                String ssid = WiFi.SSID(idx);
+
+                // Skip empty SSIDs (hidden networks)
+                if (ssid.length() == 0)
+                    continue;
+
+                // Skip duplicates (same SSID already added)
+                bool duplicate = false;
+                for (int j = 0; j < i; j++)
+                {
+                    if (WiFi.SSID(indices[j]) == ssid)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate)
+                    continue;
+
+                // Escape quotes in SSID for JSON
+                ssid.replace("\\", "\\\\");
+                ssid.replace("\"", "\\\"");
+
+                if (addedCount > 0)
+                    json += ",";
+                json += "{\"ssid\":\"" + ssid + "\",";
+                json += "\"rssi\":" + String(WiFi.RSSI(idx)) + ",";
+                json += "\"secure\":" + String(WiFi.encryptionType(idx) != WIFI_AUTH_OPEN ? 1 : 0) + "}";
+                addedCount++;
+            }
+        }
+
+        json += "]";
+
+        // Clean up scan results to free memory
+        WiFi.scanDelete();
+
+        Serial.printf("[Portal] Scan complete, found %d networks\n", n);
+
+        server->sendHeader("Cache-Control", "no-cache");
+        server->send(HTTP_OK, "application/json", json);
+    }
+
+    void handleStyleCss()
+    {
+        if (server)
+            serveFile("/style.css", "text/css");
+    }
+
+    void handleScriptJs()
+    {
+        if (server)
+            serveFile("/script.js", "application/javascript");
+    }
+
+    void handleWpadDat()
+    {
+        if (server)
+        {
+            // Return valid PAC that says "no proxy" - stops Windows WPAD retry loop
+            server->send(HTTP_OK, "application/x-ns-proxy-autoconfig",
+                         "function FindProxyForURL(url,host){return\"DIRECT\";}");
+        }
+    }
+
+    void handleConnectTest()
+    {
+        if (server)
+        {
+            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            server->send(HTTP_OK, "text/plain", "Microsoft Connect Test");
+        }
+    }
+
+    void handleNcsi()
+    {
+        if (server)
+        {
+            server->sendHeader("Cache-Control", "no-cache");
+            server->send(HTTP_OK, "text/plain", "Microsoft NCSI");
+        }
+    }
+
+    void handleMobileRedirect()
+    {
+        if (server)
+        {
+            Serial.println("[Portal] Mobile connectivity check - redirecting");
+            server->sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
+            server->send(HTTP_FOUND, "text/plain", "");
+        }
+    }
+
+    void handleNotFound()
+    {
+        if (!server)
+            return;
+
+        // Use const references to avoid String copies on every request
+        const String &uri = server->uri();
+        const String &host = server->hostHeader();
+
+        // Quick length check - reject oversized requests immediately
+        if (uri.length() > 256 || host.length() > 128)
+        {
+            server->send(HTTP_BAD_REQUEST, "text/plain", "");
+            return;
+        }
+
+        // Prioritize speed: If it's WPAD or a generic app ping, stop immediately
+        if (host.indexOf("wpad") >= 0 || uri.indexOf("favicon") >= 0 || uri.indexOf(".map") >= 0)
+        {
+            server->send(HTTP_NO_CONTENT, "text/plain", "");
+            return;
+        }
+
+        // Everything else gets processed via handleRoot/captivePortal logic
+        handleRoot();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Portal Lifecycle
+    // ─────────────────────────────────────────────────────────────
+
     bool start()
     {
         if (portalActive)
@@ -407,217 +600,29 @@ namespace WiFiPortal
         server->on("/", HTTP_GET, handleRoot);
         server->on("/save", HTTP_POST, handleSave);
         server->on("/success.html", HTTP_GET, handleSuccess);
+        server->on("/status", HTTP_GET, handleStatus);
+        server->on("/reset", HTTP_POST, handleReset);
+        server->on("/scan", HTTP_GET, handleScan);
 
-        // Connection status endpoint - polled by the page after /save
-        server->on("/status", HTTP_GET, []()
-                   {
-            if (!server) return;
-            
-            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-            
-            String json = "{";
-            switch (connectState) {
-                case ConnectState::IDLE:
-                    json += "\"state\":\"idle\"";
-                    break;
-                case ConnectState::PENDING:
-                case ConnectState::CONNECTING:
-                    json += "\"state\":\"connecting\",\"attempt\":";
-                    json += String(connectRetryCount + 1);
-                    json += ",\"maxAttempts\":";
-                    json += String(MAX_CONNECT_RETRIES);
-                    break;
-                case ConnectState::SUCCESS:
-                    json += "\"state\":\"success\",\"ip\":\"";
-                    json += connectedIP;
-                    json += "\"";
-                    break;
-                case ConnectState::FAILED:
-                    json += "\"state\":\"failed\",\"error\":\"";
-                    // Escape any quotes in error message
-                    for (size_t i = 0; i < strlen(connectError); i++) {
-                        if (connectError[i] == '"') json += "\\\"";
-                        else json += connectError[i];
-                    }
-                    json += "\"";
-                    break;
-            }
-            json += "}";
-            
-            server->send(HTTP_OK, "application/json", json); });
+        // Static assets
+        server->on("/style.css", HTTP_GET, handleStyleCss);
+        server->on("/script.js", HTTP_GET, handleScriptJs);
 
-        // Reset endpoint - allows user to try again with new credentials
-        server->on("/reset", HTTP_POST, []()
-                   {
-            if (!server) return;
-            
-            Serial.println("[Portal] Reset requested - clearing state for retry");
-            connectState = ConnectState::IDLE;
-            connectRetryCount = 0;
-            memset(connectError, 0, sizeof(connectError));
-            memset(savedSSID, 0, sizeof(savedSSID));
-            memset(savedPassword, 0, sizeof(savedPassword));
-            credentialsReceived = false;
-            
-            // Reset WiFi back to AP_STA mode (allows scanning)
-            WiFi.disconnect(true);
-            WiFi.mode(WIFI_AP_STA);
-            
-            server->sendHeader("Cache-Control", "no-cache");
-            server->send(HTTP_OK, "application/json", "{\"status\":\"reset\"}"); });
-
-        // WiFi scan endpoint - returns JSON array of networks
-        server->on("/scan", HTTP_GET, []()
-                   {
-            if (!server) return;
-            
-            Serial.println("[Portal] Starting WiFi scan...");
-            
-            // Ensure we're in AP_STA mode for scanning (AP stays active)
-            if (WiFi.getMode() != WIFI_AP_STA) {
-                WiFi.mode(WIFI_AP_STA);
-                delay(100);
-            }
-            
-            // Scan for networks (this blocks for 1-3 seconds)
-            // Using async=false, show_hidden=false, passive=false, max_ms_per_chan=300
-            int n = WiFi.scanNetworks(false, false, false, 300);
-            
-            // Build JSON response
-            String json = "[";
-            
-            if (n > 0) {
-                // Create index array for sorting by RSSI
-                int indices[n];
-                for (int i = 0; i < n; i++) indices[i] = i;
-                
-                // Sort indices by signal strength (strongest first)
-                for (int i = 0; i < n - 1; i++) {
-                    for (int j = i + 1; j < n; j++) {
-                        if (WiFi.RSSI(indices[j]) > WiFi.RSSI(indices[i])) {
-                            int temp = indices[i];
-                            indices[i] = indices[j];
-                            indices[j] = temp;
-                        }
-                    }
-                }
-                
-                // Limit to 15 networks to save memory
-                int maxNetworks = (n > 15) ? 15 : n;
-                int addedCount = 0;
-                
-                for (int i = 0; i < n && addedCount < maxNetworks; i++) {
-                    int idx = indices[i];
-                    String ssid = WiFi.SSID(idx);
-                    
-                    // Skip empty SSIDs (hidden networks)
-                    if (ssid.length() == 0) continue;
-                    
-                    // Skip duplicates (same SSID already added)
-                    bool duplicate = false;
-                    for (int j = 0; j < i; j++) {
-                        if (WiFi.SSID(indices[j]) == ssid) {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-                    if (duplicate) continue;
-                    
-                    // Escape quotes in SSID for JSON
-                    ssid.replace("\\", "\\\\");
-                    ssid.replace("\"", "\\\"");
-                    
-                    if (addedCount > 0) json += ",";
-                    json += "{\"ssid\":\"" + ssid + "\",";
-                    json += "\"rssi\":" + String(WiFi.RSSI(idx)) + ",";
-                    json += "\"secure\":" + String(WiFi.encryptionType(idx) != WIFI_AUTH_OPEN ? 1 : 0) + "}";
-                    addedCount++;
-                }
-            }
-            
-            json += "]";
-            
-            // Clean up scan results to free memory
-            WiFi.scanDelete();
-            
-            Serial.printf("[Portal] Scan complete, found %d networks\n", n);
-            
-            server->sendHeader("Cache-Control", "no-cache");
-            server->send(HTTP_OK, "application/json", json); });
-
-        // Serve static assets explicitly
-        server->on("/style.css", HTTP_GET, []()
-                   {
-            if (server) serveFile("/style.css", "text/css"); });
-        server->on("/script.js", HTTP_GET, []()
-                   {
-            if (server) serveFile("/script.js", "application/javascript"); });
-
-        // CRITICAL FIX FOR WINDOWS: Stop WPAD spinning with valid PAC
-        server->on("/wpad.dat", HTTP_GET, []()
-                   {
-            if (server) {
-                // Return valid PAC that says "no proxy" - stops retry loop
-                server->send(HTTP_OK, "application/x-ns-proxy-autoconfig", 
-                    "function FindProxyForURL(url,host){return\"DIRECT\";}");
-            } });
-
-        // CRITICAL FIX FOR WINDOWS 2026: Answer NCSI probe correctly
-        server->on("/connecttest.txt", HTTP_GET, []()
-                   {
-            if (server) {
-                server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-                server->send(HTTP_OK, "text/plain", "Microsoft Connect Test");
-            } });
-
+        // Windows connectivity probes
+        server->on("/wpad.dat", HTTP_GET, handleWpadDat);
+        server->on("/connecttest.txt", HTTP_GET, handleConnectTest);
+        server->on("/ncsi.txt", HTTP_ANY, handleNcsi);
         server->on("/redirect", HTTP_GET, handleRoot);
-        server->on("/ncsi.txt", HTTP_ANY, []()
-                   {
-            if (server) {
-                server->sendHeader("Cache-Control", "no-cache");
-                server->send(HTTP_OK, "text/plain", "Microsoft NCSI");
-            } });
 
-        // Android/iOS connectivity checks - redirect to trigger captive portal
-        auto forceRedirect = []()
-        {
-            if (server)
-            {
-                Serial.println("[Portal] Mobile connectivity check - redirecting");
-                server->sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
-                server->send(HTTP_FOUND, "text/plain", "");
-            }
-        };
+        // Mobile connectivity checks (Android/iOS/Firefox)
+        server->on("/generate_204", HTTP_ANY, handleMobileRedirect);
+        server->on("/gen_204", HTTP_ANY, handleMobileRedirect);
+        server->on("/hotspot-detect.html", HTTP_ANY, handleMobileRedirect);
+        server->on("/canonical.html", HTTP_ANY, handleMobileRedirect);
+        server->on("/success.txt", HTTP_ANY, handleMobileRedirect);
 
-        server->on("/generate_204", HTTP_ANY, forceRedirect);        // Android
-        server->on("/gen_204", HTTP_ANY, forceRedirect);             // Android
-        server->on("/hotspot-detect.html", HTTP_ANY, forceRedirect); // iOS
-        server->on("/canonical.html", HTTP_ANY, forceRedirect);      // Firefox
-        server->on("/success.txt", HTTP_ANY, forceRedirect);         // Firefox
-
-        // Ultra-fast onNotFound handler - prioritize speed
-        server->onNotFound([]()
-                           {
-            if (!server) return;
-            
-            // Use const references to avoid String copies on every request
-            const String& uri = server->uri();
-            const String& host = server->hostHeader();
-            
-            // Quick length check - reject oversized requests immediately
-            if (uri.length() > 256 || host.length() > 128) {
-                server->send(HTTP_BAD_REQUEST, "text/plain", "");
-                return;
-            }
-            
-            // Prioritize speed: If it's WPAD or a generic app ping, stop immediately (HTTP 204 is fastest)
-            if (host.indexOf("wpad") >= 0 || uri.indexOf("favicon") >= 0 || uri.indexOf(".map") >= 0) {
-                server->send(HTTP_NO_CONTENT, "text/plain", ""); 
-                return;
-            }
-            
-            // Everything else gets processed via handleRoot/captivePortal logic
-            handleRoot(); });
+        // Catch-all for unknown paths
+        server->onNotFound(handleNotFound);
 
         server->begin();
         Serial.println("[Portal] Web server started on port 80");

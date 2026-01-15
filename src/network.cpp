@@ -2,13 +2,9 @@
 #include "config.h"
 #include "wifi_portal.h"
 #include "wifi_credentials.h"
-#include "settings_manager.h"
-#include "prayer_types.h"
+#include "settings_server.h"
 #include <WiFi.h>
-#include <ESPmDNS.h>
-#include <WebServer.h>
 #include <LittleFS.h>
-#include <ArduinoJson.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -20,14 +16,10 @@ namespace Network
     constexpr int NTP_SYNC_TIMEOUT_ATTEMPTS = 60; // 60 * 500ms = 30 seconds
 
     static bool portalMode = false;
-    static bool settingsMode = false;     // True when settings server is running
     static char currentSSID[33] = "";     // Max SSID: 32 + null
     static char currentPassword[65] = ""; // Max WPA2: 64 + null
     static int connectionAttempts = 0;
     static bool isRetryPortal = false; // True if portal opened after failed connection
-
-    static WebServer *settingsServer = nullptr;
-    static const char *MDNS_HOSTNAME = "spiritualassistantsettings";
 
     void init()
     {
@@ -60,193 +52,6 @@ namespace Network
         copyLen = (hardcodedPassLen < sizeof(currentPassword) - 1) ? hardcodedPassLen : sizeof(currentPassword) - 1;
         memcpy(currentPassword, Config::WIFI_PASS.data(), copyLen);
         currentPassword[copyLen] = '\0';
-    }
-
-    bool startMDNS()
-    {
-        if (MDNS.begin(MDNS_HOSTNAME))
-        {
-            Serial.printf("[mDNS] Started: http://%s.local\n", MDNS_HOSTNAME);
-            MDNS.addService("http", "tcp", 80);
-            return true;
-        }
-        Serial.println("[mDNS] Failed to start");
-        return false;
-    }
-
-    void startSettingsServer()
-    {
-        if (settingsServer != nullptr)
-        {
-            return; // Already running
-        }
-
-        settingsServer = new WebServer(80);
-
-        // Serve settings page
-        settingsServer->on("/", HTTP_GET, []()
-                           {
-            File file = LittleFS.open("/settings.html", "r");
-            if (file)
-            {
-                settingsServer->streamFile(file, "text/html");
-                file.close();
-            }
-            else
-            {
-                settingsServer->send(200, "text/html", 
-                    "<html><body><h1>Welcome to Settings</h1><p>Settings page coming soon.</p></body></html>");
-            } });
-
-        // Serve static files
-        settingsServer->serveStatic("/style.css", LittleFS, "/style.css");
-        settingsServer->serveStatic("/script.js", LittleFS, "/script.js");
-
-        // Handle favicon requests (browsers always request this)
-        settingsServer->on("/favicon.ico", HTTP_GET, []()
-                           {
-                               settingsServer->send(204); // No content
-                           });
-
-        // Handle Apple touch icon (iOS)
-        settingsServer->on("/apple-touch-icon.png", HTTP_GET, []()
-                           { settingsServer->send(204); });
-        settingsServer->on("/apple-touch-icon-precomposed.png", HTTP_GET, []()
-                           { settingsServer->send(204); });
-
-        // API: Get current settings
-        settingsServer->on("/api/settings", HTTP_GET, []()
-                           {
-            int method = SettingsManager::getPrayerMethod();
-            const char* methodName = SettingsManager::getMethodName(method);
-            uint8_t volume = SettingsManager::getVolume();
-            
-            JsonDocument doc;
-            doc["prayerMethod"] = method;
-            doc["methodName"] = methodName;
-            doc["volume"] = volume;
-            
-            // Adhan enabled for each prayer (excluding Sunrise)
-            JsonObject adhan = doc["adhanEnabled"].to<JsonObject>();
-            adhan["fajr"] = SettingsManager::getAdhanEnabled(PrayerType::Fajr);
-            adhan["dhuhr"] = SettingsManager::getAdhanEnabled(PrayerType::Dhuhr);
-            adhan["asr"] = SettingsManager::getAdhanEnabled(PrayerType::Asr);
-            adhan["maghrib"] = SettingsManager::getAdhanEnabled(PrayerType::Maghrib);
-            adhan["isha"] = SettingsManager::getAdhanEnabled(PrayerType::Isha);
-            
-            String response;
-            serializeJson(doc, response);
-            settingsServer->send(200, "application/json", response);
-            Serial.printf("[Settings API] GET - Method: %d, Volume: %d%%\n", method, volume); });
-
-        // API: Update settings
-        settingsServer->on("/api/settings", HTTP_POST, []()
-                           {
-            if (!settingsServer->hasArg("plain")) {
-                settingsServer->send(400, "application/json", "{\"error\":\"No body\"}");
-                return;
-            }
-            
-            String body = settingsServer->arg("plain");
-            JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, body);
-            
-            if (error) {
-                settingsServer->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
-                return;
-            }
-            
-            bool changed = false;
-            
-            // Prayer method
-            if (doc["prayerMethod"].is<int>()) {
-                int newMethod = doc["prayerMethod"];
-                if (SettingsManager::setPrayerMethod(newMethod)) {
-                    changed = true;
-                    Serial.printf("[Settings API] Method changed to: %d\n", newMethod);
-                }
-            }
-            
-            // Volume
-            if (doc["volume"].is<int>()) {
-                int newVolume = doc["volume"];
-                if (newVolume >= 0 && newVolume <= 100) {
-                    if (SettingsManager::setVolume(static_cast<uint8_t>(newVolume))) {
-                        changed = true;
-                        Serial.printf("[Settings API] Volume changed to: %d%%\n", newVolume);
-                    }
-                }
-            }
-            
-            // Adhan enabled settings
-            if (doc["adhanEnabled"].is<JsonObject>()) {
-                JsonObject adhan = doc["adhanEnabled"];
-                if (adhan["fajr"].is<bool>()) {
-                    SettingsManager::setAdhanEnabled(PrayerType::Fajr, adhan["fajr"]);
-                    changed = true;
-                }
-                if (adhan["dhuhr"].is<bool>()) {
-                    SettingsManager::setAdhanEnabled(PrayerType::Dhuhr, adhan["dhuhr"]);
-                    changed = true;
-                }
-                if (adhan["asr"].is<bool>()) {
-                    SettingsManager::setAdhanEnabled(PrayerType::Asr, adhan["asr"]);
-                    changed = true;
-                }
-                if (adhan["maghrib"].is<bool>()) {
-                    SettingsManager::setAdhanEnabled(PrayerType::Maghrib, adhan["maghrib"]);
-                    changed = true;
-                }
-                if (adhan["isha"].is<bool>()) {
-                    SettingsManager::setAdhanEnabled(PrayerType::Isha, adhan["isha"]);
-                    changed = true;
-                }
-            }
-            
-            if (changed) {
-                int method = SettingsManager::getPrayerMethod();
-                const char* methodName = SettingsManager::getMethodName(method);
-                
-                JsonDocument response;
-                response["success"] = true;
-                response["prayerMethod"] = method;
-                response["methodName"] = methodName;
-                response["volume"] = SettingsManager::getVolume();
-                response["message"] = "Settings saved successfully.";
-                
-                String responseStr;
-                serializeJson(response, responseStr);
-                settingsServer->send(200, "application/json", responseStr);
-            } else {
-                settingsServer->send(400, "application/json", "{\"error\":\"No valid settings provided\"}");
-            } });
-
-        // Catch-all handler - serve settings page for unknown paths
-        settingsServer->onNotFound([]()
-                                   {
-            File file = LittleFS.open("/settings.html", "r");
-            if (file)
-            {
-                settingsServer->streamFile(file, "text/html");
-                file.close();
-            }
-            else
-            {
-                settingsServer->send(200, "text/html", 
-                    "<html><body><h1>Welcome to Settings</h1><p>Settings page coming soon.</p></body></html>");
-            } });
-
-        settingsServer->begin();
-        settingsMode = true;
-        Serial.println("[Settings] Server started on port 80");
-    }
-
-    void handleSettingsServer()
-    {
-        if (settingsServer != nullptr && settingsMode)
-        {
-            settingsServer->handleClient();
-        }
     }
 
     bool connectWiFi()
@@ -438,12 +243,11 @@ namespace Network
         Serial.println("[Network] Portal complete - syncing time...");
         syncTime();
 
-        Serial.println("[Network] Starting mDNS and settings server...");
-        startMDNS();
-        startSettingsServer();
+        Serial.println("[Network] Starting settings server...");
+        SettingsServer::start();
 
         Serial.println("[Network] ✓ Setup complete! Device is ready.");
-        Serial.printf("[Network] Settings available at: http://%s.local\n", MDNS_HOSTNAME);
+        Serial.printf("[Network] Settings available at: http://%s.local\n", SettingsServer::getHostname());
     }
 
     bool isConnected()
@@ -454,11 +258,6 @@ namespace Network
     bool isPortalActive()
     {
         return portalMode;
-    }
-
-    bool isSettingsActive()
-    {
-        return settingsMode;
     }
 
     bool isRetryConnection()
