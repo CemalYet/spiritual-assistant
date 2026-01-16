@@ -128,7 +128,7 @@ bool nonBlockingDelay(unsigned long ms)
             return true; // Signal that recalculation is needed
         }
 
-        delay(10); // Small yield
+        delay(1); // Minimal yield for responsive web server
     }
     return false; // Normal completion
 }
@@ -444,10 +444,10 @@ void loop()
         completeSetupAfterPortal();
     }
 
-    // Wait if setup incomplete
+    // Wait if setup incomplete - but keep handling settings server
     if (!app.setupComplete || !app.prayersFetched)
     {
-        delay(5000);
+        nonBlockingDelay(1000);
         return;
     }
 
@@ -456,7 +456,7 @@ void loop()
 
     handlePrayerTime(now);
 
-    const int sleepTime = calculateSleepTime(now);
-    Serial.printf("[Sleep] %s - %ds\n", now._hhMM.data(), sleepTime);
+    // Cap sleep time to 5 seconds max for responsive settings server
+    const int sleepTime = min(calculateSleepTime(now), 5);
     nonBlockingDelay(sleepTime * 1000);
 }

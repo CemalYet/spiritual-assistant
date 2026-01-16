@@ -8,43 +8,56 @@ namespace HttpHelpers
         if (!server)
             return false;
 
-        // Add security headers
-        server->sendHeader("X-Content-Type-Options", "nosniff");
-
-        // Add cache control
-        if (cacheSeconds > 0)
+        // Log User-Agent to identify browser
+        String userAgent = "unknown";
+        if (server->hasHeader("User-Agent"))
         {
-            server->sendHeader("Cache-Control", String("public, max-age=") + String(cacheSeconds));
+            userAgent = server->header("User-Agent");
+            if (userAgent.length() > 50)
+                userAgent = userAgent.substring(0, 50) + "...";
         }
-        else
-        {
-            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-            server->sendHeader("Pragma", "no-cache");
-            server->sendHeader("Expires", "-1");
-        }
+        Serial.printf("[HTTP] Request: %s from %s\n", path, userAgent.c_str());
 
-        // Open file
-        File file = LittleFS.open(path, "r");
-        if (!file)
+        if (!LittleFS.exists(path))
         {
             Serial.printf("[HTTP] File not found: %s\n", path);
             server->send(HTTP_NOT_FOUND, "text/plain", "File not found");
             return false;
         }
 
-        // Check file size
-        size_t fileSize = file.size();
-        if (fileSize > MAX_FILE_SIZE)
+        File file = LittleFS.open(path, "r");
+        if (!file)
         {
-            Serial.printf("[HTTP] File too large: %s (%u bytes)\n", path, fileSize);
-            file.close();
-            server->send(HTTP_NOT_FOUND, "text/plain", "File too large");
+            Serial.printf("[HTTP] Failed to open file\n");
+            server->send(HTTP_NOT_FOUND, "text/plain", "File not found");
             return false;
         }
 
+        size_t fileSize = file.size();
+        Serial.printf("[HTTP] Serving %s (%u bytes) Free heap: %u\n", path, fileSize, ESP.getFreeHeap());
+
+        // Set headers
+        server->sendHeader("Connection", "close");
+        if (cacheSeconds > 0)
+        {
+            server->sendHeader("Cache-Control", String("public, max-age=") + String(cacheSeconds));
+        }
+
+        // Stream file to client
+        Serial.println("[HTTP] Starting streamFile...");
+        unsigned long startTime = millis();
         size_t sent = server->streamFile(file, contentType);
+        unsigned long elapsed = millis() - startTime;
         file.close();
-        return (sent > 0);
+
+        Serial.printf("[HTTP] Done: sent %u/%u bytes in %lu ms\n", sent, fileSize, elapsed);
+
+        if (sent != fileSize)
+        {
+            Serial.println("[HTTP] WARNING: Incomplete transfer!");
+        }
+
+        return (sent == fileSize);
     }
 
     void sendNoCacheHeaders(WebServer *server)

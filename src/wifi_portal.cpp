@@ -181,6 +181,17 @@ namespace WiFiPortal
         }
     }
 
+    void handleSettings()
+    {
+        if (!server)
+            return;
+
+        if (!serveFile("/settings.html", "text/html", 0))
+        {
+            Serial.println("[Portal] ERROR: Failed to serve settings.html");
+        }
+    }
+
     void handleSave()
     {
         if (!server)
@@ -600,6 +611,7 @@ namespace WiFiPortal
         server->on("/", HTTP_GET, handleRoot);
         server->on("/save", HTTP_POST, handleSave);
         server->on("/success.html", HTTP_GET, handleSuccess);
+        server->on("/settings.html", HTTP_GET, handleSettings);
         server->on("/status", HTTP_GET, handleStatus);
         server->on("/reset", HTTP_POST, handleReset);
         server->on("/scan", HTTP_GET, handleScan);

@@ -5,7 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Spiritual Assistant - Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --blue: #007BFF;
+            --green: #28A745;
+            --gray: #6C757D;
+            --gray-light: #9CA3AF;
+            --gray-bg: #f7f9fc;
+            --border: #e5e7eb;
+            --text: #333;
+            --text-dark: #1f2937;
+            --radius: 8px;
+            --radius-lg: 16px;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,8 +29,8 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #F8F9FA;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -24,11 +40,14 @@
 
         .container {
             background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
             max-width: 500px;
             width: 100%;
             padding: 40px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
         }
 
         .header {
@@ -37,37 +56,63 @@
         }
 
         h1 {
-            color: #333;
+            color: #212529;
             font-size: 28px;
             margin-bottom: 10px;
         }
 
         .subtitle {
-            color: #666;
+            color: var(--gray);
             font-size: 14px;
         }
 
         .welcome-icon {
-            font-size: 64px;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .welcome-icon svg {
+            width: 72px;
+            height: 72px;
         }
 
         .section {
-            margin-bottom: 25px;
+            margin-bottom: 0;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section:last-of-type {
+            border-bottom: none;
         }
 
         .section-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
+            letter-spacing: -0.3px;
         }
 
         .section-title .icon {
-            font-size: 20px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .section-title .icon svg {
+            width: 22px;
+            height: 22px;
+            stroke: var(--blue);
+            stroke-width: 1.5;
+            fill: none;
         }
 
         label {
@@ -82,51 +127,55 @@
             padding: 12px 16px;
             font-size: 16px;
             border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            background: #fff;
-            color: #333;
+            border-radius: var(--radius);
+            background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E") no-repeat right 16px center;
+            color: var(--text);
             cursor: pointer;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 16px center;
         }
 
         select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--blue);
         }
 
         .volume-container {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
+        }
+
+        .volume-icon {
+            font-size: 18px;
+            user-select: none;
         }
 
         .volume-slider {
             flex: 1;
             -webkit-appearance: none;
+            appearance: none;
             height: 8px;
             border-radius: 4px;
-            background: #e0e0e0;
+            background: var(--gray-light);
             outline: none;
         }
 
         .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
+            appearance: none;
             width: 24px;
             height: 24px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--blue);
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 2px 6px rgba(0, 123, 255, 0.4);
         }
 
         .volume-slider::-moz-range-thumb {
             width: 24px;
             height: 24px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--blue);
             cursor: pointer;
             border: none;
         }
@@ -135,7 +184,7 @@
             min-width: 45px;
             text-align: right;
             font-weight: 600;
-            color: #667eea;
+            color: var(--blue);
         }
 
         .toggle-list {
@@ -149,14 +198,26 @@
             justify-content: space-between;
             align-items: center;
             padding: 12px 16px;
-            background: #f7f9fc;
-            border-radius: 8px;
+            background: var(--gray-bg);
+            border-radius: var(--radius);
         }
 
         .toggle-label {
             font-size: 15px;
-            color: #333;
+            color: var(--text);
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-label .prayer-icon {
+            width: 20px;
+            height: 20px;
+            stroke: var(--blue);
+            stroke-width: 2;
+            fill: none;
+            flex-shrink: 0;
         }
 
         .toggle-switch {
@@ -174,11 +235,8 @@
         .toggle-slider {
             position: absolute;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
+            inset: 0;
+            background: var(--gray-light);
             transition: 0.3s;
             border-radius: 28px;
         }
@@ -190,14 +248,14 @@
             width: 22px;
             left: 3px;
             bottom: 3px;
-            background-color: white;
+            background: white;
             transition: 0.3s;
             border-radius: 50%;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         input:checked+.toggle-slider {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--green);
         }
 
         input:checked+.toggle-slider:before {
@@ -210,20 +268,21 @@
             font-size: 16px;
             font-weight: 600;
             border: none;
-            border-radius: 8px;
+            border-radius: var(--radius);
             cursor: pointer;
             transition: all 0.2s;
             width: 100%;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--green);
             color: #fff;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            background: #218838;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
         }
 
         .btn-primary:disabled {
@@ -234,7 +293,7 @@
 
         .status-message {
             padding: 12px 16px;
-            border-radius: 8px;
+            border-radius: var(--radius);
             margin-top: 15px;
             font-size: 14px;
             display: none;
@@ -268,16 +327,265 @@
         }
 
         .info-box {
-            background: #f3f4f6;
-            border-radius: 8px;
-            padding: 15px;
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            border-left: 4px solid var(--blue);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-top: 24px;
+            font-size: 13px;
+            color: #1E40AF;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .info-box svg {
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .info-box strong {
+            color: #1E40AF;
+        }
+
+        .back-link {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
             margin-top: 20px;
+            padding: 12px;
+            color: #6B7280;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: var(--blue);
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .current-location {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            margin-bottom: 15px;
+        }
+
+        .location-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .location-info span:first-child {
+            font-weight: 600;
+            color: #166534;
+        }
+
+        .coords {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            background: var(--blue);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .btn-small:hover {
+            background: #0056b3;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .search-container input {
+            flex: 1;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .search-container input:focus {
+            outline: none;
+            border-color: var(--blue);
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input-wrapper input {
+            width: 100%;
+            padding: 10px 40px 10px 14px;
+            font-size: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .search-input-wrapper input:focus {
+            outline: none;
+            border-color: var(--blue);
+        }
+
+        .clear-search-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #ccc;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+            color: #fff;
+            display: none;
+        }
+
+        .clear-search-btn:hover {
+            background: #999;
+        }
+
+        .search-results {
+            margin-top: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .search-result-item {
+            padding: 14px 16px;
+            background: var(--gray-bg);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .search-result-item:hover {
+            background: #e3f2fd;
+            border-color: var(--blue);
+        }
+
+        .search-result-item:active {
+            background: var(--blue);
+            color: #fff;
+            transform: scale(0.98);
+        }
+
+        .search-result-item .result-text {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .search-result-item .result-arrow {
+            color: var(--blue);
+            font-size: 18px;
+            margin-left: 12px;
+        }
+
+        .search-result-item:active .result-arrow {
+            color: #fff;
+        }
+
+        .link-text {
             font-size: 13px;
             color: #666;
         }
 
-        .info-box strong {
-            color: #333;
+        .link-text a {
+            color: var(--blue);
+            text-decoration: none;
+        }
+
+        .link-text a:hover {
+            text-decoration: underline;
+        }
+
+        .coords-input {
+            display: flex;
+            gap: 15px;
+            margin-top: 8px;
+        }
+
+        .coord-field {
+            flex: 1;
+        }
+
+        .coord-field input {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .coord-field input:focus {
+            outline: none;
+            border-color: var(--blue);
+        }
+
+        .save-container {
+            background: #fff;
+            padding-top: 20px;
+            margin-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn-primary.has-changes::after {
+            content: ' •';
+            color: #fbbf24;
+            font-size: 20px;
+        }
+
+        .form-disabled {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .form-disabled .save-container {
+            pointer-events: auto;
+            opacity: 1;
         }
     </style>
 </head>
@@ -285,14 +593,40 @@
 <body>
     <div class="container">
         <div class="header">
-            <div class="welcome-icon">🕌</div>
+            <div class="welcome-icon">
+                <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#007BFF" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Dome -->
+                    <path d="M6 12c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+                    <!-- Crescent on top -->
+                    <path
+                        d="M12 4c-.5 0-1 .2-1.3.6.5.1.9.5.9 1 0 .6-.4 1-1 1-.3 0-.5-.1-.7-.3.3.8 1.1 1.2 2.1 1.2 1.2 0 2-.8 2-1.8S13.2 4 12 4z"
+                        fill="#007BFF" />
+                    <!-- Main building -->
+                    <rect x="5" y="12" width="14" height="9" />
+                    <!-- Door arch -->
+                    <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
+                    <!-- Left minaret -->
+                    <rect x="2" y="10" width="2" height="11" />
+                    <path d="M3 10V8" />
+                    <circle cx="3" cy="7.5" r="0.5" fill="#007BFF" />
+                    <!-- Right minaret -->
+                    <rect x="20" y="10" width="2" height="11" />
+                    <path d="M21 10V8" />
+                    <circle cx="21" cy="7.5" r="0.5" fill="#007BFF" />
+                </svg>
+            </div>
             <h1>Settings</h1>
             <p class="subtitle">Spiritual Assistant Configuration</p>
         </div>
 
         <div class="section">
             <div class="section-title">
-                <span class="icon">🧭</span>
+                <span class="icon"><svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                        <path d="M12 8l2 4-2 2-2-2 2-4z" fill="#007BFF" />
+                    </svg></span>
                 Prayer Calculation Method
             </div>
             <label for="prayerMethod">Select calculation method for your region:</label>
@@ -316,54 +650,171 @@
             <div id="currentMethod" class="current-value">Loading current setting...</div>
         </div>
 
+        <!-- LOCATION SECTION -->
         <div class="section">
             <div class="section-title">
-                <span class="icon">🔊</span>
+                <span class="icon"><svg viewBox="0 0 24 24">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                    </svg></span>
+                Location
+            </div>
+
+            <!-- Current Location Display -->
+            <div id="currentLocation" class="current-location" style="display:none;">
+                <div class="location-info">
+                    <span id="cityNameDisplay">--</span>
+                    <span id="coordsDisplay" class="coords">--</span>
+                </div>
+            </div>
+
+            <!-- Diyanet Location (for method 13) -->
+            <div id="diyanetLocation" style="display:none;">
+                <label for="countrySelect">Country:</label>
+                <select id="countrySelect">
+                    <option value="">Select country...</option>
+                </select>
+
+                <label for="stateSelect" style="margin-top:12px;">State / Province:</label>
+                <select id="stateSelect" disabled>
+                    <option value="">Select state...</option>
+                </select>
+
+                <label for="citySelect" style="margin-top:12px;">City / District:</label>
+                <select id="citySelect" disabled>
+                    <option value="">Select city...</option>
+                </select>
+
+                <div id="diyanetStatus" class="current-value"></div>
+            </div>
+
+            <!-- GPS Location (for other methods) -->
+            <div id="gpsLocation" style="display:none;">
+                <!-- City Search (autocomplete with Photon) -->
+                <div id="citySearchSection">
+                    <label style="display:flex;align-items:center;gap:6px;"><svg
+                            style="width:16px;height:16px;stroke:#007BFF;fill:none;stroke-width:2" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>Search City:</label>
+                    <div class="search-input-wrapper">
+                        <input type="text" id="citySearchInput" placeholder="Start typing city name..."
+                            autocomplete="off">
+                        <button type="button" id="clearSearchBtn" class="clear-search-btn">✕</button>
+                    </div>
+                    <div id="searchResults" class="search-results"></div>
+                    <div id="manualEntryLink" class="link-text" style="margin-top:10px;">
+                        Can't find your city? <a href="#" id="showManualEntry">Enter manually</a>
+                    </div>
+                </div>
+
+                <!-- Manual Entry (last resort) -->
+                <div id="manualEntrySection" style="display:none; margin-top:20px;">
+                    <label style="display:flex;align-items:center;gap:6px;"><svg
+                            style="width:16px;height:16px;stroke:#007BFF;fill:none;stroke-width:2" viewBox="0 0 24 24">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>Manual Entry:</label>
+                    <div class="coords-input">
+                        <div class="coord-field">
+                            <label for="manualLat">Latitude:</label>
+                            <input type="number" id="manualLat" step="0.0001" placeholder="41.0082">
+                        </div>
+                        <div class="coord-field">
+                            <label for="manualLng">Longitude:</label>
+                            <input type="number" id="manualLng" step="0.0001" placeholder="28.9784">
+                        </div>
+                    </div>
+                    <button type="button" id="applyManualBtn" class="btn-small" style="margin-top:10px;">Apply</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">
+                <span class="icon"><svg viewBox="0 0 24 24">
+                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                    </svg></span>
                 Adhan Volume
             </div>
             <div class="volume-container">
+                <span class="volume-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007BFF"
+                        stroke-width="2">
+                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                    </svg></span>
                 <input type="range" id="volume" class="volume-slider" min="0" max="100" value="80">
+                <span class="volume-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007BFF"
+                        stroke-width="2">
+                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                    </svg></span>
                 <span id="volumeValue" class="volume-value">80%</span>
             </div>
         </div>
 
         <div class="section">
             <div class="section-title">
-                <span class="icon">🔔</span>
+                <span class="icon"><svg viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg></span>
                 Adhan Notifications
             </div>
             <label>Enable or disable adhan for each prayer time:</label>
             <div class="toggle-list">
                 <div class="toggle-item">
-                    <span class="toggle-label">🌅 Sabah (Fajr)</span>
+                    <span class="toggle-label"><svg class="prayer-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M12 3v1M12 20v1M4.22 4.22l.71.71M18.36 18.36l.71.71M1 12h1M22 12h1M4.22 19.78l.71-.71M18.36 5.64l.71-.71" />
+                            <circle cx="12" cy="12" r="5" />
+                        </svg>Sabah (Fajr)</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="adhanFajr" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
                 <div class="toggle-item">
-                    <span class="toggle-label">☀️ Öğle (Dhuhr)</span>
+                    <span class="toggle-label"><svg class="prayer-icon" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="5" />
+                            <path
+                                d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                        </svg>Öğle (Dhuhr)</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="adhanDhuhr" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
                 <div class="toggle-item">
-                    <span class="toggle-label">🌤️ İkindi (Asr)</span>
+                    <span class="toggle-label"><svg class="prayer-icon" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="4" />
+                            <path
+                                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                        </svg>İkindi (Asr)</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="adhanAsr" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
                 <div class="toggle-item">
-                    <span class="toggle-label">🌆 Akşam (Maghrib)</span>
+                    <span class="toggle-label"><svg class="prayer-icon" viewBox="0 0 24 24">
+                            <path d="M17 18a5 5 0 0 0-10 0" />
+                            <path d="M12 9V2" />
+                            <path d="M4.22 10.22l1.42 1.42" />
+                            <path d="M18.36 10.22l-1.42 1.42" />
+                            <path d="M1 18h22" />
+                        </svg>Akşam (Maghrib)</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="adhanMaghrib" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
                 <div class="toggle-item">
-                    <span class="toggle-label">🌙 Yatsı (Isha)</span>
+                    <span class="toggle-label"><svg class="prayer-icon" viewBox="0 0 24 24">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>Yatsı (Isha)</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="adhanIsha" checked>
                         <span class="toggle-slider"></span>
@@ -372,107 +823,233 @@
             </div>
         </div>
 
-        <button id="saveBtn" class="btn btn-primary">Save Settings</button>
-
-        <div id="statusMessage" class="status-message"></div>
+        <div class="save-container">
+            <button id="saveBtn" class="btn btn-primary">
+                <svg style="width:18px;height:18px;vertical-align:middle;margin-right:8px;stroke:currentColor;fill:none;stroke-width:2"
+                    viewBox="0 0 24 24">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17,21 17,13 7,13 7,21" />
+                    <polyline points="7,3 7,8 15,8" />
+                </svg>Save Configuration
+            </button>
+            <div id="statusMessage" class="status-message"></div>
+        </div>
 
         <div class="info-box">
-            <strong>Note:</strong> Güneş (Sunrise) is displayed for reference only - no adhan is played at sunrise.
-            Changes are applied immediately after saving.
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#007BFF;fill:none;stroke-width:2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <span><strong>Note:</strong> Güneş (Sunrise) is displayed for reference only - no adhan is played at
+                sunrise.</span>
         </div>
+
+        <a href="/" class="back-link">
+            <svg viewBox="0 0 24 24">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back to Home
+        </a>
     </div>
 
     <script>
-        const methodSelect = document.getElementById('prayerMethod');
-        const volumeSlider = document.getElementById('volume');
-        const volumeValue = document.getElementById('volumeValue');
-        const saveBtn = document.getElementById('saveBtn');
-        const statusMessage = document.getElementById('statusMessage');
-        const currentMethodDiv = document.getElementById('currentMethod');
+        const $ = id => document.getElementById(id);
+        const show = el => el.style.display = 'block';
+        const hide = el => el.style.display = 'none';
 
-        const adhanToggles = {
-            fajr: document.getElementById('adhanFajr'),
-            dhuhr: document.getElementById('adhanDhuhr'),
-            asr: document.getElementById('adhanAsr'),
-            maghrib: document.getElementById('adhanMaghrib'),
-            isha: document.getElementById('adhanIsha')
-        };
+        const methodSelect = $('prayerMethod'), volumeSlider = $('volume'), volumeValue = $('volumeValue');
+        const saveBtn = $('saveBtn'), statusMessage = $('statusMessage'), container = document.querySelector('.container');
+        const currentMethodDiv = $('currentMethod'), currentLocationDiv = $('currentLocation');
+        const cityNameDisplay = $('cityNameDisplay'), coordsDisplay = $('coordsDisplay');
+        const gpsLocationDiv = $('gpsLocation'), citySearchInput = $('citySearchInput');
+        const clearSearchBtn = $('clearSearchBtn'), searchResults = $('searchResults');
+        const showManualEntryLink = $('showManualEntry'), manualEntrySection = $('manualEntrySection');
+        const manualLat = $('manualLat'), manualLng = $('manualLng'), applyManualBtn = $('applyManualBtn');
+        const diyanetLocationDiv = $('diyanetLocation'), countrySelect = $('countrySelect');
+        const stateSelect = $('stateSelect'), citySelect = $('citySelect'), diyanetStatus = $('diyanetStatus');
 
-        volumeSlider.addEventListener('input', () => {
-            volumeValue.textContent = volumeSlider.value + '%';
+        let locationData = { latitude: null, longitude: null, cityName: '', diyanetId: null };
+        const adhanToggles = { fajr: $('adhanFajr'), dhuhr: $('adhanDhuhr'), asr: $('adhanAsr'), maghrib: $('adhanMaghrib'), isha: $('adhanIsha') };
+        let hasUnsavedChanges = false, debounceTimer, countriesLoaded = false;
+        const DIYANET_API = '/api/diyanet';
+
+        function markUnsaved() {
+            if (hasUnsavedChanges) return;
+            hasUnsavedChanges = true;
+            saveBtn.classList.add('has-changes');
+            saveBtn.textContent = 'Save Settings';
+        }
+        function markSaved() { hasUnsavedChanges = false; saveBtn.classList.remove('has-changes'); }
+
+        window.addEventListener('beforeunload', e => { if (hasUnsavedChanges) { e.preventDefault(); e.returnValue = ''; } });
+        volumeSlider.addEventListener('input', () => { volumeValue.textContent = volumeSlider.value + '%'; markUnsaved(); });
+        methodSelect.addEventListener('change', () => { updateLocationUI(); markUnsaved(); });
+        Object.values(adhanToggles).forEach(t => t.addEventListener('change', markUnsaved));
+
+        function updateLocationUI() {
+            const isDiyanet = methodSelect.value === '13';
+            diyanetLocationDiv.style.display = isDiyanet ? 'block' : 'none';
+            gpsLocationDiv.style.display = isDiyanet ? 'none' : 'block';
+            if (isDiyanet && locationData.diyanetId) diyanetStatus.textContent = `Current: ID ${locationData.diyanetId}`;
+            if (locationData.latitude && locationData.longitude) showCurrentLocation();
+        }
+        function showCurrentLocation() {
+            show(currentLocationDiv);
+            cityNameDisplay.textContent = locationData.cityName || 'Location set';
+            coordsDisplay.textContent = `${locationData.latitude.toFixed(4)}°, ${locationData.longitude.toFixed(4)}°`;
+        }
+        function setLocation(lat, lng, name) {
+            Object.assign(locationData, { latitude: lat, longitude: lng, cityName: name });
+            showCurrentLocation();
+            markUnsaved();
+        }
+
+        function updateClearButton() { if (clearSearchBtn) clearSearchBtn.style.display = citySearchInput.value ? 'block' : 'none'; }
+        citySearchInput.addEventListener('input', () => {
+            updateClearButton();
+            const query = citySearchInput.value.trim();
+            if (query.length < 3) { searchResults.innerHTML = ''; return; }
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => searchCity(query), 300);
+        });
+        if (clearSearchBtn) clearSearchBtn.addEventListener('click', () => { citySearchInput.value = ''; searchResults.innerHTML = ''; updateClearButton(); citySearchInput.focus(); });
+
+        async function searchCity(query) {
+            searchResults.innerHTML = '<div class="current-value">Searching...</div>';
+            try {
+                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+                const data = await res.json();
+                if (!data.features.length) { searchResults.innerHTML = '<div class="current-value">No results found</div>'; return; }
+                searchResults.innerHTML = '';
+                data.features.forEach(f => {
+                    const { name = '', state = '', country = '' } = f.properties;
+                    const [lon, lat] = f.geometry.coordinates;
+                    const displayName = [name, state, country].filter(Boolean).join(', ');
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `<span class="result-text">${displayName}</span><span class="result-arrow">→</span>`;
+                    item.onclick = () => { setLocation(lat, lon, displayName); searchResults.innerHTML = ''; citySearchInput.value = name; };
+                    searchResults.appendChild(item);
+                });
+            } catch { searchResults.innerHTML = '<div class="current-value">Search failed. Try again.</div>'; }
+        }
+
+        showManualEntryLink.addEventListener('click', e => { e.preventDefault(); show(manualEntrySection); });
+        applyManualBtn.addEventListener('click', () => {
+            const lat = parseFloat(manualLat.value), lng = parseFloat(manualLng.value);
+            if (isNaN(lat) || isNaN(lng)) return alert('Please enter valid coordinates');
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return alert('Coordinates out of range');
+            setLocation(lat, lng, `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`);
+        });
+
+        async function fetchDiyanet(endpoint) {
+            const res = await fetch(DIYANET_API + endpoint);
+            if (!res.ok) throw new Error('API failed');
+            return res.json();
+        }
+
+        async function loadDiyanetCountries() {
+            if (countriesLoaded) return;
+            countrySelect.innerHTML = '<option value="">Loading countries...</option>';
+            stateSelect.disabled = citySelect.disabled = true;
+            try {
+                const countries = await fetchDiyanet('/ulkeler');
+                const popularNames = ['turkey', 'germany', 'netherlands', 'belgium', 'france', 'united kingdom', 'austria', 'switzerland', 'sweden', 'denmark', 'norway'];
+                const popular = [], others = [];
+                countries.forEach(c => {
+                    const name = c.UlkeAdiEn || c.UlkeAdi, idx = popularNames.indexOf(name.toLowerCase());
+                    (idx !== -1 ? popular : others).push({ id: c.UlkeID, name, popularIndex: idx });
+                });
+                popular.sort((a, b) => a.popularIndex - b.popularIndex);
+                others.sort((a, b) => a.name.localeCompare(b.name));
+                countrySelect.innerHTML = '<option value="">Select country...</option>';
+                const addGroup = (label, items) => {
+                    if (!items.length) return;
+                    const g = document.createElement('optgroup'); g.label = label;
+                    items.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; g.appendChild(o); });
+                    countrySelect.appendChild(g);
+                };
+                addGroup('Popular', popular);
+                addGroup('All Countries', others);
+                countriesLoaded = true;
+                if (locationData.diyanetId) diyanetStatus.textContent = `Current: ID ${locationData.diyanetId}`;
+            } catch { countrySelect.innerHTML = '<option value="">Tap to retry loading...</option>'; diyanetStatus.textContent = '⚠️ Could not connect to Diyanet API'; }
+        }
+        countrySelect.addEventListener('click', loadDiyanetCountries);
+
+        async function loadSelectOptions(select, endpoint, idKey, nameKey, placeholder) {
+            select.innerHTML = '<option value="">Loading...</option>'; select.disabled = true;
+            try {
+                const items = await fetchDiyanet(endpoint);
+                select.innerHTML = `<option value="">${placeholder}</option>`;
+                items.forEach(i => { const o = document.createElement('option'); o.value = i[idKey]; o.textContent = i[nameKey + 'En'] || i[nameKey]; select.appendChild(o); });
+                select.disabled = false;
+            } catch { select.innerHTML = `<option value="">Failed to load</option>`; }
+        }
+        countrySelect.addEventListener('change', async () => {
+            if (!countrySelect.value) { stateSelect.innerHTML = '<option value="">Select state...</option>'; stateSelect.disabled = true; citySelect.innerHTML = '<option value="">Select city...</option>'; citySelect.disabled = true; return; }
+            citySelect.innerHTML = '<option value="">Select city...</option>'; citySelect.disabled = true;
+            await loadSelectOptions(stateSelect, `/sehirler/${countrySelect.value}`, 'SehirID', 'SehirAdi', 'Select state...');
+        });
+        stateSelect.addEventListener('change', async () => {
+            if (!stateSelect.value) { citySelect.innerHTML = '<option value="">Select city...</option>'; citySelect.disabled = true; return; }
+            await loadSelectOptions(citySelect, `/ilceler/${stateSelect.value}`, 'IlceID', 'IlceAdi', 'Select city...');
+        });
+
+        citySelect.addEventListener('change', async () => {
+            const cityId = citySelect.value;
+            if (!cityId) return;
+            const cityName = citySelect.options[citySelect.selectedIndex].text;
+            const stateName = stateSelect.options[stateSelect.selectedIndex].text;
+            const countryName = countrySelect.options[countrySelect.selectedIndex].text;
+            locationData.diyanetId = parseInt(cityId);
+            locationData.cityName = `${cityName}, ${stateName}, ${countryName}`;
+            markUnsaved();
+            diyanetStatus.textContent = '✓ Getting coordinates...';
+            for (const q of [`${cityName} ${stateName} ${countryName}`, `${cityName} ${countryName}`, `${stateName} ${countryName}`]) {
+                try {
+                    const data = await (await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`)).json();
+                    if (data.features?.length) { const [lon, lat] = data.features[0].geometry.coordinates; locationData.latitude = lat; locationData.longitude = lon; showCurrentLocation(); diyanetStatus.textContent = `✓ ${cityName} (ID: ${cityId})`; return; }
+                } catch { }
+            }
+            locationData.latitude = locationData.longitude = 0;
+            diyanetStatus.textContent = `✓ ${cityName} selected (ID: ${cityId})`;
         });
 
         async function loadSettings() {
+            currentMethodDiv.textContent = 'Default: Turkey (Diyanet)';
+            updateLocationUI();
             try {
-                const response = await fetch('/api/settings');
-                if (response.ok) {
-                    const data = await response.json();
-                    methodSelect.value = data.prayerMethod;
-                    currentMethodDiv.textContent = `Current: ${data.methodName}`;
-                    volumeSlider.value = data.volume || 80;
-                    volumeValue.textContent = volumeSlider.value + '%';
-                    if (data.adhanEnabled) {
-                        adhanToggles.fajr.checked = data.adhanEnabled.fajr !== false;
-                        adhanToggles.dhuhr.checked = data.adhanEnabled.dhuhr !== false;
-                        adhanToggles.asr.checked = data.adhanEnabled.asr !== false;
-                        adhanToggles.maghrib.checked = data.adhanEnabled.maghrib !== false;
-                        adhanToggles.isha.checked = data.adhanEnabled.isha !== false;
-                    }
-                } else {
-                    currentMethodDiv.textContent = 'Could not load current setting';
-                }
-            } catch (e) {
-                currentMethodDiv.textContent = 'Could not connect to device';
-            }
+                const res = await fetch('/api/settings');
+                if (!res.ok) return;
+                const d = await res.json();
+                methodSelect.value = d.prayerMethod || 13;
+                currentMethodDiv.textContent = `Current: ${d.methodName || 'Turkey (Diyanet)'}`;
+                volumeSlider.value = d.volume || 80;
+                volumeValue.textContent = volumeSlider.value + '%';
+                if (d.latitude && d.longitude) Object.assign(locationData, { latitude: d.latitude, longitude: d.longitude, cityName: d.cityName || '', diyanetId: d.diyanetId || null });
+                if (d.adhanEnabled) Object.entries(adhanToggles).forEach(([k, el]) => el.checked = d.adhanEnabled[k] !== false);
+                updateLocationUI();
+            } catch { currentMethodDiv.textContent = 'Using defaults'; }
         }
 
         saveBtn.addEventListener('click', async () => {
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
+            const isDiyanet = methodSelect.value === '13';
+            if (isDiyanet && !locationData.diyanetId) return showStatus('Please select your city from the Diyanet location picker', 'error');
+            if (!isDiyanet && (!locationData.latitude || !locationData.longitude)) return showStatus('Please set your location first', 'error');
+            container.classList.add('form-disabled'); saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
             showStatus('Saving settings...', 'loading');
-
             try {
-                const payload = {
-                    prayerMethod: parseInt(methodSelect.value),
-                    volume: parseInt(volumeSlider.value),
-                    adhanEnabled: {
-                        fajr: adhanToggles.fajr.checked,
-                        dhuhr: adhanToggles.dhuhr.checked,
-                        asr: adhanToggles.asr.checked,
-                        maghrib: adhanToggles.maghrib.checked,
-                        isha: adhanToggles.isha.checked
-                    }
-                };
-
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    showStatus('✓ Settings saved successfully!', 'success');
-                    currentMethodDiv.textContent = `Current: ${data.methodName}`;
-                } else {
-                    showStatus('Failed to save settings. Please try again.', 'error');
-                }
-            } catch (e) {
-                showStatus('Connection error. Please check your network.', 'error');
-            }
-
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save Settings';
+                const adhan = {}; Object.entries(adhanToggles).forEach(([k, el]) => adhan[k] = el.checked);
+                const payload = { prayerMethod: parseInt(methodSelect.value), latitude: locationData.latitude, longitude: locationData.longitude, cityName: locationData.cityName, diyanetId: locationData.diyanetId, volume: parseInt(volumeSlider.value), adhanEnabled: adhan };
+                const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (res.ok) { const d = await res.json(); showStatus('✓ Settings saved successfully!', 'success'); currentMethodDiv.textContent = `Current: ${d.methodName}`; markSaved(); }
+                else showStatus('Failed to save settings. Please try again.', 'error');
+            } catch { showStatus('Connection error. Please check your network.', 'error'); }
+            container.classList.remove('form-disabled'); saveBtn.disabled = false; saveBtn.textContent = 'Save Settings';
         });
 
-        function showStatus(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.className = 'status-message';
-            if (type === 'success') statusMessage.classList.add('status-success');
-            else if (type === 'error') statusMessage.classList.add('status-error');
-            else if (type === 'loading') statusMessage.classList.add('status-loading');
-        }
-
+        function showStatus(msg, type) { statusMessage.textContent = msg; statusMessage.className = 'status-message status-' + type; }
         loadSettings();
     </script>
 </body>
