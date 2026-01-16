@@ -4,6 +4,7 @@
 #include "wifi_credentials.h"
 #include "settings_server.h"
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <LittleFS.h>
 #include <stdlib.h>
 #include <time.h>
@@ -102,6 +103,10 @@ namespace Network
                 if (WiFi.status() == WL_CONNECTED)
                 {
                     Serial.printf("\n[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+
+                    // Disable WiFi power saving to prevent connection resets during transfers
+                    esp_wifi_set_ps(WIFI_PS_NONE);
+                    Serial.println("[WiFi] Power saving disabled for stable transfers");
 
                     if (!WiFiCredentials::hasCredentials())
                     {
