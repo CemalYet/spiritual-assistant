@@ -12,11 +12,14 @@
         :root {
             --blue: #007BFF;
             --green: #28A745;
+            --orange: #F59E0B;
             --gray: #6C757D;
             --gray-light: #9CA3AF;
             --gray-bg: #f7f9fc;
             --border: #e5e7eb;
+            --border-input: #e0e0e0;
             --text: #333;
+            --text-muted: #666;
             --text-dark: #1f2937;
             --radius: 8px;
             --radius-lg: 16px;
@@ -79,13 +82,70 @@
         }
 
         .section {
-            margin-bottom: 0;
-            padding: 24px 0;
-            border-bottom: 1px solid var(--border);
+            margin-bottom: 16px;
+            padding: 20px;
+            background: var(--gray-bg);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
         }
 
         .section:last-of-type {
-            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-content {
+            margin-top: 16px;
+        }
+
+        .section.collapsed .section-content {
+            display: none;
+        }
+
+        .current-summary {
+            font-size: 14px;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+
+        .current-summary.warning {
+            color: var(--orange);
+            font-weight: 500;
+        }
+
+        .btn-edit {
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+            color: var(--text);
+            cursor: pointer;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-edit svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .btn-edit:hover {
+            background: var(--gray-bg);
+            border-color: var(--blue);
+            color: var(--blue);
         }
 
         .section-title {
@@ -139,6 +199,18 @@
             border-color: var(--blue);
         }
 
+        .input-base {
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 2px solid var(--border-input);
+            border-radius: 6px;
+        }
+
+        .input-base:focus {
+            outline: none;
+            border-color: var(--blue);
+        }
+
         .volume-container {
             display: flex;
             align-items: center;
@@ -185,6 +257,32 @@
             text-align: right;
             font-weight: 600;
             color: var(--blue);
+        }
+
+        .btn-test {
+            padding: 8px 12px;
+            font-size: 13px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-bg);
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-test:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-test:active {
+            background: #d1d5db;
+        }
+
+        .btn-test:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .toggle-list {
@@ -396,7 +494,7 @@
 
         .coords {
             font-size: 12px;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .btn-secondary {
@@ -432,15 +530,6 @@
 
         .search-container input {
             flex: 1;
-            padding: 10px 14px;
-            font-size: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-        }
-
-        .search-container input:focus {
-            outline: none;
-            border-color: var(--blue);
         }
 
         .search-input-wrapper {
@@ -450,15 +539,7 @@
 
         .search-input-wrapper input {
             width: 100%;
-            padding: 10px 40px 10px 14px;
-            font-size: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-        }
-
-        .search-input-wrapper input:focus {
-            outline: none;
-            border-color: var(--blue);
+            padding-right: 40px;
         }
 
         .clear-search-btn {
@@ -530,7 +611,7 @@
 
         .link-text {
             font-size: 13px;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .link-text a {
@@ -554,15 +635,6 @@
 
         .coord-field input {
             width: 100%;
-            padding: 10px 14px;
-            font-size: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-        }
-
-        .coord-field input:focus {
-            outline: none;
-            border-color: var(--blue);
         }
 
         .save-container {
@@ -620,112 +692,137 @@
             <p class="subtitle">Spiritual Assistant Configuration</p>
         </div>
 
-        <div class="section">
-            <div class="section-title">
-                <span class="icon"><svg viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-                        <path d="M12 8l2 4-2 2-2-2 2-4z" fill="#007BFF" />
-                    </svg></span>
-                Prayer Calculation Method
+        <div class="section collapsed" id="methodSection">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">
+                        <span class="icon"><svg viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+                                <path d="M12 8l2 4-2 2-2-2 2-4z" fill="#007BFF" />
+                            </svg></span>
+                        Prayer Calculation
+                    </div>
+                    <div id="currentMethod" class="current-summary">Loading...</div>
+                </div>
+                <button type="button" class="btn-edit" id="editMethodBtn"><svg viewBox="0 0 24 24">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>Change</button>
             </div>
-            <label for="prayerMethod">Select calculation method for your region:</label>
-            <select id="prayerMethod">
-                <option value="1">Karachi</option>
-                <option value="2">ISNA (North America)</option>
-                <option value="3">MWL (Muslim World League)</option>
-                <option value="4">Umm al-Qura (Makkah)</option>
-                <option value="5">Egyptian</option>
-                <option value="6">Gulf</option>
-                <option value="7">Tehran</option>
-                <option value="8">Dubai</option>
-                <option value="9">Kuwait</option>
-                <option value="10">Qatar</option>
-                <option value="11">Singapore</option>
-                <option value="12">France (UOIF)</option>
-                <option value="13" selected>Turkey (Diyanet)</option>
-                <option value="14">Russia</option>
-                <option value="15">Moonsighting Committee</option>
-            </select>
-            <div id="currentMethod" class="current-value">Loading current setting...</div>
+            <div class="section-content">
+                <label for="prayerMethod">Select calculation method:</label>
+                <select id="prayerMethod">
+                    <option value="1">Karachi</option>
+                    <option value="2">ISNA (North America)</option>
+                    <option value="3">MWL (Muslim World League)</option>
+                    <option value="4">Umm al-Qura (Makkah)</option>
+                    <option value="5">Egyptian</option>
+                    <option value="6">Gulf</option>
+                    <option value="7">Tehran</option>
+                    <option value="8">Dubai</option>
+                    <option value="9">Kuwait</option>
+                    <option value="10">Qatar</option>
+                    <option value="11">Singapore</option>
+                    <option value="12">France (UOIF)</option>
+                    <option value="13" selected>Turkey (Diyanet)</option>
+                    <option value="14">Russia</option>
+                    <option value="15">Moonsighting Committee</option>
+                </select>
+            </div>
         </div>
 
         <!-- LOCATION SECTION -->
-        <div class="section">
-            <div class="section-title">
-                <span class="icon"><svg viewBox="0 0 24 24">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
-                        <circle cx="12" cy="9" r="2.5" />
-                    </svg></span>
-                Location
-            </div>
-
-            <!-- Current Location Display -->
-            <div id="currentLocation" class="current-location" style="display:none;">
-                <div class="location-info">
-                    <span id="cityNameDisplay">--</span>
-                    <span id="coordsDisplay" class="coords">--</span>
-                </div>
-            </div>
-
-            <!-- Diyanet Location (for method 13) -->
-            <div id="diyanetLocation" style="display:none;">
-                <label for="countrySelect">Country:</label>
-                <select id="countrySelect">
-                    <option value="">Select country...</option>
-                </select>
-
-                <label for="stateSelect" style="margin-top:12px;">State / Province:</label>
-                <select id="stateSelect" disabled>
-                    <option value="">Select state...</option>
-                </select>
-
-                <label for="citySelect" style="margin-top:12px;">City / District:</label>
-                <select id="citySelect" disabled>
-                    <option value="">Select city...</option>
-                </select>
-
-                <div id="diyanetStatus" class="current-value"></div>
-            </div>
-
-            <!-- GPS Location (for other methods) -->
-            <div id="gpsLocation" style="display:none;">
-                <!-- City Search (autocomplete with Photon) -->
-                <div id="citySearchSection">
-                    <label style="display:flex;align-items:center;gap:6px;"><svg
-                            style="width:16px;height:16px;stroke:#007BFF;fill:none;stroke-width:2" viewBox="0 0 24 24">
-                            <circle cx="11" cy="11" r="8" />
-                            <path d="m21 21-4.35-4.35" />
-                        </svg>Search City:</label>
-                    <div class="search-input-wrapper">
-                        <input type="text" id="citySearchInput" placeholder="Start typing city name..."
-                            autocomplete="off">
-                        <button type="button" id="clearSearchBtn" class="clear-search-btn">✕</button>
+        <div class="section collapsed" id="locationSection">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">
+                        <span class="icon"><svg viewBox="0 0 24 24">
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                                <circle cx="12" cy="9" r="2.5" />
+                            </svg></span>
+                        Location
                     </div>
-                    <div id="searchResults" class="search-results"></div>
-                    <div id="manualEntryLink" class="link-text" style="margin-top:10px;">
-                        Can't find your city? <a href="#" id="showManualEntry">Enter manually</a>
+                    <div id="locationSummary" class="current-summary">Not configured</div>
+                </div>
+                <button type="button" class="btn-edit" id="editLocationBtn"><svg viewBox="0 0 24 24">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>Change</button>
+            </div>
+            <div class="section-content">
+                <!-- Current Location Display -->
+                <div id="currentLocation" class="current-location" style="display:none;">
+                    <div class="location-info">
+                        <span id="cityNameDisplay">--</span>
+                        <span id="coordsDisplay" class="coords">--</span>
                     </div>
                 </div>
 
-                <!-- Manual Entry (last resort) -->
-                <div id="manualEntrySection" style="display:none; margin-top:20px;">
-                    <label style="display:flex;align-items:center;gap:6px;"><svg
-                            style="width:16px;height:16px;stroke:#007BFF;fill:none;stroke-width:2" viewBox="0 0 24 24">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>Manual Entry:</label>
-                    <div class="coords-input">
-                        <div class="coord-field">
-                            <label for="manualLat">Latitude:</label>
-                            <input type="number" id="manualLat" step="0.0001" placeholder="41.0082">
+                <!-- Diyanet Location (for method 13) -->
+                <div id="diyanetLocation" style="display:none;">
+                    <label for="countrySelect">Country:</label>
+                    <select id="countrySelect">
+                        <option value="">Select country...</option>
+                    </select>
+
+                    <label for="stateSelect" style="margin-top:12px;">State / Province:</label>
+                    <select id="stateSelect" disabled>
+                        <option value="">Select state...</option>
+                    </select>
+
+                    <label for="citySelect" style="margin-top:12px;">City / District:</label>
+                    <select id="citySelect" disabled>
+                        <option value="">Select city...</option>
+                    </select>
+
+                    <div id="diyanetStatus" class="current-value"></div>
+                </div>
+
+                <!-- GPS Location (for other methods) -->
+                <div id="gpsLocation" style="display:none;">
+                    <!-- City Search (autocomplete with Photon) -->
+                    <div id="citySearchSection">
+                        <label style="display:flex;align-items:center;gap:6px;"><svg
+                                style="width:16px;height:16px;stroke:#007BFF;fill:none;stroke-width:2"
+                                viewBox="0 0 24 24">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.35-4.35" />
+                            </svg>Search City:</label>
+                        <div class="search-input-wrapper">
+                            <input type="text" id="citySearchInput" class="input-base"
+                                placeholder="Start typing city name..." autocomplete="off">
+                            <button type="button" id="clearSearchBtn" class="clear-search-btn">✕</button>
                         </div>
-                        <div class="coord-field">
-                            <label for="manualLng">Longitude:</label>
-                            <input type="number" id="manualLng" step="0.0001" placeholder="28.9784">
+                        <div id="searchResults" class="search-results"></div>
+                        <div id="manualEntryLink" class="link-text" style="margin-top:10px;">
+                            Can't find your city? <a href="#" id="showManualEntry">Enter manually</a>
                         </div>
                     </div>
-                    <button type="button" id="applyManualBtn" class="btn-small" style="margin-top:10px;">Apply</button>
+
+                    <!-- Manual Entry (last resort) -->
+                    <div id="manualEntrySection" style="display:none; margin-top:20px;">
+                        <label style="display:flex;align-items:center;gap:6px;"><svg
+                                style="width:16px;height:16px;stroke:#007BFF;fill:none;stroke-width:2"
+                                viewBox="0 0 24 24">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>Manual Entry:</label>
+                        <div class="coords-input">
+                            <div class="coord-field">
+                                <label for="manualLat">Latitude:</label>
+                                <input type="number" id="manualLat" class="input-base" step="0.0001"
+                                    placeholder="41.0082">
+                            </div>
+                            <div class="coord-field">
+                                <label for="manualLng">Longitude:</label>
+                                <input type="number" id="manualLng" class="input-base" step="0.0001"
+                                    placeholder="28.9784">
+                            </div>
+                        </div>
+                        <button type="button" id="applyManualBtn" class="btn-small"
+                            style="margin-top:10px;">Apply</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -752,6 +849,12 @@
                         <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
                     </svg></span>
                 <span id="volumeValue" class="volume-value">80%</span>
+                <button type="button" id="testVolumeBtn" class="btn-test" title="Test volume">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Test
+                </button>
             </div>
         </div>
 
@@ -856,7 +959,11 @@
         const $ = id => document.getElementById(id);
         const show = el => el.style.display = 'block';
         const hide = el => el.style.display = 'none';
+        const toggle = (el, force) => el.classList.toggle('collapsed', force);
 
+        const methodSection = $('methodSection'), locationSection = $('locationSection');
+        const editMethodBtn = $('editMethodBtn'), editLocationBtn = $('editLocationBtn');
+        const locationSummary = $('locationSummary'), testVolumeBtn = $('testVolumeBtn');
         const methodSelect = $('prayerMethod'), volumeSlider = $('volume'), volumeValue = $('volumeValue');
         const saveBtn = $('saveBtn'), statusMessage = $('statusMessage'), container = document.querySelector('.container');
         const currentMethodDiv = $('currentMethod'), currentLocationDiv = $('currentLocation');
@@ -873,17 +980,47 @@
         let hasUnsavedChanges = false, debounceTimer, countriesLoaded = false;
         const DIYANET_API = '/api/diyanet';
 
+        // Save button starts disabled
+        saveBtn.disabled = true;
+
+        const editIcon = '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+        const checkIcon = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+
+        // Section toggle handlers
+        editMethodBtn.onclick = () => { toggle(methodSection); editMethodBtn.innerHTML = methodSection.classList.contains('collapsed') ? editIcon + 'Change' : checkIcon + 'Done'; };
+        editLocationBtn.onclick = () => { toggle(locationSection); editLocationBtn.innerHTML = locationSection.classList.contains('collapsed') ? editIcon + 'Change' : checkIcon + 'Done'; if (!locationSection.classList.contains('collapsed')) updateLocationUI(); };
+
+        // Test volume button
+        testVolumeBtn.onclick = async () => {
+            testVolumeBtn.disabled = true;
+            testVolumeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+            try { await fetch('/api/test-audio?volume=' + volumeSlider.value); } catch { }
+            setTimeout(() => { testVolumeBtn.disabled = false; testVolumeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Test'; }, 3000);
+        };
+
         function markUnsaved() {
             if (hasUnsavedChanges) return;
             hasUnsavedChanges = true;
+            saveBtn.disabled = false;
             saveBtn.classList.add('has-changes');
-            saveBtn.textContent = 'Save Settings';
         }
-        function markSaved() { hasUnsavedChanges = false; saveBtn.classList.remove('has-changes'); }
+        function markSaved() {
+            hasUnsavedChanges = false;
+            saveBtn.disabled = true;
+            saveBtn.classList.remove('has-changes');
+        }
+
+        function updateSummaries() {
+            const methodName = methodSelect.options[methodSelect.selectedIndex]?.text || 'Turkey (Diyanet)';
+            currentMethodDiv.textContent = methodName;
+            const hasLocation = locationData.cityName || locationData.latitude;
+            locationSummary.textContent = hasLocation ? (locationData.cityName || `${locationData.latitude.toFixed(2)}°, ${locationData.longitude.toFixed(2)}°`) : 'Not configured';
+            locationSummary.classList.toggle('warning', !hasLocation);
+        }
 
         window.addEventListener('beforeunload', e => { if (hasUnsavedChanges) { e.preventDefault(); e.returnValue = ''; } });
         volumeSlider.addEventListener('input', () => { volumeValue.textContent = volumeSlider.value + '%'; markUnsaved(); });
-        methodSelect.addEventListener('change', () => { updateLocationUI(); markUnsaved(); });
+        methodSelect.addEventListener('change', () => { updateLocationUI(); updateSummaries(); markUnsaved(); });
         Object.values(adhanToggles).forEach(t => t.addEventListener('change', markUnsaved));
 
         function updateLocationUI() {
@@ -892,6 +1029,7 @@
             gpsLocationDiv.style.display = isDiyanet ? 'none' : 'block';
             if (isDiyanet && locationData.diyanetId) diyanetStatus.textContent = `Current: ID ${locationData.diyanetId}`;
             if (locationData.latitude && locationData.longitude) showCurrentLocation();
+            updateSummaries();
         }
         function showCurrentLocation() {
             show(currentLocationDiv);
@@ -1005,11 +1143,12 @@
             locationData.diyanetId = parseInt(cityId);
             locationData.cityName = `${cityName}, ${stateName}, ${countryName}`;
             markUnsaved();
+            updateSummaries();
             diyanetStatus.textContent = '✓ Getting coordinates...';
             for (const q of [`${cityName} ${stateName} ${countryName}`, `${cityName} ${countryName}`, `${stateName} ${countryName}`]) {
                 try {
                     const data = await (await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`)).json();
-                    if (data.features?.length) { const [lon, lat] = data.features[0].geometry.coordinates; locationData.latitude = lat; locationData.longitude = lon; showCurrentLocation(); diyanetStatus.textContent = `✓ ${cityName} (ID: ${cityId})`; return; }
+                    if (data.features?.length) { const [lon, lat] = data.features[0].geometry.coordinates; locationData.latitude = lat; locationData.longitude = lon; showCurrentLocation(); updateSummaries(); diyanetStatus.textContent = `✓ ${cityName} (ID: ${cityId})`; return; }
                 } catch { }
             }
             locationData.latitude = locationData.longitude = 0;
@@ -1017,20 +1156,20 @@
         });
 
         async function loadSettings() {
-            currentMethodDiv.textContent = 'Default: Turkey (Diyanet)';
-            updateLocationUI();
+            currentMethodDiv.textContent = 'Turkey (Diyanet)';
+            locationSummary.textContent = 'Not configured';
             try {
                 const res = await fetch('/api/settings');
                 if (!res.ok) return;
                 const d = await res.json();
                 methodSelect.value = d.prayerMethod || 13;
-                currentMethodDiv.textContent = `Current: ${d.methodName || 'Turkey (Diyanet)'}`;
                 volumeSlider.value = d.volume || 80;
                 volumeValue.textContent = volumeSlider.value + '%';
                 if (d.latitude && d.longitude) Object.assign(locationData, { latitude: d.latitude, longitude: d.longitude, cityName: d.cityName || '', diyanetId: d.diyanetId || null });
                 if (d.adhanEnabled) Object.entries(adhanToggles).forEach(([k, el]) => el.checked = d.adhanEnabled[k] !== false);
+                updateSummaries();
                 updateLocationUI();
-            } catch { currentMethodDiv.textContent = 'Using defaults'; }
+            } catch { currentMethodDiv.textContent = 'Turkey (Diyanet)'; }
         }
 
         saveBtn.addEventListener('click', async () => {
