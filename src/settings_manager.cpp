@@ -16,10 +16,23 @@ namespace SettingsManager
     constexpr const char *KEY_ADHAN_MAGHRIB = "adhanMaghrib";
     constexpr const char *KEY_ADHAN_ISHA = "adhanIsha";
 
+    // Location keys
+    constexpr const char *KEY_LATITUDE = "latitude";
+    constexpr const char *KEY_LONGITUDE = "longitude";
+    constexpr const char *KEY_CITY_NAME = "cityName";
+    constexpr const char *KEY_DIYANET_ID = "diyanetId";
+
     // Cached values to avoid frequent NVS reads
     static int cachedPrayerMethod = -1;
     static int8_t cachedVolume = -1;
     static int8_t cachedAdhanEnabled[6] = {-1, -1, -1, -1, -1, -1}; // -1 = not loaded
+
+    // Location cache (static buffers - no heap)
+    static double cachedLatitude = NAN;
+    static double cachedLongitude = NAN;
+    static char cachedCityName[96] = {0}; // "City, State, Country" format
+    static int32_t cachedDiyanetId = -1;
+    static bool locationLoaded = false;
 
     // Action flags
     static volatile bool flagRecalculation = false;
@@ -277,5 +290,133 @@ namespace SettingsManager
     void clearWiFiReconnectFlag()
     {
         flagWiFiReconnect = false;
+    }
+
+    // --- Location Implementation ---
+
+    static void loadLocationIfNeeded()
+    {
+        if (locationLoaded)
+            return;
+
+        preferences.begin(NAMESPACE, true);
+        cachedLatitude = preferences.getDouble(KEY_LATITUDE, NAN);
+        cachedLongitude = preferences.getDouble(KEY_LONGITUDE, NAN);
+        cachedDiyanetId = preferences.getInt(KEY_DIYANET_ID, -1);
+
+        // Read city name into static buffer
+        size_t len = preferences.getString(KEY_CITY_NAME, cachedCityName, sizeof(cachedCityName));
+        if (len == 0)
+            cachedCityName[0] = '\0';
+
+        preferences.end();
+        locationLoaded = true;
+
+        Serial.printf("[Settings] Location loaded: %.4f, %.4f (%s) DiyanetID=%d\n",
+                      cachedLatitude, cachedLongitude,
+                      cachedCityName[0] ? cachedCityName : "unnamed",
+                      cachedDiyanetId);
+    }
+
+    double getLatitude()
+    {
+        loadLocationIfNeeded();
+        return cachedLatitude;
+    }
+
+    double getLongitude()
+    {
+        loadLocationIfNeeded();
+        return cachedLongitude;
+    }
+
+    bool setLocation(double latitude, double longitude)
+    {
+        loadLocationIfNeeded();
+
+        // Skip if unchanged
+        if (cachedLatitude == latitude && cachedLongitude == longitude)
+            return true;
+
+        if (!preferences.begin(NAMESPACE, false))
+        {
+            Serial.println("[Settings] ERROR: Failed to open NVS!");
+            return false;
+        }
+
+        bool success = preferences.putDouble(KEY_LATITUDE, latitude) &&
+                       preferences.putDouble(KEY_LONGITUDE, longitude);
+        preferences.end();
+
+        if (success)
+        {
+            cachedLatitude = latitude;
+            cachedLongitude = longitude;
+            flagRecalculation = true;
+            Serial.printf("[Settings] Location saved: %.4f, %.4f\n", latitude, longitude);
+        }
+
+        return success;
+    }
+
+    const char *getCityName()
+    {
+        loadLocationIfNeeded();
+        return cachedCityName;
+    }
+
+    bool setCityName(const char *name)
+    {
+        if (!name)
+            name = "";
+
+        // Copy to cache (strlcpy always null-terminates)
+        strlcpy(cachedCityName, name, sizeof(cachedCityName));
+
+        if (!preferences.begin(NAMESPACE, false))
+        {
+            Serial.println("[Settings] ERROR: Failed to open NVS!");
+            return false;
+        }
+
+        bool success = preferences.putString(KEY_CITY_NAME, cachedCityName) > 0;
+        preferences.end();
+
+        if (success)
+            Serial.printf("[Settings] City name saved: %s\n", cachedCityName);
+
+        return success;
+    }
+
+    int32_t getDiyanetId()
+    {
+        loadLocationIfNeeded();
+        return cachedDiyanetId;
+    }
+
+    bool setDiyanetId(int32_t id)
+    {
+        loadLocationIfNeeded();
+
+        if (cachedDiyanetId == id)
+            return true;
+
+        if (!preferences.begin(NAMESPACE, false))
+        {
+            Serial.println("[Settings] ERROR: Failed to open NVS!");
+            return false;
+        }
+
+        bool success = preferences.putInt(KEY_DIYANET_ID, id) > 0;
+        preferences.end();
+
+        if (success)
+        {
+            cachedDiyanetId = id;
+            flagRecalculation = true;
+            Serial.printf("[Settings] Diyanet ID saved: %d\n", id);
+        }
+
+        return success;
     }
 }

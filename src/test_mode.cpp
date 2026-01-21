@@ -159,7 +159,7 @@ namespace TestMode
 
         // Run 30-day test with configured method
         Serial.printf("[Test] Running: 30-day prayer times (Method %d)\n", Config::PRAYER_METHOD);
-        print30DaysAdhanLibrary(Config::PRAYER_METHOD, Config::LATITUDE, Config::LONGITUDE);
+        print30DaysAdhanLibrary(Config::PRAYER_METHOD, Config::TEST_LATITUDE, Config::TEST_LONGITUDE);
 
         Serial.println("\n╔═══════════════════════════════════════════════╗");
         Serial.println("║          🎉 ALL TESTS COMPLETED 🎉           ║");

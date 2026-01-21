@@ -16,12 +16,11 @@ namespace Config
 {
     constexpr std::string_view WIFI_SSID = ""; // Empty - use portal for configuration
     constexpr std::string_view WIFI_PASS = ""; // Empty - use portal for configuration
-    constexpr std::string_view CITY = "Leuven";
-    constexpr std::string_view COUNTRY = "Belgium";
 
-    // Location coordinates (for Adhan library calculation)
-    constexpr double LATITUDE = 50.8798; // Leuven
-    constexpr double LONGITUDE = 4.7005;
+    // --- TEST MODE DEFAULTS (only used when TEST_MODE = true) ---
+    constexpr double TEST_LATITUDE = 50.8798; // Leuven
+    constexpr double TEST_LONGITUDE = 4.7005;
+    constexpr int TEST_DIYANET_ILCE_ID = 11706; // Leuven
 
     constexpr int PRAYER_METHOD = 13; // Diyanet (13 = use abdus.dev API or Adhan library)
 
@@ -63,9 +62,7 @@ namespace Config
 
     // Diyanet API (ezanvakti.emushaf.net) - 30 days cached
     constexpr std::string_view DIYANET_API_BASE = "https://ezanvakti.emushaf.net";
-    constexpr int DIYANET_ILCE_ID = 11706; // Leuven (LEUVEN (LOUVAIN))
-    // To find your city ID: https://ezanvakti.emushaf.net/docs
-    // Example: Belgium -> /sehirler/11 -> /ilceler/664 -> find your city
+    // DiyanetId is now stored in NVS via SettingsManager
 
     // LCD Configuration
     constexpr bool LCD_ENABLED = true;
