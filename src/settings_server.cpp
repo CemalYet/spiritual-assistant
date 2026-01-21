@@ -106,7 +106,7 @@ namespace SettingsServer
 
     static void serveSettingsPage()
     {
-        if (HttpHelpers::serveFile(server, "/settings.html", "text/html", 0))
+        if (HttpHelpers::serveFile(server, "/settings.html", "text/html", 300)) // 5 min cache
             return;
 
         server->send(HttpHelpers::HTTP_OK, "text/html",
@@ -119,6 +119,14 @@ namespace SettingsServer
         doc["prayerMethod"] = SettingsManager::getPrayerMethod();
         doc["methodName"] = SettingsManager::getMethodName(SettingsManager::getPrayerMethod());
         doc["volume"] = SettingsManager::getVolume();
+
+        // Location data
+        doc["latitude"] = SettingsManager::getLatitude();
+        doc["longitude"] = SettingsManager::getLongitude();
+        doc["cityName"] = SettingsManager::getCityName();
+        int32_t diyanetId = SettingsManager::getDiyanetId();
+        if (diyanetId > 0)
+            doc["diyanetId"] = diyanetId;
 
         JsonObject adhan = doc["adhanEnabled"].to<JsonObject>();
         adhan["fajr"] = SettingsManager::getAdhanEnabled(PrayerType::Fajr);
@@ -176,6 +184,20 @@ namespace SettingsServer
             }
         }
 
+        // Location data
+        if (doc["latitude"].is<double>() && doc["longitude"].is<double>())
+        {
+            changed |= SettingsManager::setLocation(
+                doc["latitude"].as<double>(),
+                doc["longitude"].as<double>());
+        }
+
+        if (doc["cityName"].is<const char *>())
+            changed |= SettingsManager::setCityName(doc["cityName"].as<const char *>());
+
+        if (doc["diyanetId"].is<int>())
+            changed |= SettingsManager::setDiyanetId(doc["diyanetId"].as<int32_t>());
+
         if (!changed)
             return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "No valid settings");
 
@@ -197,6 +219,7 @@ namespace SettingsServer
         client.setInsecure();
 
         HTTPClient http;
+        http.useHTTP10(true);
         http.begin(client, String(DIYANET_API) + endpoint);
         http.setTimeout(PROXY_TIMEOUT);
 

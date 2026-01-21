@@ -5,9 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Spiritual Assistant - Settings</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --blue: #007BFF;
@@ -32,7 +29,7 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             background: #F8F9FA;
             min-height: 100vh;
             display: flex;
@@ -124,7 +121,7 @@
             border-top: 1px solid var(--border);
         }
 
-        .section-content > * + * {
+        .section-content>*+* {
             margin-top: 12px;
         }
 
@@ -152,11 +149,11 @@
         }
 
         .section-header.clickable:hover {
-            background: rgba(0,123,255,0.04);
+            background: rgba(0, 123, 255, 0.04);
         }
 
         .section-header.clickable:active {
-            background: rgba(0,123,255,0.08);
+            background: rgba(0, 123, 255, 0.08);
         }
 
         .chevron {
@@ -787,7 +784,9 @@
                     </div>
                     <div id="currentMethod" class="current-summary">Loading...</div>
                 </div>
-                <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg class="chevron" viewBox="0 0 24 24">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
             </div>
             <div class="section-content">
                 <label for="prayerMethod">Select calculation method:</label>
@@ -824,7 +823,9 @@
                     </div>
                     <div id="locationSummary" class="current-summary">Not configured</div>
                 </div>
-                <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg class="chevron" viewBox="0 0 24 24">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
             </div>
             <div class="section-content">
                 <!-- Current Location Display -->
@@ -839,14 +840,15 @@
                 <div id="diyanetLocation" style="display:none;">
                     <!-- Breadcrumb - shows selected path -->
                     <div id="diyanetBreadcrumb" class="breadcrumb" style="display:none;"></div>
-                    
+
                     <!-- Single search input -->
                     <label id="diyanetSearchLabel">Country:</label>
-                    <input type="text" id="diyanetSearchInput" class="input-base" placeholder="Type to search..." autocomplete="off">
-                    
+                    <input type="text" id="diyanetSearchInput" class="input-base" placeholder="Type to search..."
+                        autocomplete="off">
+
                     <!-- Results list -->
                     <div id="diyanetResults" class="search-results"></div>
-                    
+
                     <div id="diyanetStatus" class="current-value"></div>
                 </div>
 
@@ -1055,7 +1057,7 @@
 
         // Clickable header handlers
         methodHeader.onclick = () => toggle(methodSection);
-        locationHeader.onclick = () => { toggle(locationSection); if (!locationSection.classList.contains('collapsed')) updateLocationUI(); };
+        locationHeader.onclick = () => { toggle(locationSection); if (!locationSection.classList.contains('collapsed')) updateLocationUI(true); };
 
         // Test volume button
         testVolumeBtn.onclick = async () => {
@@ -1087,15 +1089,15 @@
 
         window.addEventListener('beforeunload', e => { if (hasUnsavedChanges) { e.preventDefault(); e.returnValue = ''; } });
         volumeSlider.addEventListener('input', () => { volumeValue.textContent = volumeSlider.value + '%'; markUnsaved(); });
-        methodSelect.addEventListener('change', () => { updateLocationUI(); updateSummaries(); markUnsaved(); });
+        methodSelect.addEventListener('change', () => { updateLocationUI(true); updateSummaries(); markUnsaved(); });
         Object.values(adhanToggles).forEach(t => t.addEventListener('change', markUnsaved));
 
-        function updateLocationUI() {
+        function updateLocationUI(loadCountries = false) {
             const isDiyanet = methodSelect.value === '13';
             diyanetLocationDiv.style.display = isDiyanet ? 'block' : 'none';
             gpsLocationDiv.style.display = isDiyanet ? 'none' : 'block';
-            if (isDiyanet) {
-                // Reset and show picker UI for new selection
+            if (isDiyanet && loadCountries) {
+                // Only load countries when section is expanded
                 resetDiyanetPicker();
             }
             if (locationData.latitude && locationData.longitude) showCurrentLocation();
@@ -1129,6 +1131,7 @@
         function setLocation(lat, lng, name) {
             Object.assign(locationData, { latitude: lat, longitude: lng, cityName: name });
             showCurrentLocation();
+            updateSummaries();
             markUnsaved();
         }
 
@@ -1159,7 +1162,7 @@
                     item.onclick = () => { setLocation(lat, lon, displayName); searchResults.innerHTML = ''; citySearchInput.value = name; };
                     searchResults.appendChild(item);
                 });
-            } catch { searchResults.innerHTML = '<div class="current-value">Search failed. Try again.</div>'; }
+            } catch { searchResults.innerHTML = '<div class="current-value">! Search failed. Try again.</div>'; }
         }
 
         showManualEntryLink.addEventListener('click', e => { e.preventDefault(); show(manualEntrySection); });
@@ -1202,12 +1205,12 @@
                 diyanetInput.disabled = false;
                 diyanetInput.placeholder = 'Type country name...';
                 // Don't show dropdown yet - wait for user to focus/type
-            } catch { 
+            } catch {
                 diyanetState.loading = false;
                 diyanetInput.disabled = false;
                 diyanetInput.placeholder = 'Type to search...';
-                diyanetResults.innerHTML = '<div class="current-value">⚠️ Failed to load. Tap to retry.</div>'; 
-                diyanetResults.onclick = initDiyanetPicker; 
+                diyanetResults.innerHTML = '<div class="current-value">! Failed to load. Tap to retry.</div>';
+                diyanetResults.onclick = initDiyanetPicker;
             }
         }
 
@@ -1247,11 +1250,12 @@
                 diyanetInput.disabled = false;
                 diyanetInput.placeholder = placeholder;
                 renderDiyanetList(diyanetState.cache.slice(0, 15), false);
-            } catch { 
+            } catch {
                 diyanetState.loading = false;
                 diyanetInput.disabled = false;
                 diyanetInput.placeholder = placeholder;
-                diyanetResults.innerHTML = '<div class="current-value">Failed to load</div>'; 
+                diyanetResults.innerHTML = '<div class="current-value">! Failed to load. Tap to retry.</div>';
+                diyanetResults.onclick = () => loadDiyanetLevel(endpoint, idKey, nameKey, label, placeholder);
             }
         }
 
@@ -1278,13 +1282,13 @@
             if (diyanetState.country) parts.push({ name: diyanetState.country.name, level: 'country' });
             if (diyanetState.state) parts.push({ name: diyanetState.state.name, level: 'state' });
             if (diyanetState.city) parts.push({ name: diyanetState.city.name, level: 'city' });
-            
+
             if (!parts.length) { hide(diyanetBreadcrumb); return; }
             show(diyanetBreadcrumb);
-            diyanetBreadcrumb.innerHTML = parts.map((p, i) => 
+            diyanetBreadcrumb.innerHTML = parts.map((p, i) =>
                 `<span class="breadcrumb-chip" data-level="${p.level}">${p.name} <span class="remove">×</span></span>`
             ).join('<span class="breadcrumb-separator">›</span>');
-            
+
             diyanetBreadcrumb.querySelectorAll('.breadcrumb-chip').forEach(chip => {
                 chip.onclick = () => goBackToLevel(chip.dataset.level);
             });
@@ -1359,7 +1363,7 @@
             } else if (!diyanetResults.innerHTML) {
                 // Show list on focus if dropdown is empty
                 const query = diyanetInput.value.toLowerCase().trim();
-                const filtered = query 
+                const filtered = query
                     ? diyanetState.cache.filter(i => i.name.toLowerCase().includes(query)).slice(0, 15)
                     : diyanetState.cache.slice(0, 15);
                 renderDiyanetList(filtered, diyanetState.level === 'country');

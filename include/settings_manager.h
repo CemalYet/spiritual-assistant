@@ -37,6 +37,17 @@ namespace SettingsManager
     // Get volume mapped to hardware range (0-21)
     uint8_t getHardwareVolume();
 
+    // --- Location Settings ---
+    double getLatitude();
+    double getLongitude();
+    bool setLocation(double latitude, double longitude);
+
+    const char *getCityName();
+    bool setCityName(const char *name);
+
+    int32_t getDiyanetId();
+    bool setDiyanetId(int32_t id);
+
     // --- Action Flags ---
     // Check if prayer times need recalculation (method or location changed)
     bool needsRecalculation();

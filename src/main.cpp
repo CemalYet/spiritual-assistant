@@ -67,8 +67,16 @@ bool loadPrayerTimes(int method, int dayOffset = 0)
     }
 
     // Use Adhan library calculation (logging happens inside calculateTimes)
-    return PrayerCalculator::calculateTimes(app.prayers, method,
-                                            Config::LATITUDE, Config::LONGITUDE, dayOffset);
+    double lat = SettingsManager::getLatitude();
+    double lng = SettingsManager::getLongitude();
+
+    if (std::isnan(lat) || std::isnan(lng))
+    {
+        Serial.println("[Prayer] ERROR: Location not configured!");
+        return false;
+    }
+
+    return PrayerCalculator::calculateTimes(app.prayers, method, lat, lng, dayOffset);
 }
 
 // Checks if we need tomorrow's prayer times (current time is past Isha)

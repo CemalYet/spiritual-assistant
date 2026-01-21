@@ -2,6 +2,7 @@
 #include "config.h"
 #include "current_time.h"
 #include "diyanet_parser.h"
+#include "settings_manager.h"
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
@@ -126,8 +127,15 @@ namespace
 
 bool PrayerAPI::fetchMonthlyPrayerTimes(int ilceId)
 {
-    if (ilceId == 0)
-        ilceId = Config::DIYANET_ILCE_ID;
+    if (ilceId <= 0)
+        ilceId = SettingsManager::getDiyanetId();
+
+    // Still no valid ID? Can't fetch
+    if (ilceId <= 0)
+    {
+        Serial.println("[Diyanet] ERROR: No diyanetId configured!");
+        return false;
+    }
 
     // Check cache first
     if (s_cache.totalDays == 0)
@@ -147,6 +155,7 @@ bool PrayerAPI::fetchMonthlyPrayerTimes(int ilceId)
 
     String url = String(Config::DIYANET_API_BASE.data()) + "/vakitler/" + String(ilceId);
     http.begin(client, url);
+    http.useHTTP10(true);
     http.setTimeout(HTTP_TIMEOUT_MS);
 
     const int httpCode = http.GET();
@@ -243,6 +252,12 @@ bool PrayerAPI::getCachedPrayerTimes(DailyPrayers &prayers, bool forTomorrow)
     {
         if (!loadCache())
             return false;
+    }
+
+    int32_t currentIlceId = SettingsManager::getDiyanetId();
+    if (s_cache.ilceId != currentIlceId)
+    {
+        return false; // Location changed, need fresh data
     }
 
     int dayOffset = 0; // Default: today (first day in cache)
