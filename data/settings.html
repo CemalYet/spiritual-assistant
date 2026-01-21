@@ -37,20 +37,21 @@
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
-            padding: 20px;
+            align-items: flex-start;
+            padding: 12px;
         }
 
         .container {
             background: #fff;
             border-radius: var(--radius-lg);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
+            max-width: 540px;
             width: 100%;
-            padding: 40px;
+            padding: 24px 16px;
             border: 1px solid var(--border);
             position: relative;
             overflow: hidden;
+            margin-top: 8px;
         }
 
         .header {
@@ -96,22 +97,20 @@
         .section-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             gap: 12px;
         }
 
-        .section-content {
-            margin-top: 16px;
-        }
-
-        .section.collapsed .section-content {
-            display: none;
+        .section-header>div:first-child {
+            flex: 1;
+            min-width: 0;
         }
 
         .current-summary {
             font-size: 14px;
             color: var(--gray);
             margin-top: 4px;
+            word-break: break-word;
         }
 
         .current-summary.warning {
@@ -119,33 +118,63 @@
             font-weight: 500;
         }
 
-        .btn-edit {
-            padding: 6px 14px;
-            font-size: 13px;
-            font-weight: 500;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #fff;
-            color: var(--text);
+        .section-content {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .section-content > * + * {
+            margin-top: 12px;
+        }
+
+        .section.collapsed .section-content {
+            display: none;
+        }
+
+        /* Hide summary when section is expanded (not collapsed) */
+        .section:not(.collapsed) .current-summary {
+            display: none;
+        }
+
+        /* Clickable header for collapsible sections */
+        .section-header.clickable {
             cursor: pointer;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            transition: background 0.15s ease;
+            margin: -20px -20px 0;
+            padding: 20px;
+            border-radius: var(--radius) var(--radius) 0 0;
         }
 
-        .btn-edit svg {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            fill: none;
+        .section.collapsed .section-header.clickable {
+            margin-bottom: -20px;
+            border-radius: var(--radius);
+        }
+
+        .section-header.clickable:hover {
+            background: rgba(0,123,255,0.04);
+        }
+
+        .section-header.clickable:active {
+            background: rgba(0,123,255,0.08);
+        }
+
+        .chevron {
+            width: 20px;
+            height: 20px;
+            stroke: var(--gray);
             stroke-width: 2;
+            fill: none;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
         }
 
-        .btn-edit:hover {
-            background: var(--gray-bg);
-            border-color: var(--blue);
-            color: var(--blue);
+        .section.collapsed .chevron {
+            transform: rotate(0deg);
+        }
+
+        .section:not(.collapsed) .chevron {
+            transform: rotate(180deg);
         }
 
         .section-title {
@@ -177,9 +206,12 @@
 
         label {
             display: block;
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
         }
 
         select {
@@ -209,6 +241,45 @@
         .input-base:focus {
             outline: none;
             border-color: var(--blue);
+        }
+
+        /* Breadcrumb chips */
+        .breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .breadcrumb-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            background: var(--blue);
+            color: #fff;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .breadcrumb-chip:hover {
+            background: #0056b3;
+        }
+
+        .breadcrumb-chip .remove {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .breadcrumb-separator {
+            color: var(--text-muted);
+            align-self: center;
+            font-size: 12px;
         }
 
         .volume-container {
@@ -260,24 +331,26 @@
         }
 
         .btn-test {
-            padding: 8px 12px;
-            font-size: 13px;
+            padding: 8px;
             border: none;
-            border-radius: 6px;
-            background: var(--gray-bg);
-            color: var(--text);
+            border-radius: 50%;
+            background: var(--blue);
+            color: #fff;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
         }
 
         .btn-test:hover {
-            background: #e5e7eb;
+            background: #0056b3;
         }
 
         .btn-test:active {
-            background: #d1d5db;
+            background: #004494;
         }
 
         .btn-test:disabled {
@@ -477,24 +550,26 @@
             background: #f0fdf4;
             border: 1px solid #86efac;
             border-radius: var(--radius);
-            padding: 12px 16px;
-            margin-bottom: 15px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
         }
 
         .location-info {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
         }
 
         .location-info span:first-child {
+            font-size: 16px;
             font-weight: 600;
             color: #166534;
         }
 
         .coords {
-            font-size: 12px;
-            color: var(--text-muted);
+            font-size: 13px;
+            color: #15803d;
+            opacity: 0.8;
         }
 
         .btn-secondary {
@@ -566,20 +641,20 @@
 
         .search-results {
             margin-top: 8px;
-            max-height: 200px;
+            max-height: 260px;
             overflow-y: auto;
         }
 
         .search-result-item {
-            padding: 14px 16px;
+            padding: 12px 14px;
             background: var(--gray-bg);
             border-radius: var(--radius);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 2px solid transparent;
+            border: 1px solid transparent;
             transition: all 0.15s ease;
         }
 
@@ -591,20 +666,27 @@
         .search-result-item:active {
             background: var(--blue);
             color: #fff;
-            transform: scale(0.98);
+            transform: scale(0.99);
         }
 
         .search-result-item .result-text {
             flex: 1;
+            font-size: 14px;
             font-weight: 500;
+            color: var(--text-dark);
         }
 
         .search-result-item .result-arrow {
-            color: var(--blue);
-            font-size: 18px;
-            margin-left: 12px;
+            color: var(--text-muted);
+            font-size: 16px;
+            margin-left: 8px;
         }
 
+        .search-result-item:hover .result-arrow {
+            color: var(--blue);
+        }
+
+        .search-result-item:active .result-text,
         .search-result-item:active .result-arrow {
             color: #fff;
         }
@@ -693,7 +775,7 @@
         </div>
 
         <div class="section collapsed" id="methodSection">
-            <div class="section-header">
+            <div class="section-header clickable" id="methodHeader">
                 <div>
                     <div class="section-title">
                         <span class="icon"><svg viewBox="0 0 24 24">
@@ -705,10 +787,7 @@
                     </div>
                     <div id="currentMethod" class="current-summary">Loading...</div>
                 </div>
-                <button type="button" class="btn-edit" id="editMethodBtn"><svg viewBox="0 0 24 24">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>Change</button>
+                <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div class="section-content">
                 <label for="prayerMethod">Select calculation method:</label>
@@ -734,7 +813,7 @@
 
         <!-- LOCATION SECTION -->
         <div class="section collapsed" id="locationSection">
-            <div class="section-header">
+            <div class="section-header clickable" id="locationHeader">
                 <div>
                     <div class="section-title">
                         <span class="icon"><svg viewBox="0 0 24 24">
@@ -745,10 +824,7 @@
                     </div>
                     <div id="locationSummary" class="current-summary">Not configured</div>
                 </div>
-                <button type="button" class="btn-edit" id="editLocationBtn"><svg viewBox="0 0 24 24">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>Change</button>
+                <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div class="section-content">
                 <!-- Current Location Display -->
@@ -761,21 +837,16 @@
 
                 <!-- Diyanet Location (for method 13) -->
                 <div id="diyanetLocation" style="display:none;">
-                    <label for="countrySelect">Country:</label>
-                    <select id="countrySelect">
-                        <option value="">Select country...</option>
-                    </select>
-
-                    <label for="stateSelect" style="margin-top:12px;">State / Province:</label>
-                    <select id="stateSelect" disabled>
-                        <option value="">Select state...</option>
-                    </select>
-
-                    <label for="citySelect" style="margin-top:12px;">City / District:</label>
-                    <select id="citySelect" disabled>
-                        <option value="">Select city...</option>
-                    </select>
-
+                    <!-- Breadcrumb - shows selected path -->
+                    <div id="diyanetBreadcrumb" class="breadcrumb" style="display:none;"></div>
+                    
+                    <!-- Single search input -->
+                    <label id="diyanetSearchLabel">Country:</label>
+                    <input type="text" id="diyanetSearchInput" class="input-base" placeholder="Type to search..." autocomplete="off">
+                    
+                    <!-- Results list -->
+                    <div id="diyanetResults" class="search-results"></div>
+                    
                     <div id="diyanetStatus" class="current-value"></div>
                 </div>
 
@@ -808,7 +879,7 @@
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>Manual Entry:</label>
-                        <div class="coords-input">
+                        <div class="coords-input" style="align-items:flex-end;">
                             <div class="coord-field">
                                 <label for="manualLat">Latitude:</label>
                                 <input type="number" id="manualLat" class="input-base" step="0.0001"
@@ -819,9 +890,8 @@
                                 <input type="number" id="manualLng" class="input-base" step="0.0001"
                                     placeholder="28.9784">
                             </div>
+                            <button type="button" id="applyManualBtn" class="btn-small">Apply</button>
                         </div>
-                        <button type="button" id="applyManualBtn" class="btn-small"
-                            style="margin-top:10px;">Apply</button>
                     </div>
                 </div>
             </div>
@@ -850,10 +920,9 @@
                     </svg></span>
                 <span id="volumeValue" class="volume-value">80%</span>
                 <button type="button" id="testVolumeBtn" class="btn-test" title="Test volume">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M8 5v14l11-7z" />
                     </svg>
-                    Test
                 </button>
             </div>
         </div>
@@ -962,7 +1031,6 @@
         const toggle = (el, force) => el.classList.toggle('collapsed', force);
 
         const methodSection = $('methodSection'), locationSection = $('locationSection');
-        const editMethodBtn = $('editMethodBtn'), editLocationBtn = $('editLocationBtn');
         const locationSummary = $('locationSummary'), testVolumeBtn = $('testVolumeBtn');
         const methodSelect = $('prayerMethod'), volumeSlider = $('volume'), volumeValue = $('volumeValue');
         const saveBtn = $('saveBtn'), statusMessage = $('statusMessage'), container = document.querySelector('.container');
@@ -972,30 +1040,29 @@
         const clearSearchBtn = $('clearSearchBtn'), searchResults = $('searchResults');
         const showManualEntryLink = $('showManualEntry'), manualEntrySection = $('manualEntrySection');
         const manualLat = $('manualLat'), manualLng = $('manualLng'), applyManualBtn = $('applyManualBtn');
-        const diyanetLocationDiv = $('diyanetLocation'), countrySelect = $('countrySelect');
-        const stateSelect = $('stateSelect'), citySelect = $('citySelect'), diyanetStatus = $('diyanetStatus');
+        const diyanetLocationDiv = $('diyanetLocation'), diyanetStatus = $('diyanetStatus');
 
         let locationData = { latitude: null, longitude: null, cityName: '', diyanetId: null };
         const adhanToggles = { fajr: $('adhanFajr'), dhuhr: $('adhanDhuhr'), asr: $('adhanAsr'), maghrib: $('adhanMaghrib'), isha: $('adhanIsha') };
-        let hasUnsavedChanges = false, debounceTimer, countriesLoaded = false;
+        let hasUnsavedChanges = false, debounceTimer;
         const DIYANET_API = '/api/diyanet';
 
         // Save button starts disabled
         saveBtn.disabled = true;
 
-        const editIcon = '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-        const checkIcon = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+        // Header references
+        const methodHeader = $('methodHeader'), locationHeader = $('locationHeader');
 
-        // Section toggle handlers
-        editMethodBtn.onclick = () => { toggle(methodSection); editMethodBtn.innerHTML = methodSection.classList.contains('collapsed') ? editIcon + 'Change' : checkIcon + 'Done'; };
-        editLocationBtn.onclick = () => { toggle(locationSection); editLocationBtn.innerHTML = locationSection.classList.contains('collapsed') ? editIcon + 'Change' : checkIcon + 'Done'; if (!locationSection.classList.contains('collapsed')) updateLocationUI(); };
+        // Clickable header handlers
+        methodHeader.onclick = () => toggle(methodSection);
+        locationHeader.onclick = () => { toggle(locationSection); if (!locationSection.classList.contains('collapsed')) updateLocationUI(); };
 
         // Test volume button
         testVolumeBtn.onclick = async () => {
             testVolumeBtn.disabled = true;
             testVolumeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
             try { await fetch('/api/test-audio?volume=' + volumeSlider.value); } catch { }
-            setTimeout(() => { testVolumeBtn.disabled = false; testVolumeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Test'; }, 3000);
+            setTimeout(() => { testVolumeBtn.disabled = false; testVolumeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'; }, 3000);
         };
 
         function markUnsaved() {
@@ -1027,9 +1094,32 @@
             const isDiyanet = methodSelect.value === '13';
             diyanetLocationDiv.style.display = isDiyanet ? 'block' : 'none';
             gpsLocationDiv.style.display = isDiyanet ? 'none' : 'block';
-            if (isDiyanet && locationData.diyanetId) diyanetStatus.textContent = `Current: ID ${locationData.diyanetId}`;
+            if (isDiyanet) {
+                // Reset and show picker UI for new selection
+                resetDiyanetPicker();
+            }
             if (locationData.latitude && locationData.longitude) showCurrentLocation();
             updateSummaries();
+        }
+        function resetDiyanetPicker() {
+            // Clear and show picker UI elements
+            diyanetInput.style.display = '';
+            diyanetInput.value = '';
+            diyanetLabel.style.display = '';
+            diyanetLabel.textContent = 'Country:';
+            // Reset state to country level
+            diyanetState.level = 'country';
+            diyanetState.country = null;
+            diyanetState.state = null;
+            diyanetState.city = null;
+            diyanetState.cache = [];
+            // Clear breadcrumb and results
+            diyanetBreadcrumb.innerHTML = '';
+            hide(diyanetBreadcrumb);
+            diyanetStatus.textContent = '';
+            diyanetResults.innerHTML = '';
+            // Load countries in background (but don't show dropdown yet)
+            initDiyanetPicker();
         }
         function showCurrentLocation() {
             show(currentLocationDiv);
@@ -1086,73 +1176,194 @@
             return res.json();
         }
 
-        async function loadDiyanetCountries() {
-            if (countriesLoaded) return;
-            countrySelect.innerHTML = '<option value="">Loading countries...</option>';
-            stateSelect.disabled = citySelect.disabled = true;
+        // Diyanet unified location picker
+        const diyanetState = { level: 'country', country: null, state: null, city: null, cache: [], loading: false };
+        const diyanetInput = $('diyanetSearchInput');
+        const diyanetResults = $('diyanetResults');
+        const diyanetBreadcrumb = $('diyanetBreadcrumb');
+        const diyanetLabel = $('diyanetSearchLabel');
+
+        async function initDiyanetPicker() {
+            diyanetState.loading = true;
+            diyanetInput.disabled = true;
+            diyanetInput.placeholder = 'Loading countries...';
             try {
                 const countries = await fetchDiyanet('/ulkeler');
                 const popularNames = ['turkey', 'germany', 'netherlands', 'belgium', 'france', 'united kingdom', 'austria', 'switzerland', 'sweden', 'denmark', 'norway'];
                 const popular = [], others = [];
                 countries.forEach(c => {
                     const name = c.UlkeAdiEn || c.UlkeAdi, idx = popularNames.indexOf(name.toLowerCase());
-                    (idx !== -1 ? popular : others).push({ id: c.UlkeID, name, popularIndex: idx });
+                    (idx !== -1 ? popular : others).push({ id: c.UlkeID, name, isPopular: idx !== -1, popularIndex: idx });
                 });
                 popular.sort((a, b) => a.popularIndex - b.popularIndex);
                 others.sort((a, b) => a.name.localeCompare(b.name));
-                countrySelect.innerHTML = '<option value="">Select country...</option>';
-                const addGroup = (label, items) => {
-                    if (!items.length) return;
-                    const g = document.createElement('optgroup'); g.label = label;
-                    items.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; g.appendChild(o); });
-                    countrySelect.appendChild(g);
-                };
-                addGroup('Popular', popular);
-                addGroup('All Countries', others);
-                countriesLoaded = true;
-                if (locationData.diyanetId) diyanetStatus.textContent = `Current: ID ${locationData.diyanetId}`;
-            } catch { countrySelect.innerHTML = '<option value="">Tap to retry loading...</option>'; diyanetStatus.textContent = '⚠️ Could not connect to Diyanet API'; }
+                diyanetState.cache = [...popular, ...others];
+                diyanetState.loading = false;
+                diyanetInput.disabled = false;
+                diyanetInput.placeholder = 'Type country name...';
+                // Don't show dropdown yet - wait for user to focus/type
+            } catch { 
+                diyanetState.loading = false;
+                diyanetInput.disabled = false;
+                diyanetInput.placeholder = 'Type to search...';
+                diyanetResults.innerHTML = '<div class="current-value">⚠️ Failed to load. Tap to retry.</div>'; 
+                diyanetResults.onclick = initDiyanetPicker; 
+            }
         }
-        countrySelect.addEventListener('click', loadDiyanetCountries);
 
-        async function loadSelectOptions(select, endpoint, idKey, nameKey, placeholder) {
-            select.innerHTML = '<option value="">Loading...</option>'; select.disabled = true;
+        function renderDiyanetList(items, showPopularLabel = true) {
+            diyanetResults.innerHTML = '';
+            let lastWasPopular = null;
+            items.forEach(item => {
+                if (showPopularLabel && item.isPopular !== undefined && item.isPopular !== lastWasPopular) {
+                    const label = document.createElement('div');
+                    label.className = 'result-group-label';
+                    label.textContent = item.isPopular ? '★ Popular' : 'All Countries';
+                    label.style.cssText = 'font-size:11px;color:var(--text-muted);padding:8px 12px 4px;font-weight:600;text-transform:uppercase;';
+                    diyanetResults.appendChild(label);
+                    lastWasPopular = item.isPopular;
+                }
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.innerHTML = `<span class="result-text">${item.name}</span><span class="result-arrow">›</span>`;
+                div.onclick = () => selectDiyanetItem(item);
+                diyanetResults.appendChild(div);
+            });
+            if (!items.length) diyanetResults.innerHTML = '<div class="current-value">No results found</div>';
+        }
+
+        async function loadDiyanetLevel(endpoint, idKey, nameKey, label, placeholder) {
+            diyanetLabel.textContent = label;
+            diyanetInput.value = '';
+            diyanetInput.disabled = true;
+            diyanetInput.placeholder = 'Loading...';
+            updateBreadcrumb();
+            diyanetState.loading = true;
+            diyanetResults.innerHTML = '<div class="current-value">Loading...</div>';
             try {
                 const items = await fetchDiyanet(endpoint);
-                select.innerHTML = `<option value="">${placeholder}</option>`;
-                items.forEach(i => { const o = document.createElement('option'); o.value = i[idKey]; o.textContent = i[nameKey + 'En'] || i[nameKey]; select.appendChild(o); });
-                select.disabled = false;
-            } catch { select.innerHTML = `<option value="">Failed to load</option>`; }
+                diyanetState.cache = items.map(i => ({ id: i[idKey], name: i[nameKey + 'En'] || i[nameKey] }));
+                diyanetState.loading = false;
+                diyanetInput.disabled = false;
+                diyanetInput.placeholder = placeholder;
+                renderDiyanetList(diyanetState.cache.slice(0, 15), false);
+            } catch { 
+                diyanetState.loading = false;
+                diyanetInput.disabled = false;
+                diyanetInput.placeholder = placeholder;
+                diyanetResults.innerHTML = '<div class="current-value">Failed to load</div>'; 
+            }
         }
-        countrySelect.addEventListener('change', async () => {
-            if (!countrySelect.value) { stateSelect.innerHTML = '<option value="">Select state...</option>'; stateSelect.disabled = true; citySelect.innerHTML = '<option value="">Select city...</option>'; citySelect.disabled = true; return; }
-            citySelect.innerHTML = '<option value="">Select city...</option>'; citySelect.disabled = true;
-            await loadSelectOptions(stateSelect, `/sehirler/${countrySelect.value}`, 'SehirID', 'SehirAdi', 'Select state...');
-        });
-        stateSelect.addEventListener('change', async () => {
-            if (!stateSelect.value) { citySelect.innerHTML = '<option value="">Select city...</option>'; citySelect.disabled = true; return; }
-            await loadSelectOptions(citySelect, `/ilceler/${stateSelect.value}`, 'IlceID', 'IlceAdi', 'Select city...');
-        });
 
-        citySelect.addEventListener('change', async () => {
-            const cityId = citySelect.value;
-            if (!cityId) return;
-            const cityName = citySelect.options[citySelect.selectedIndex].text;
-            const stateName = stateSelect.options[stateSelect.selectedIndex].text;
-            const countryName = countrySelect.options[countrySelect.selectedIndex].text;
-            locationData.diyanetId = parseInt(cityId);
-            locationData.cityName = `${cityName}, ${stateName}, ${countryName}`;
+        async function selectDiyanetItem(item) {
+            if (diyanetState.level === 'country') {
+                diyanetState.country = item;
+                diyanetState.level = 'state';
+                await loadDiyanetLevel(`/sehirler/${item.id}`, 'SehirID', 'SehirAdi', 'State / Province:', 'Type to search states...');
+            } else if (diyanetState.level === 'state') {
+                diyanetState.state = item;
+                diyanetState.level = 'city';
+                await loadDiyanetLevel(`/ilceler/${item.id}`, 'IlceID', 'IlceAdi', 'City / District:', 'Type to search cities...');
+            } else if (diyanetState.level === 'city') {
+                diyanetState.city = item;
+                diyanetInput.value = item.name;
+                diyanetResults.innerHTML = '';
+                updateBreadcrumb();
+                finalizeDiyanetSelection();
+            }
+        }
+
+        function updateBreadcrumb() {
+            const parts = [];
+            if (diyanetState.country) parts.push({ name: diyanetState.country.name, level: 'country' });
+            if (diyanetState.state) parts.push({ name: diyanetState.state.name, level: 'state' });
+            if (diyanetState.city) parts.push({ name: diyanetState.city.name, level: 'city' });
+            
+            if (!parts.length) { hide(diyanetBreadcrumb); return; }
+            show(diyanetBreadcrumb);
+            diyanetBreadcrumb.innerHTML = parts.map((p, i) => 
+                `<span class="breadcrumb-chip" data-level="${p.level}">${p.name} <span class="remove">×</span></span>`
+            ).join('<span class="breadcrumb-separator">›</span>');
+            
+            diyanetBreadcrumb.querySelectorAll('.breadcrumb-chip').forEach(chip => {
+                chip.onclick = () => goBackToLevel(chip.dataset.level);
+            });
+        }
+
+        async function goBackToLevel(level) {
+            diyanetInput.style.display = '';
+            diyanetLabel.style.display = '';
+            if (level === 'country') {
+                diyanetState.country = diyanetState.state = diyanetState.city = null;
+                diyanetState.level = 'country';
+                diyanetLabel.textContent = 'Country:';
+                diyanetInput.value = '';
+                diyanetInput.placeholder = 'Type to search...';
+                initDiyanetPicker();
+            } else if (level === 'state') {
+                diyanetState.state = diyanetState.city = null;
+                diyanetState.level = 'state';
+                await loadDiyanetLevel(`/sehirler/${diyanetState.country.id}`, 'SehirID', 'SehirAdi', 'State / Province:', 'Type to search states...');
+            }
+            updateBreadcrumb();
+        }
+
+        async function finalizeDiyanetSelection() {
+            const { country, state, city } = diyanetState;
+            locationData.diyanetId = parseInt(city.id);
+            locationData.cityName = `${city.name}, ${state.name}, ${country.name}`;
+            // Hide picker UI, show only result
+            hide(diyanetBreadcrumb);
+            diyanetInput.style.display = 'none';
+            diyanetLabel.style.display = 'none';
+            diyanetResults.innerHTML = '';
             markUnsaved();
             updateSummaries();
-            diyanetStatus.textContent = '✓ Getting coordinates...';
-            for (const q of [`${cityName} ${stateName} ${countryName}`, `${cityName} ${countryName}`, `${stateName} ${countryName}`]) {
-                try {
-                    const data = await (await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`)).json();
-                    if (data.features?.length) { const [lon, lat] = data.features[0].geometry.coordinates; locationData.latitude = lat; locationData.longitude = lon; showCurrentLocation(); updateSummaries(); diyanetStatus.textContent = `✓ ${cityName} (ID: ${cityId})`; return; }
-                } catch { }
+            diyanetStatus.textContent = 'Getting coordinates...';
+            const coords = await getCoords(`${city.name} ${state.name} ${country.name}`) || await getCoords(`${city.name} ${country.name}`);
+            if (coords) {
+                locationData.latitude = coords.lat; locationData.longitude = coords.lon;
+                showCurrentLocation(); updateSummaries();
             }
-            locationData.latitude = locationData.longitude = 0;
-            diyanetStatus.textContent = `✓ ${cityName} selected (ID: ${cityId})`;
+            // Clear status - green box already shows the location
+            diyanetStatus.textContent = '';
+        }
+
+        async function getCoords(q) {
+            try {
+                const data = await (await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`)).json();
+                if (data.features?.length) {
+                    const [lon, lat] = data.features[0].geometry.coordinates;
+                    return { lat, lon };
+                }
+            } catch { }
+            return null;
+        }
+
+        diyanetInput.addEventListener('input', () => {
+            if (diyanetState.loading) return; // Don't search while loading
+            const query = diyanetInput.value.toLowerCase().trim();
+            if (!diyanetState.cache.length) {
+                diyanetResults.innerHTML = '<div class="current-value">Loading...</div>';
+                return;
+            }
+            const filtered = diyanetState.cache.filter(i => i.name.toLowerCase().includes(query)).slice(0, 15);
+            renderDiyanetList(filtered, diyanetState.level === 'country');
+        });
+
+        // Show dropdown on focus (if data is loaded)
+        diyanetInput.addEventListener('focus', () => {
+            if (diyanetState.loading) return;
+            if (!diyanetState.cache.length) {
+                initDiyanetPicker();
+            } else if (!diyanetResults.innerHTML) {
+                // Show list on focus if dropdown is empty
+                const query = diyanetInput.value.toLowerCase().trim();
+                const filtered = query 
+                    ? diyanetState.cache.filter(i => i.name.toLowerCase().includes(query)).slice(0, 15)
+                    : diyanetState.cache.slice(0, 15);
+                renderDiyanetList(filtered, diyanetState.level === 'country');
+            }
         });
 
         async function loadSettings() {
