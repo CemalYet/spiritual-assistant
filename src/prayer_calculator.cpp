@@ -1,6 +1,7 @@
 #include "prayer_calculator.h"
 #include "config.h"
 #include "settings_manager.h"
+#include "prayer_types.h"
 #include <Arduino.h>
 #include <time.h>
 #include <algorithm>
@@ -309,7 +310,7 @@ bool PrayerCalculator::calculateTimes(DailyPrayers &prayers, int method, double 
     coordinates.longitude = longitude;
 
     // Check if using Diyanet method - apply latitude clamping for 62°+ rule
-    const bool isDiyanetMethod = (method == 13);
+    const bool isDiyanetMethod = (method == PRAYER_METHOD_DIYANET);
     if (isDiyanetMethod)
     {
         coordinates.latitude = clampLatitudeForDiyanet(latitude);
