@@ -91,8 +91,14 @@ namespace
             return;
         }
 
-        s_prefs.putBytes("diyanet", &s_cache, sizeof(s_cache));
+        size_t written = s_prefs.putBytes("diyanet", &s_cache, sizeof(s_cache));
         s_prefs.end();
+
+        if (written != sizeof(s_cache))
+        {
+            Serial.println("[Cache] ERROR: NVS write failed or incomplete");
+            return;
+        }
 
 #if DEBUG_CACHE_LOGS
         struct tm t = {};
@@ -297,4 +303,44 @@ bool PrayerAPI::getCachedPrayerTimes(DailyPrayers &prayers, bool forTomorrow)
 
     Serial.printf("[Cache] Retrieved day %d/%d\n", dayOffset + 1, s_cache.totalDays);
     return true;
+}
+
+PrayerAPI::CacheInfo PrayerAPI::getCacheInfo()
+{
+    CacheInfo info = {0, 0, false};
+
+    // Load cache if not in memory
+    if (s_cache.totalDays == 0)
+        loadCache();
+
+    if (s_cache.totalDays == 0)
+        return info;
+
+    info.ilceId = s_cache.ilceId;
+
+    // Calculate days remaining from today
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo))
+    {
+        timeinfo.tm_hour = 0;
+        timeinfo.tm_min = 0;
+        timeinfo.tm_sec = 0;
+        time_t today = mktime(&timeinfo);
+
+        int dayOffset = DiyanetParser::calculateDayOffset(s_cache.fetchedAt, today);
+        info.daysRemaining = s_cache.totalDays - dayOffset;
+
+        if (info.daysRemaining < 0)
+            info.daysRemaining = 0;
+    }
+    else
+    {
+        info.daysRemaining = s_cache.totalDays;
+    }
+
+    // Check if ilceId matches current settings
+    int32_t currentIlceId = SettingsManager::getDiyanetId();
+    info.isValid = (s_cache.ilceId == currentIlceId) && (info.daysRemaining > 0);
+
+    return info;
 }

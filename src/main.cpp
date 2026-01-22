@@ -38,7 +38,7 @@ LCDDisplay display; // LCD display (separate - has its own state)
 // Returns true if prayer times were loaded successfully.
 bool loadPrayerTimes(int method, int dayOffset = 0)
 {
-    const bool wantDiyanet = (method == 13);
+    const bool wantDiyanet = (method == PRAYER_METHOD_DIYANET);
     const bool fetchTomorrow = (dayOffset > 0);
 
     // For Diyanet, try cache first
@@ -93,7 +93,7 @@ int getDayOffset()
     int method = SettingsManager::getPrayerMethod();
 
     // For Diyanet, check cached Isha time
-    if (method == 13)
+    if (method == PRAYER_METHOD_DIYANET)
     {
         DailyPrayers tempPrayers;
         if (PrayerAPI::getCachedPrayerTimes(tempPrayers, false))

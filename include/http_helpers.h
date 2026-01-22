@@ -12,6 +12,7 @@ namespace HttpHelpers
     constexpr int HTTP_BAD_REQUEST = 400;
     constexpr int HTTP_NOT_FOUND = 404;
     constexpr int HTTP_TOO_MANY_REQUESTS = 429;
+    constexpr int HTTP_INTERNAL_ERROR = 500;
     constexpr int HTTP_BAD_GATEWAY = 502;
 
     // Maximum file size for safety (100KB)

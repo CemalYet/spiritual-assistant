@@ -2,6 +2,7 @@
 #include "settings_manager.h"
 #include "prayer_types.h"
 #include "http_helpers.h"
+#include "prayer_api.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
@@ -22,6 +23,8 @@ namespace SettingsServer
     static void serveSettingsPage();
     static void handleGetSettings();
     static void handlePostSettings();
+    static void handleGetStatus();
+    static void handleRefresh();
     static void handleNotFound();
 
     static void sendJson(int code, const String &json)
@@ -73,6 +76,8 @@ namespace SettingsServer
         server->serveStatic("/script.js", LittleFS, "/script.js");
         server->on("/api/settings", HTTP_GET, handleGetSettings);
         server->on("/api/settings", HTTP_POST, handlePostSettings);
+        server->on("/api/status", HTTP_GET, handleGetStatus);
+        server->on("/api/refresh", HTTP_POST, handleRefresh);
         server->onNotFound(handleNotFound);
 
         HttpHelpers::registerBrowserResourceHandlers(server);
@@ -246,6 +251,98 @@ namespace SettingsServer
         }
         server->sendContent("");
         http.end();
+    }
+
+    static void handleGetStatus()
+    {
+        JsonDocument doc;
+
+        // WiFi status
+        JsonObject wifi = doc["wifi"].to<JsonObject>();
+        wifi["connected"] = WiFi.isConnected();
+        wifi["ssid"] = WiFi.SSID();
+        wifi["rssi"] = WiFi.RSSI();
+        wifi["ip"] = WiFi.localIP().toString();
+
+        // Time status
+        JsonObject timeObj = doc["time"].to<JsonObject>();
+        struct tm timeinfo;
+        bool timeValid = getLocalTime(&timeinfo, 100);
+        timeObj["synced"] = timeValid;
+        if (timeValid)
+        {
+            char timeStr[9];
+            strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
+            timeObj["deviceTime"] = timeStr;
+
+            // Calculate UTC offset correctly (handles midnight boundary)
+            time_t now = ::time(nullptr);
+            struct tm utc;
+            gmtime_r(&now, &utc);
+            time_t localEpoch = mktime(&timeinfo);
+            time_t utcEpoch = mktime(&utc);
+            int offsetHours = (int)((localEpoch - utcEpoch) / 3600);
+
+            timeObj["timezone"] = "Local";
+            timeObj["utcOffset"] = offsetHours;
+        }
+        else
+        {
+            timeObj["deviceTime"] = "--:--:--";
+            timeObj["timezone"] = "Not synced";
+            timeObj["utcOffset"] = 0;
+        }
+
+        // Prayer status
+        JsonObject prayer = doc["prayer"].to<JsonObject>();
+        int method = SettingsManager::getPrayerMethod();
+        prayer["method"] = method;
+        prayer["methodName"] = SettingsManager::getMethodName(method);
+
+        if (method == PRAYER_METHOD_DIYANET)
+        {
+            PrayerAPI::CacheInfo cache = PrayerAPI::getCacheInfo();
+            prayer["diyanetOk"] = cache.isValid;
+            prayer["daysRemaining"] = cache.daysRemaining;
+            prayer["usingFallback"] = !cache.isValid;
+        }
+        else
+        {
+            prayer["diyanetOk"] = true; // Not using Diyanet
+            prayer["daysRemaining"] = -1;
+            prayer["usingFallback"] = false;
+        }
+
+        String response;
+        serializeJson(doc, response);
+        sendJson(HttpHelpers::HTTP_OK, response);
+    }
+
+    static void handleRefresh()
+    {
+        int method = SettingsManager::getPrayerMethod();
+        if (method != PRAYER_METHOD_DIYANET)
+        {
+            sendJson(HttpHelpers::HTTP_OK, "{\"success\":true,\"message\":\"Not using Diyanet\"}");
+            return;
+        }
+
+        int ilceId = SettingsManager::getDiyanetId();
+        if (ilceId <= 0)
+        {
+            sendJson(HttpHelpers::HTTP_BAD_REQUEST, "{\"success\":false,\"error\":\"No location configured\"}");
+            return;
+        }
+
+        bool success = PrayerAPI::fetchMonthlyPrayerTimes(ilceId);
+        if (success)
+        {
+            sendJson(HttpHelpers::HTTP_OK, "{\"success\":true,\"message\":\"Prayer times refreshed\"}");
+        }
+        else
+        {
+            sendJson(HttpHelpers::HTTP_INTERNAL_ERROR, "{\"success\":false,\"error\":\"Failed to fetch from Diyanet\"}");
+        }
     }
 
     static void handleNotFound()

@@ -20,12 +20,17 @@
             --text-dark: #1f2937;
             --radius: 8px;
             --radius-lg: 16px;
+            --transition: 0.25s ease;
+            --space-sm: 12px;
+            --space-md: 20px;
+            --space-lg: 28px;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -41,10 +46,10 @@
         .container {
             background: #fff;
             border-radius: var(--radius-lg);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
             max-width: 540px;
             width: 100%;
-            padding: 24px 16px;
+            padding: var(--space-lg) var(--space-md);
             border: 1px solid var(--border);
             position: relative;
             overflow: hidden;
@@ -80,11 +85,17 @@
         }
 
         .section {
-            margin-bottom: 16px;
-            padding: 20px;
+            margin-bottom: var(--space-lg);
+            padding: var(--space-md) var(--space-md);
             background: var(--gray-bg);
-            border-radius: var(--radius);
+            border-radius: var(--radius-lg);
             border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: box-shadow var(--transition);
+        }
+
+        .section:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
         }
 
         .section:last-of-type {
@@ -108,11 +119,19 @@
             color: var(--gray);
             margin-top: 4px;
             word-break: break-word;
+            font-weight: 400;
         }
 
         .current-summary.warning {
             color: var(--orange);
             font-weight: 500;
+        }
+
+        .helper-text {
+            font-size: 12px;
+            color: var(--gray-light);
+            margin-top: 6px;
+            line-height: 1.4;
         }
 
         .section-content {
@@ -298,6 +317,7 @@
             border-radius: 4px;
             background: var(--gray-light);
             outline: none;
+            transition: background var(--transition);
         }
 
         .volume-slider::-webkit-slider-thumb {
@@ -398,6 +418,11 @@
             opacity: 0;
             width: 0;
             height: 0;
+            position: absolute;
+        }
+
+        .toggle-switch input:focus {
+            outline: none;
         }
 
         .toggle-slider {
@@ -405,7 +430,7 @@
             cursor: pointer;
             inset: 0;
             background: var(--gray-light);
-            transition: 0.3s;
+            transition: background var(--transition);
             border-radius: 28px;
         }
 
@@ -417,9 +442,14 @@
             left: 3px;
             bottom: 3px;
             background: white;
-            transition: 0.3s;
+            transition: transform var(--transition), box-shadow var(--transition);
             border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .toggle-switch:active .toggle-slider:before {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            transform: scale(0.95);
         }
 
         input:checked+.toggle-slider {
@@ -428,6 +458,10 @@
 
         input:checked+.toggle-slider:before {
             transform: translateX(22px);
+        }
+
+        .toggle-switch:active input:checked+.toggle-slider:before {
+            transform: translateX(22px) scale(0.95);
         }
 
         .btn {
@@ -445,12 +479,13 @@
         .btn-primary {
             background: var(--green);
             color: #fff;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.25);
         }
 
         .btn-primary:hover {
             background: #218838;
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            box-shadow: 0 6px 16px rgba(40, 167, 69, 0.35);
         }
 
         .btn-primary:disabled {
@@ -738,6 +773,261 @@
             pointer-events: auto;
             opacity: 1;
         }
+
+        /* System Status Styles */
+        .status-section {
+            margin-bottom: var(--space-lg);
+            background: var(--gray-bg);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: transparent;
+        }
+
+        .status-section:not(.collapsed) .status-header {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .status-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-title svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--blue);
+        }
+
+        .status-body {
+            padding: 16px 20px;
+        }
+
+        .status-group {
+            margin-bottom: 16px;
+        }
+
+        .status-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-group-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+        }
+
+        .status-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .status-value {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.green {
+            background: var(--green);
+        }
+
+        .status-dot.orange {
+            background: var(--orange);
+        }
+
+        .status-dot.red {
+            background: #dc2626;
+        }
+
+        .status-dot.gray {
+            background: var(--gray-light);
+        }
+
+        .status-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: #fff;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--gray-light);
+        }
+
+        .btn-refresh {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--gray-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-refresh:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-refresh svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .btn-retry {
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            background: var(--orange);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-retry:hover {
+            background: #d97706;
+        }
+
+        .status-loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--gray);
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: var(--text-dark);
+            color: #fff;
+            padding: 14px 24px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: var(--green);
+        }
+
+        .toast.error {
+            background: #dc2626;
+        }
+
+        /* Status section collapsed by default */
+        .status-section.collapsed .status-body,
+        .status-section.collapsed .status-footer {
+            display: none;
+        }
+
+        .status-section .status-header {
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+
+        .status-section .status-header:hover {
+            background: var(--gray-bg);
+        }
+
+        .status-chevron {
+            transition: transform var(--transition);
+        }
+
+        .status-section.collapsed .status-chevron {
+            transform: rotate(0deg);
+        }
+
+        .status-section:not(.collapsed) .status-chevron {
+            transform: rotate(180deg);
+        }
+
+        .status-ok {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        /* Skeleton loader */
+        .skeleton {
+            background: linear-gradient(90deg, var(--gray-bg) 25%, #e8ecf1 50%, var(--gray-bg) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            color: transparent !important;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .skeleton-text {
+            height: 14px;
+            width: 60%;
+            display: inline-block;
+        }
+
+        .skeleton-bar {
+            height: 8px;
+            width: 100%;
+            margin: 8px 0;
+        }
     </style>
 </head>
 
@@ -807,6 +1097,7 @@
                     <option value="14">Russia</option>
                     <option value="15">Moonsighting Committee</option>
                 </select>
+                <p class="helper-text">Official calculation for accurate prayer times</p>
             </div>
         </div>
 
@@ -896,6 +1187,7 @@
                         </div>
                     </div>
                 </div>
+                <p class="helper-text">Used to calculate accurate prayer times</p>
             </div>
         </div>
 
@@ -921,12 +1213,13 @@
                         <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
                     </svg></span>
                 <span id="volumeValue" class="volume-value">80%</span>
-                <button type="button" id="testVolumeBtn" class="btn-test" title="Test volume">
+                <button type="button" id="testVolumeBtn" class="btn-test" title="Preview adhan (local)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M8 5v14l11-7z" />
                     </svg>
                 </button>
             </div>
+            <p class="helper-text">Volume applies after saving changes</p>
         </div>
 
         <div class="section">
@@ -937,7 +1230,7 @@
                     </svg></span>
                 Adhan Notifications
             </div>
-            <label>Enable or disable adhan for each prayer time:</label>
+            <label>Prayer Notifications</label>
             <div class="toggle-list">
                 <div class="toggle-item">
                     <span class="toggle-label"><svg class="prayer-icon" viewBox="0 0 24 24">
@@ -997,6 +1290,30 @@
             </div>
         </div>
 
+        <!-- System Status Section (collapsed by default) -->
+        <div class="status-section collapsed" id="statusSection">
+            <div class="status-header" onclick="toggleStatus()">
+                <div class="status-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    Device Health
+                    <span id="statusIndicator" class="status-ok">✓</span>
+                </div>
+                <svg class="status-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
+            </div>
+            <div class="status-body" id="statusBody">
+                <div class="status-loading">Loading status...</div>
+            </div>
+            <div class="status-footer" id="statusFooter">
+                <span id="statusTimestamp">--</span>
+            </div>
+        </div>
+
         <div class="save-container">
             <button id="saveBtn" class="btn btn-primary">
                 <svg style="width:18px;height:18px;vertical-align:middle;margin-right:8px;stroke:currentColor;fill:none;stroke-width:2"
@@ -1004,8 +1321,9 @@
                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                     <polyline points="17,21 17,13 7,13 7,21" />
                     <polyline points="7,3 7,8 15,8" />
-                </svg>Save Configuration
+                </svg>Apply Changes
             </button>
+            <p class="helper-text" style="text-align:center;margin-top:8px">Changes take effect only after applying</p>
             <div id="statusMessage" class="status-message"></div>
         </div>
 
@@ -1026,11 +1344,32 @@
         </a>
     </div>
 
+    <!-- Toast container -->
+    <div id="toast" class="toast"></div>
+
     <script>
         const $ = id => document.getElementById(id);
         const show = el => el.style.display = 'block';
         const hide = el => el.style.display = 'none';
         const toggle = (el, force) => el.classList.toggle('collapsed', force);
+
+        // Toast notification
+        let toastTimer;
+        function toast(msg, type = '') {
+            const t = $('toast');
+            t.textContent = msg;
+            t.className = 'toast' + (type ? ' ' + type : '');
+            clearTimeout(toastTimer);
+            requestAnimationFrame(() => t.classList.add('show'));
+            toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // Toggle status section
+        function toggleStatus() {
+            const s = $('statusSection');
+            s.classList.toggle('collapsed');
+            if (!s.classList.contains('collapsed')) refreshStatus();
+        }
 
         const methodSection = $('methodSection'), locationSection = $('locationSection');
         const locationSummary = $('locationSummary'), testVolumeBtn = $('testVolumeBtn');
@@ -1048,6 +1387,57 @@
         const adhanToggles = { fajr: $('adhanFajr'), dhuhr: $('adhanDhuhr'), asr: $('adhanAsr'), maghrib: $('adhanMaghrib'), isha: $('adhanIsha') };
         let hasUnsavedChanges = false, debounceTimer;
         const DIYANET_API = '/api/diyanet';
+        const METHOD_DIYANET = 13;
+
+        // ===== SYSTEM STATUS =====
+        const row = (label, value, dot) => `<div class="status-row"><span class="status-label">${label}</span><span class="status-value">${dot ? `<span class="status-dot ${dot}"></span>` : ''}${value}</span></div>`;
+        const group = (title, rows) => `<div class="status-group"><div class="status-group-title">${title}</div>${rows}</div>`;
+
+        async function refreshStatus() {
+            const body = $('statusBody');
+            body.innerHTML = '<div class="status-loading">Loading...</div>';
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw new Error();
+                const d = await res.json();
+                renderStatus(d);
+                $('statusTimestamp').textContent = 'Status as of ' + new Date().toLocaleTimeString();
+            } catch (e) {
+                body.innerHTML = '<div class="status-loading">! Failed to load</div>';
+            }
+        }
+
+        function renderStatus(d) {
+            const w = d.wifi || {}, t = d.time || {}, p = d.prayer || {};
+            const wifiOk = w.connected, timeOk = t.synced;
+            const allOk = wifiOk && timeOk && (p.method !== METHOD_DIYANET || p.diyanetOk);
+            $('statusIndicator').textContent = allOk ? '✓' : '!';
+            $('statusIndicator').className = allOk ? 'status-ok' : 'status-dot orange';
+
+            let prayerRows = p.method === METHOD_DIYANET
+                ? row('Source', p.diyanetOk ? 'Diyanet API' : 'Diyanet unavailable', p.diyanetOk ? 'green' : 'orange')
+                + row('Fallback', p.usingFallback ? 'Using local calc' : 'Ready')
+                + row('Next Sync', p.daysRemaining > 0 ? 'in ' + p.daysRemaining + ' days' : 'Retry needed')
+                + (p.diyanetOk ? '' : '<button class="btn-retry" onclick="retryDiyanet()">Retry</button>')
+                : row('Source', 'Local calculation', 'green') + row('Method', p.methodName || '--');
+
+            $('statusBody').innerHTML =
+                group('Network', row('WiFi', wifiOk ? w.ssid + ' (' + w.rssi + ' dBm)' : 'Disconnected', wifiOk ? 'green' : 'red') + row('IP', w.ip || '--'))
+                + group('Time', row('Device', timeOk ? t.deviceTime : 'Not synced', timeOk ? 'green' : 'orange') + row('Timezone', (t.timezone || '--') + ' (UTC' + (t.utcOffset >= 0 ? '+' : '') + (t.utcOffset || 0) + ')'))
+                + group('Prayer', prayerRows);
+        }
+
+        async function retryDiyanet() {
+            const btn = document.querySelector('.btn-retry');
+            if (btn) { btn.disabled = true; btn.textContent = 'Retrying...'; }
+            try {
+                const res = await fetch('/api/refresh', { method: 'POST' });
+                const d = await res.json();
+                d.success ? refreshStatus() : alert('! ' + (d.error || 'Failed'));
+            } catch (e) { alert('! Network error'); }
+            if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+        }
+        // ===== END SYSTEM STATUS =====
 
         // Save button starts disabled
         saveBtn.disabled = true;
@@ -1389,21 +1779,23 @@
 
         saveBtn.addEventListener('click', async () => {
             const isDiyanet = methodSelect.value === '13';
-            if (isDiyanet && !locationData.diyanetId) return showStatus('Please select your city from the Diyanet location picker', 'error');
-            if (!isDiyanet && (!locationData.latitude || !locationData.longitude)) return showStatus('Please set your location first', 'error');
-            container.classList.add('form-disabled'); saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
-            showStatus('Saving settings...', 'loading');
+            if (isDiyanet && !locationData.diyanetId) return toast('Please select your city first', 'error');
+            if (!isDiyanet && (!locationData.latitude || !locationData.longitude)) return toast('Please set your location first', 'error');
+            container.classList.add('form-disabled'); saveBtn.disabled = true; saveBtn.textContent = 'Applying...';
             try {
                 const adhan = {}; Object.entries(adhanToggles).forEach(([k, el]) => adhan[k] = el.checked);
                 const payload = { prayerMethod: parseInt(methodSelect.value), latitude: locationData.latitude, longitude: locationData.longitude, cityName: locationData.cityName, diyanetId: locationData.diyanetId, volume: parseInt(volumeSlider.value), adhanEnabled: adhan };
                 const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (res.ok) { const d = await res.json(); showStatus('✓ Settings saved successfully!', 'success'); currentMethodDiv.textContent = `Current: ${d.methodName}`; markSaved(); }
-                else showStatus('Failed to save settings. Please try again.', 'error');
-            } catch { showStatus('Connection error. Please check your network.', 'error'); }
-            container.classList.remove('form-disabled'); saveBtn.disabled = false; saveBtn.textContent = 'Save Settings';
+                if (res.ok) { const d = await res.json(); toast('Settings applied ✓', 'success'); currentMethodDiv.textContent = `Current: ${d.methodName}`; markSaved(); }
+                else toast('Failed to save. Try again.', 'error');
+            } catch { toast('Connection error', 'error'); }
+            container.classList.remove('form-disabled'); saveBtn.disabled = false; saveBtn.textContent = 'Apply Changes';
         });
 
-        function showStatus(msg, type) { statusMessage.textContent = msg; statusMessage.className = 'status-message status-' + type; }
+        function showStatus(msg, type) { /* Legacy - use toast() instead */ }
+
+        // Load both status and settings on page load
+        refreshStatus();
         loadSettings();
     </script>
 </body>

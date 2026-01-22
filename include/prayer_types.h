@@ -36,3 +36,6 @@ constexpr std::string_view getJsonKey(PrayerType type)
 {
     return PRAYER_NAMES_EN[idx(type)];
 }
+
+// Prayer calculation methods
+constexpr int PRAYER_METHOD_DIYANET = 13;
