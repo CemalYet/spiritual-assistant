@@ -3,8 +3,8 @@
 #include "prayer_types.h"
 #include "http_helpers.h"
 #include "prayer_api.h"
+#include "audio_player.h"
 #include <WiFi.h>
-#include <ESPmDNS.h>
 #include <WebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -15,7 +15,6 @@ namespace SettingsServer
 {
     static WebServer *server = nullptr;
     static bool active = false;
-    static constexpr char MDNS_HOSTNAME[] = "spiritualassistantsettings";
     static constexpr char DIYANET_API[] = "https://ezanvakti.emushaf.net";
     static constexpr int PROXY_TIMEOUT = 10000;
 
@@ -25,7 +24,11 @@ namespace SettingsServer
     static void handlePostSettings();
     static void handleGetStatus();
     static void handleRefresh();
+    static void handleTestAdhan();
+    static void handleTestAudio();
+    static void handleStopAdhan();
     static void handleNotFound();
+    static void checkTestAudioTimeout();
 
     static void sendJson(int code, const String &json)
     {
@@ -43,24 +46,12 @@ namespace SettingsServer
         return (lastSlash >= 0) ? uri.substring(lastSlash + 1) : "";
     }
 
-    bool startMDNS()
-    {
-        if (!MDNS.begin(MDNS_HOSTNAME))
-        {
-            Serial.println("[mDNS] Failed to start");
-            return false;
-        }
-        Serial.printf("[mDNS] Started: http://%s.local\n", MDNS_HOSTNAME);
-        MDNS.addService("http", "tcp", 80);
-        return true;
-    }
-
     void start()
     {
         if (server)
             return;
 
-        startMDNS();
+        // mDNS removed - use IP address directly
 
         if (!LittleFS.begin(false) && !LittleFS.begin(true))
             Serial.println("[Settings] ERROR: Failed to mount LittleFS!");
@@ -78,13 +69,16 @@ namespace SettingsServer
         server->on("/api/settings", HTTP_POST, handlePostSettings);
         server->on("/api/status", HTTP_GET, handleGetStatus);
         server->on("/api/refresh", HTTP_POST, handleRefresh);
+        server->on("/api/test-adhan", HTTP_POST, handleTestAdhan);
+        server->on("/api/test-audio", HTTP_GET, handleTestAudio);
+        server->on("/api/stop-adhan", HTTP_POST, handleStopAdhan);
         server->onNotFound(handleNotFound);
 
         HttpHelpers::registerBrowserResourceHandlers(server);
 
         server->begin();
         active = true;
-        Serial.printf("[Settings] Server started at http://%s.local\n", MDNS_HOSTNAME);
+        Serial.printf("[Settings] Server started at http://%s\n", WiFi.localIP().toString().c_str());
     }
 
     void stop()
@@ -95,7 +89,6 @@ namespace SettingsServer
         server->stop();
         delete server;
         server = nullptr;
-        MDNS.end();
         active = false;
         Serial.println("[Settings] Server stopped");
     }
@@ -103,11 +96,13 @@ namespace SettingsServer
     void handle()
     {
         if (server && active)
+        {
             server->handleClient();
+            checkTestAudioTimeout();
+        }
     }
 
     bool isActive() { return active; }
-    const char *getHostname() { return MDNS_HOSTNAME; }
 
     static void serveSettingsPage()
     {
@@ -368,6 +363,58 @@ namespace SettingsServer
 
         // Default: serve settings page
         serveSettingsPage();
+    }
+
+    static unsigned long testAudioStopTime = 0;
+    static constexpr unsigned long TEST_AUDIO_DURATION_MS = 5000;
+
+    static bool startTestAudio()
+    {
+        if (playAudioFile("/azan.mp3"))
+        {
+            testAudioStopTime = millis() + TEST_AUDIO_DURATION_MS;
+            return true;
+        }
+        return false;
+    }
+
+    static void handleTestAdhan()
+    {
+        if (startTestAudio())
+            sendJson(200, "{\"success\":true,\"message\":\"Playing 5 sec preview\"}");
+        else
+            sendJsonError(500, "Failed to play adhan");
+    }
+
+    static void handleTestAudio()
+    {
+        if (server->hasArg("volume"))
+        {
+            int vol = server->arg("volume").toInt();
+            if (vol >= 0 && vol <= 100)
+                setVolume(vol * 21 / 100);
+        }
+
+        if (startTestAudio())
+            sendJson(200, "{\"success\":true,\"message\":\"Playing 5 sec preview\"}");
+        else
+            sendJsonError(500, "Failed to play audio");
+    }
+
+    static void handleStopAdhan()
+    {
+        testAudioStopTime = 0;
+        stopAudio();
+        sendJson(200, "{\"success\":true,\"message\":\"Adhan stopped\"}");
+    }
+
+    void checkTestAudioTimeout()
+    {
+        if (testAudioStopTime > 0 && millis() >= testAudioStopTime)
+        {
+            stopAudio();
+            testAudioStopTime = 0;
+        }
     }
 
 } // namespace SettingsServer

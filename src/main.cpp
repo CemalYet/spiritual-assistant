@@ -6,7 +6,6 @@
 #include "prayer_types.h"
 #include "daily_prayers.h"
 #include "current_time.h"
-#include "lcd_display.h"
 #include "network.h"
 #include "settings_server.h"
 #include "prayer_api.h"
@@ -15,6 +14,8 @@
 #include "wifi_credentials.h"
 #include "audio_player.h"
 #include "settings_manager.h"
+#include "lvgl_display.h"
+#include "ui_home.h"
 #include <time.h>
 
 // TEMPORARY: Set to true to clear stored WiFi credentials for testing portal
@@ -27,19 +28,23 @@ struct AppState
     std::optional<PrayerType> nextPrayer; // Next upcoming prayer (nullopt if none today)
     int nextPrayerSeconds = -1;           // Seconds since midnight for next prayer
     bool prayersFetched = false;          // Whether prayer times are loaded
+    bool showingTomorrow = false;         // True if displaying tomorrow's prayers (after Isha)
     bool setupComplete = false;           // Whether setup finished successfully
 };
 
-AppState app;       // Global application state
-LCDDisplay display; // LCD display (separate - has its own state)
+AppState app; // Global application state
 
 // --- PRAYER LOADING (Single source of truth) ---
 // Loads prayer times based on method. Handles Diyanet cache/API and Adhan fallback.
+// Also sets app.showingTomorrow flag based on dayOffset.
 // Returns true if prayer times were loaded successfully.
 bool loadPrayerTimes(int method, int dayOffset = 0)
 {
     const bool wantDiyanet = (method == PRAYER_METHOD_DIYANET);
     const bool fetchTomorrow = (dayOffset > 0);
+
+    // Set flag: are we showing tomorrow's prayers?
+    app.showingTomorrow = fetchTomorrow;
 
     // For Diyanet, try cache first
     if (wantDiyanet)
@@ -119,24 +124,21 @@ int getDayOffset()
     return 0;
 }
 
-// Non-blocking delay that keeps settings server responsive
+// Non-blocking delay that keeps settings server and touch responsive
 // Returns true if settings changed (caller should handle recalculation)
 bool nonBlockingDelay(unsigned long ms)
 {
     unsigned long start = millis();
+
     while (millis() - start < ms)
     {
-        // Handle settings server during wait
+        LvglDisplay::loop(); // Keep touch responsive
         SettingsServer::handle();
-        audioPlayerLoop();
 
-        // Break early if settings changed - needs immediate recalculation
         if (SettingsManager::needsRecalculation())
-        {
-            return true; // Signal that recalculation is needed
-        }
+            return true;
 
-        delay(1); // Minimal yield for responsive web server
+        delay(5); // Small delay, but loop runs often for touch
     }
     return false; // Normal completion
 }
@@ -147,26 +149,49 @@ void displayNextPrayer()
     if (!app.prayersFetched)
         return;
 
-    const auto now = CurrentTime::now();
-    app.nextPrayer = app.prayers.findNext(now._minutes);
+    // Determine which prayer to show
+    if (app.showingTomorrow)
+    {
+        // After Isha: show tomorrow's Fajr
+        app.nextPrayer = PrayerType::Fajr;
+    }
+    else
+    {
+        // Normal: find next prayer today
+        const auto now = CurrentTime::now();
+        app.nextPrayer = app.prayers.findNext(now._minutes);
+    }
 
+    // No prayer found (shouldn't happen if showingTomorrow logic is correct)
     if (!app.nextPrayer)
     {
-        Serial.println("[Info] Next prayer: Tomorrow's Fajr");
         app.nextPrayerSeconds = -1;
-        display.update(now, app.nextPrayer, app.prayers);
+        UiHome::setNextPrayer("SABAH", "Yarin");
         return;
     }
 
-    // Update cache for both display and loop logic
-    app.nextPrayerSeconds = app.prayers[*app.nextPrayer].toSeconds();
+    // Update display with next prayer
+    const PrayerType prayer = *app.nextPrayer;
+    const auto &prayerTime = app.prayers[prayer];
+    app.nextPrayerSeconds = prayerTime.toSeconds();
 
-    const auto &nextTime = app.prayers[*app.nextPrayer];
-    Serial.printf("[Info] Next prayer: %s at %s\n",
-                  getPrayerName(*app.nextPrayer).data(),
-                  nextTime.value.data());
+    Serial.printf("[Info] Next prayer: %s at %s%s\n",
+                  getPrayerName(prayer).data(),
+                  prayerTime.value.data(),
+                  app.showingTomorrow ? " (tomorrow)" : "");
 
-    display.update(now, app.nextPrayer, app.prayers);
+    UiHome::setNextPrayer(getPrayerName(prayer, true).data(), prayerTime.value.data());
+
+    // Update prayer times page data
+    UiHome::PrayerTimesData ptData = {
+        app.prayers[PrayerType::Fajr].value.data(),
+        app.prayers[PrayerType::Sunrise].value.data(),
+        app.prayers[PrayerType::Dhuhr].value.data(),
+        app.prayers[PrayerType::Asr].value.data(),
+        app.prayers[PrayerType::Maghrib].value.data(),
+        app.prayers[PrayerType::Isha].value.data(),
+        app.showingTomorrow ? -1 : static_cast<int>(prayer)};
+    UiHome::setPrayerTimes(ptData);
 }
 
 // Callback for handling volume updates during adhan playback
@@ -174,8 +199,19 @@ static uint8_t s_currentVolume = 0;
 
 void onAdhanLoop()
 {
+    // Keep LVGL running during adhan playback
+    LvglDisplay::loop();
+
     // Handle settings server for real-time volume changes
     SettingsServer::handle();
+
+    // Stop adhan if user mutes
+    if (UiHome::isMuted())
+    {
+        stopAudio();
+        Serial.println("[Adhan] Stopped by user mute");
+        return;
+    }
 
     // Apply volume changes in real-time
     uint8_t newVolume = SettingsManager::getVolume();
@@ -183,7 +219,6 @@ void onAdhanLoop()
     {
         s_currentVolume = newVolume;
         setVolume(SettingsManager::getHardwareVolume());
-        Serial.printf("[Adhan] Volume changed to %d%%\n", s_currentVolume);
     }
 }
 
@@ -199,7 +234,8 @@ void checkAndPlayAdhan()
 
     // Check if adhan should play for this prayer
     // Sunrise never plays adhan, and user can disable individual prayers
-    bool shouldPlayAdhan = SettingsManager::getAdhanEnabled(currentPrayer);
+    // Also check if user has muted from UI
+    bool shouldPlayAdhan = SettingsManager::getAdhanEnabled(currentPrayer) && !UiHome::isMuted();
 
     if (shouldPlayAdhan)
     {
@@ -213,8 +249,12 @@ void checkAndPlayAdhan()
     }
     else
     {
-        Serial.printf("[Adhan] Skipped for %s (disabled or sunrise)\n",
-                      getPrayerName(currentPrayer).data());
+        if (UiHome::isMuted())
+            Serial.printf("[Adhan] Skipped for %s (muted by user)\n",
+                          getPrayerName(currentPrayer).data());
+        else
+            Serial.printf("[Adhan] Skipped for %s (disabled or sunrise)\n",
+                          getPrayerName(currentPrayer).data());
     }
 
     // Check if this was the last prayer of the day
@@ -237,8 +277,11 @@ void checkAndPlayAdhan()
 // Initialize hardware and filesystems
 void initHardware()
 {
+    // Wait for PSRAM to stabilize
+    delay(2000);
+
     Serial.begin(115200);
-    delay(1000);
+    delay(500);
 
     Serial.println("\n" + String('=', 40));
     Serial.println("  ESP32-S3 SPIRITUAL ASSISTANT v2.0");
@@ -249,9 +292,9 @@ void initHardware()
                   psramInit() ? "ACTIVE" : "NO",
                   psramInit() ? ESP.getPsramSize() / (1024 * 1024) : 0);
 
-    Serial.println(String('=', 40) + "\n");
+    Serial.printf("Free PSRAM: %d bytes\n", ESP.getFreePsram());
 
-    display.init();
+    Serial.println(String('=', 40) + "\n");
 
     if (!LittleFS.begin(true))
     {
@@ -259,6 +302,9 @@ void initHardware()
     }
 
     audioPlayerInit();
+
+    // TFT will be initialized AFTER WiFi connects
+    // to avoid PSRAM conflicts during WiFi setup
 
     if (LittleFS.exists("/azan.mp3"))
     {
@@ -278,7 +324,7 @@ bool finishSetup()
     if (!getLocalTime(&timeinfo))
     {
         Serial.println("[Error] RTC not synced - cannot proceed");
-        display.showError("TIME ERROR", "Please Reset");
+        UiHome::showError("Hata", "Saat esitlenmedi");
         return false;
     }
 
@@ -292,11 +338,14 @@ bool finishSetup()
 
     if (app.prayersFetched)
     {
+        // First create the screen, then update with prayer data
+        LvglDisplay::showPrayerScreen();
         displayNextPrayer();
     }
     else
     {
         Serial.println("[Error] Failed to load prayer times");
+        UiHome::showError("Hata", "Namaz vakitleri yuklenemedi");
     }
 
     app.setupComplete = true;
@@ -320,7 +369,6 @@ void handleSettingsChange()
     {
         app.nextPrayer = std::nullopt;
         app.nextPrayerSeconds = -1;
-        display.forceRefresh();
         displayNextPrayer();
         Serial.printf("[Settings] Recalculation complete - Method: %s\n",
                       SettingsManager::getMethodName(method));
@@ -382,10 +430,45 @@ void setup()
     WiFiCredentials::clear();
 #endif
 
+    // Initialize LVGL display BEFORE WiFi
+    Serial.println("[Display] Initializing LVGL...");
+    if (!LvglDisplay::begin())
+    {
+        Serial.println("[Display] FATAL: LVGL init failed!");
+        return;
+    }
+    delay(100);
+
     Network::init();
     SettingsManager::init();
 
+    // Show connecting screen with SSID
+    char ssidBuffer[33] = "";
+    char passBuffer[65] = "";
+    if (WiFiCredentials::load(ssidBuffer, sizeof(ssidBuffer), passBuffer, sizeof(passBuffer)))
+    {
+        UiHome::showConnecting(ssidBuffer);
+        LvglDisplay::loop(); // Flush screen
+    }
+    else
+    {
+        UiHome::showMessage("WiFi kaydedilmedi", "Portal baslatiliyor...");
+        LvglDisplay::loop();
+    }
+
     const bool wifiOk = Network::connectWiFi();
+
+    // Update screen with result
+    if (wifiOk)
+    {
+        Serial.printf("[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+        // Go directly to prayer times
+    }
+    else
+    {
+        UiHome::showPortal("SpiritualAssistant-Setup", "12345678", "192.168.4.1");
+        LvglDisplay::loop();
+    }
 
     // Portal mode - handle in loop
     if (!Network::isConnected())
@@ -393,10 +476,10 @@ void setup()
         const char *msg = Network::isRetryConnection() ? "Reconnect to AP" : "Connect to AP";
         if (Network::isRetryConnection())
         {
-            display.showError("Connection Failed", "Check Credentials");
+            Serial.println("[WiFi] Connection Failed - Check Credentials");
             delay(5000);
         }
-        display.showMessage("WiFi Setup", msg);
+        Serial.printf("[WiFi] %s\n", msg);
         return;
     }
 
@@ -433,14 +516,27 @@ void completeSetupAfterPortal()
 
 void loop()
 {
-    audioPlayerLoop();
+    LvglDisplay::loop();
 
     // Handle WiFi portal if active
     if (Network::isPortalActive())
     {
         Network::handlePortal();
+        LvglDisplay::loop();
         delay(10);
         return;
+    }
+
+    // Memory and WiFi status logging every 30 seconds
+    static unsigned long lastStatusLog = 0;
+    if (millis() - lastStatusLog > 30000)
+    {
+        lastStatusLog = millis();
+        Serial.printf("[Status] Free heap: %d bytes, Min free: %d bytes, WiFi: %s, RSSI: %d dBm\n",
+                      ESP.getFreeHeap(),
+                      ESP.getMinFreeHeap(),
+                      WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED",
+                      WiFi.RSSI());
     }
 
     SettingsServer::handle();
@@ -460,7 +556,30 @@ void loop()
     }
 
     const auto now = CurrentTime::now();
-    display.update(now, app.nextPrayer, app.prayers);
+
+    // Update time display every minute
+    static int lastDisplayMinute = -1;
+    static int lastDay = -1;
+    if (now._minutes != lastDisplayMinute)
+    {
+        lastDisplayMinute = now._minutes;
+        LvglDisplay::updateTime();
+        LvglDisplay::updateStatus();
+
+        // Check for day change at midnight - reload today's prayers
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo))
+        {
+            if (lastDay != -1 && lastDay != timeinfo.tm_mday)
+            {
+                Serial.println("[Time] New day detected - loading today's prayers");
+                int method = SettingsManager::getPrayerMethod();
+                app.prayersFetched = loadPrayerTimes(method, 0);
+                displayNextPrayer();
+            }
+            lastDay = timeinfo.tm_mday;
+        }
+    }
 
     handlePrayerTime(now);
 

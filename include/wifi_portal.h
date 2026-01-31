@@ -8,7 +8,7 @@ namespace WiFiPortal
     // Portal configuration
     constexpr const char *AP_SSID = "SpiritualAssistant-Setup";
     constexpr const char *AP_PASSWORD = "12345678"; // Minimum 8 chars for WPA2
-    constexpr int AP_CHANNEL = 1;                   // Try channel 1
+    constexpr int AP_CHANNEL = 11;                  // Try channel 1
     constexpr int AP_MAX_CONNECTIONS = 4;
     constexpr unsigned long PORTAL_TIMEOUT = 600000; // 10 minutes timeout (increased from 5 to prevent connection timeouts)
 

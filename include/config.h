@@ -58,15 +58,12 @@ namespace Config
     constexpr int GMT_OFFSET_SEC = 3600;      // Base offset
     constexpr int DAYLIGHT_OFFSET_SEC = 3600; // DST offset (set to 0 if not using DST or included in GMT_OFFSET)
 
-    constexpr const char *NTP_SERVER = "pool.ntp.org";
+    // NTP servers (multiple for redundancy)
+    constexpr const char *NTP_SERVER1 = "pool.ntp.org";
+    constexpr const char *NTP_SERVER2 = "time.google.com";
+    constexpr const char *NTP_SERVER3 = "time.cloudflare.com";
 
     // Diyanet API (ezanvakti.emushaf.net) - 30 days cached
     constexpr std::string_view DIYANET_API_BASE = "https://ezanvakti.emushaf.net";
     // DiyanetId is now stored in NVS via SettingsManager
-
-    // LCD Configuration
-    constexpr bool LCD_ENABLED = true;
-    constexpr uint8_t LCD_ADDRESS = 0x27;
-    constexpr uint8_t LCD_COLS = 16;
-    constexpr uint8_t LCD_ROWS = 2;
 }

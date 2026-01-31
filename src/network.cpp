@@ -9,6 +9,31 @@
 #include <stdlib.h>
 #include <time.h>
 
+// WiFi event handler - logs all WiFi events
+void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    switch (event)
+    {
+    case ARDUINO_EVENT_WIFI_STA_START:
+        Serial.println("[WiFi Event] STA Started");
+        break;
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        Serial.println("[WiFi Event] Connected to AP");
+        break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+        Serial.printf("[WiFi Event] Got IP: %s\n", WiFi.localIP().toString().c_str());
+        break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+        Serial.printf("[WiFi Event] DISCONNECTED! Reason: %d\n", info.wifi_sta_disconnected.reason);
+        break;
+    case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+        Serial.println("[WiFi Event] Lost IP address!");
+        break;
+    default:
+        break;
+    }
+}
+
 namespace Network
 {
     constexpr int WIFI_CONNECT_TIMEOUT_MS = 15000;
@@ -25,6 +50,9 @@ namespace Network
     void init()
     {
         Serial.println("[Network] Initializing...");
+
+        // Register WiFi event handler for debugging
+        WiFi.onEvent(onWiFiEvent);
 
         WiFiCredentials::init();
 
@@ -79,9 +107,10 @@ namespace Network
         delay(WIFI_RESET_DELAY_MS);
 
         WiFi.mode(WIFI_STA);
-        WiFi.persistent(false);      // Don't write to flash (faster, less wear)
-        WiFi.setAutoReconnect(true); // Auto-reconnect if connection drops
-        WiFi.setSleep(false);        // Disable sleep for stable connection
+        WiFi.persistent(false);
+        WiFi.setAutoReconnect(true);
+        WiFi.setSleep(false);
+        WiFi.setTxPower(WIFI_POWER_17dBm);
 
         for (int retry = 0; retry < WIFI_MAX_RETRIES; retry++)
         {
@@ -252,7 +281,7 @@ namespace Network
         SettingsServer::start();
 
         Serial.println("[Network] ✓ Setup complete! Device is ready.");
-        Serial.printf("[Network] Settings available at: http://%s.local\n", SettingsServer::getHostname());
+        Serial.printf("[Network] Settings available at: http://%s\n", WiFi.localIP().toString().c_str());
     }
 
     bool isConnected()
@@ -277,7 +306,7 @@ namespace Network
 
     void syncTime()
     {
-        Serial.println("[NTP] Syncing time with automatic DST...");
+        Serial.println("[NTP] Syncing time...");
 
         // Wait for network stack to stabilize after connection
         delay(1000);
@@ -286,8 +315,8 @@ namespace Network
         setenv("TZ", Config::TIMEZONE, 1);
         tzset();
 
-        // Also configure SNTP with the same TZ string.
-        configTzTime(Config::TIMEZONE, Config::NTP_SERVER);
+        // Configure SNTP with multiple servers for redundancy
+        configTzTime(Config::TIMEZONE, Config::NTP_SERVER1, Config::NTP_SERVER2, Config::NTP_SERVER3);
 
         // Wait up to 30 seconds for NTP sync
         constexpr int ntpPollIntervalMs = 500;
@@ -298,8 +327,6 @@ namespace Network
             {
                 Serial.printf("[NTP] Time synced: %02d:%02d:%02d\n",
                               timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-                Serial.printf("[NTP] Timezone: %s (DST: %s)\n",
-                              Config::TIMEZONE, timeinfo.tm_isdst ? "Active" : "Inactive");
                 return;
             }
             delay(ntpPollIntervalMs);
