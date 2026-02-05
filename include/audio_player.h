@@ -5,10 +5,13 @@
 
 namespace AudioConfig
 {
-    // I2S pins for MAX98357
-    constexpr uint8_t BCLK = 7;
-    constexpr uint8_t LRC = 15;
-    constexpr uint8_t DOUT = 6;
+    // I2S pins for MAX98357 (spread out for easier soldering)
+    constexpr uint8_t BCLK = 17; // Bit Clock
+    constexpr uint8_t LRC = 18;  // Left/Right Clock (Word Select)
+    constexpr uint8_t DOUT = 21; // Data Out to amplifier
+
+    // Shutdown pin for power saving (HIGH = on, LOW = off)
+    constexpr uint8_t SD_PIN = 47;
 
     // Volume range: 0-21 (lower = less distortion on MAX98357)
     constexpr uint8_t DEFAULT_VOLUME = 12;
@@ -18,11 +21,12 @@ namespace AudioConfig
 bool audioPlayerInit();
 bool playAudioFile(const char *filename);
 bool playAudioURL(const char *url);
-void audioPlayerLoop();
 bool isPlaying();
 bool isAudioFinished();
 void stopAudio();
 void setVolume(uint8_t vol); // 0-21
+void enableAmp();            // Turn on amplifier (before playing)
+void disableAmp();           // Turn off amplifier (power saving)
 
 // Callback type for work during playback (e.g., handle server, update volume)
 using PlaybackCallback = void (*)();

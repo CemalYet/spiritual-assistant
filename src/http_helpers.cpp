@@ -43,8 +43,7 @@ namespace HttpHelpers
             server->sendHeader("Cache-Control", String("public, max-age=") + String(cacheSeconds));
         }
 
-        // Stream file to client
-        Serial.println("[HTTP] Starting streamFile...");
+        // Simple streamFile - let Arduino handle chunking
         unsigned long startTime = millis();
         size_t sent = server->streamFile(file, contentType);
         unsigned long elapsed = millis() - startTime;
