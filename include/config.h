@@ -7,6 +7,11 @@
 // Uses PRAYER_METHOD setting below for calculations
 #define TEST_MODE false
 
+// --- FORCE AP PORTAL ---
+// Set to true to clear WiFi credentials on boot and force AP portal
+// Useful for testing offline mode
+#define FORCE_AP_PORTAL false
+
 // --- DEBUG MODE ---
 // Set to true to see detailed cache logs
 #define DEBUG_CACHE_LOGS true
@@ -14,8 +19,8 @@
 // --- COMPILE-TIME CONFIGURATION ---
 namespace Config
 {
-    constexpr std::string_view WIFI_SSID = ""; // Empty - use portal for configuration
-    constexpr std::string_view WIFI_PASS = ""; // Empty - use portal for configuration
+    constexpr std::string_view WIFI_SSID = "";
+    constexpr std::string_view WIFI_PASS = "";
 
     // --- TEST MODE DEFAULTS (only used when TEST_MODE = true) ---
     constexpr double TEST_LATITUDE = 50.8798; // Leuven

@@ -4,32 +4,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Success</title>
+    <title>Spiritual Assistant - Connected</title>
     <style>
+        :root {
+            --blue: #007BFF;
+            --green: #28A745;
+            --gray: #6C757D;
+            --gray-light: #9CA3AF;
+            --gray-bg: #f7f9fc;
+            --border: #e5e7eb;
+            --text: #333;
+            --text-muted: #666;
+            --text-dark: #1f2937;
+            --radius: 8px;
+            --radius-lg: 16px;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #F8F9FA;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            min-height: -webkit-fill-available;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            padding: 12px;
         }
 
         .container {
-            background: white;
-            border-radius: 20px;
-            padding: 30px 20px;
-            max-width: 380px;
+            background: #fff;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            max-width: 420px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            padding: 32px 24px;
+            border: 1px solid var(--border);
             text-align: center;
             animation: slideUp 0.5s ease-out;
         }
@@ -46,17 +61,24 @@
             }
         }
 
-        .icon {
-            width: 70px;
-            height: 70px;
-            background: linear-gradient(135deg, #10b981, #059669);
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--green), #218838);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 40px;
+            margin: 0 auto 24px;
             animation: scaleIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .success-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: white;
+            stroke-width: 3;
+            fill: none;
         }
 
         @keyframes scaleIn {
@@ -72,144 +94,119 @@
         }
 
         h1 {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 700;
-            color: #1f2937;
-            margin: 0 0 12px 0;
+            color: var(--green);
+            margin-bottom: 12px;
         }
 
-        .msg {
+        .subtitle {
             font-size: 15px;
-            color: #6b7280;
+            color: var(--text-muted);
             line-height: 1.5;
-            margin: 0 0 8px 0;
+            margin-bottom: 24px;
         }
 
-        .info {
+        .info-box {
             background: #f0fdf4;
-            border: 2px solid #10b981;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 20px 0;
+            border: 1px solid #86efac;
+            border-left: 4px solid var(--green);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 24px;
             text-align: left;
-            font-size: 13px;
-            color: #374151;
+            font-size: 14px;
+            color: #166534;
             line-height: 1.6;
         }
 
-        .info strong {
-            color: #059669;
-            font-size: 14px;
+        .info-box strong {
             display: block;
             margin-bottom: 8px;
+            font-size: 15px;
         }
 
-        .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 18px;
-            background: #e0f2fe;
-            border-radius: 25px;
-            font-size: 14px;
-            color: #0369a1;
-            font-weight: 500;
-        }
-
-        .settings-btn {
+        .btn {
             display: block;
             width: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 16px 24px;
+            padding: 16px 28px;
             font-size: 16px;
             font-weight: 600;
+            border: none;
+            border-radius: var(--radius);
             cursor: pointer;
             text-decoration: none;
-            margin-top: 20px;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.2s;
         }
 
-        .settings-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        .btn-primary {
+            background: var(--blue);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
         }
 
-        .spin {
-            width: 16px;
-            height: 16px;
-            border: 2px solid #0369a1;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+        .ip-info {
+            margin-top: 16px;
+            font-size: 13px;
+            color: var(--gray);
         }
 
-        .done {
-            display: none;
+        .ip-info strong {
+            color: var(--text-dark);
         }
 
-        .done .emoji {
-            font-size: 60px;
-            margin-bottom: 15px;
-        }
-
-        .done h1 {
-            color: #059669;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
+        .helper-text {
+            margin-top: 10px;
+            font-size: 11px;
+            color: var(--gray-light);
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <div id="main">
-            <div class="icon">✓</div>
-            <h1>WiFi Configured!</h1>
-            <p class="msg">Your device is now connected to WiFi.</p>
-            <div class="info">
-                <strong>📱 Next Step:</strong>
-                1. Connect your phone to your home WiFi<br>
-                2. Then access settings using the link below
-            </div>
-            <div class="status">
-                <span>✓ Connected</span>
-            </div>
-            <a id="settingsLink" href="http://spiritualassistantsettings.local" class="settings-btn">
-                Go to Settings →
-            </a>
-            <p id="ipInfo" style="margin-top: 15px; font-size: 13px; color: #666; text-align: center;">
-                Or use IP: <strong id="ipAddress">loading...</strong>
-            </p>
-            <p style="margin-top: 10px; font-size: 11px; color: #999; text-align: center;">
-                (mDNS .local domains may not work on all devices)
-            </p>
+        <div class="success-icon">
+            <svg viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12" />
+            </svg>
         </div>
+        <h1>WiFi Connected!</h1>
+        <p class="subtitle">Your Spiritual Assistant is now online and ready to configure.</p>
+
+        <div class="info-box">
+            <strong>📱 Next Step:</strong>
+            1. Connect your phone to your home WiFi<br>
+            2. Open settings using the button below
+        </div>
+
+        <a id="settingsLink" href="http://spiritualassistantsettings.local/settings.html" class="btn btn-primary">
+            <svg style="width:18px;height:18px;vertical-align:middle;margin-right:8px;stroke:currentColor;fill:none;stroke-width:2"
+                viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            Go to Settings
+        </a>
+
+        <p id="ipInfo" class="ip-info">
+            Or use IP: <strong id="ipAddress">loading...</strong>
+        </p>
+        <p class="helper-text">(mDNS .local domains may not work on all devices)</p>
     </div>
+
     <script>
-        // Get IP from URL parameter
         const params = new URLSearchParams(window.location.search);
         const ip = params.get('ip') || sessionStorage.getItem('deviceIP') || '';
 
         if (ip) {
             document.getElementById('ipAddress').textContent = 'http://' + ip;
-            document.getElementById('settingsLink').href = 'http://' + ip;
+            document.getElementById('settingsLink').href = 'http://' + ip + '/settings.html';
         } else {
             document.getElementById('ipInfo').style.display = 'none';
         }

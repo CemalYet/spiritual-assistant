@@ -9,25 +9,16 @@
 #include <stdlib.h>
 #include <time.h>
 
-// WiFi event handler - logs all WiFi events
+// WiFi event handler - only log important events
 void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
 {
     switch (event)
     {
-    case ARDUINO_EVENT_WIFI_STA_START:
-        Serial.println("[WiFi Event] STA Started");
-        break;
-    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-        Serial.println("[WiFi Event] Connected to AP");
-        break;
-    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-        Serial.printf("[WiFi Event] Got IP: %s\n", WiFi.localIP().toString().c_str());
-        break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-        Serial.printf("[WiFi Event] DISCONNECTED! Reason: %d\n", info.wifi_sta_disconnected.reason);
+        Serial.printf("[WiFi] Disconnected (reason: %d)\n", info.wifi_sta_disconnected.reason);
         break;
     case ARDUINO_EVENT_WIFI_STA_LOST_IP:
-        Serial.println("[WiFi Event] Lost IP address!");
+        Serial.println("[WiFi] Lost IP!");
         break;
     default:
         break;
@@ -45,32 +36,23 @@ namespace Network
     static char currentSSID[33] = "";     // Max SSID: 32 + null
     static char currentPassword[65] = ""; // Max WPA2: 64 + null
     static int connectionAttempts = 0;
-    static bool isRetryPortal = false; // True if portal opened after failed connection
+    static bool isRetryPortal = false;       // True if portal opened after failed connection
+    static bool portalConnectedWiFi = false; // True if portal just closed with WiFi success
 
-    void init()
+    void init(bool skipHardcodedCredentials)
     {
-        Serial.println("[Network] Initializing...");
-
-        // Register WiFi event handler for debugging
         WiFi.onEvent(onWiFiEvent);
-
         WiFiCredentials::init();
 
         if (WiFiCredentials::load(currentSSID, sizeof(currentSSID), currentPassword, sizeof(currentPassword)))
-        {
-            Serial.println("[Network] Found stored WiFi credentials");
             return;
-        }
+
+        if (skipHardcodedCredentials)
+            return;
 
         size_t hardcodedSSIDLen = strlen(Config::WIFI_SSID.data());
         if (hardcodedSSIDLen == 0)
-        {
-            Serial.println("[Network] No WiFi credentials found - portal required");
             return;
-        }
-
-        Serial.println("[Network] Using hardcoded credentials from config.h");
-        Serial.println("[Network] Note: These will only be saved after successful connection");
 
         // Copy but DON'T save to NVS - only save after verified connection
         size_t copyLen = (hardcodedSSIDLen < sizeof(currentSSID) - 1) ? hardcodedSSIDLen : sizeof(currentSSID) - 1;
@@ -89,7 +71,8 @@ namespace Network
         {
             Serial.println("[Network] No credentials - starting configuration portal");
             portalMode = true;
-            return WiFiPortal::start();
+            WiFiPortal::start();
+            return false; // Portal started, but WiFi not connected
         }
 
         if (WiFi.status() == WL_CONNECTED)
@@ -133,15 +116,11 @@ namespace Network
                 {
                     Serial.printf("\n[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
 
-                    // Disable WiFi power saving to prevent connection resets during transfers
+                    // Disable WiFi power saving for stable transfers
                     esp_wifi_set_ps(WIFI_PS_NONE);
-                    Serial.println("[WiFi] Power saving disabled for stable transfers");
 
                     if (!WiFiCredentials::hasCredentials())
-                    {
-                        Serial.println("[WiFi] Saving verified credentials to NVS");
                         WiFiCredentials::save(currentSSID, currentPassword);
-                    }
 
                     portalMode = false;
                     isRetryPortal = false;
@@ -186,9 +165,6 @@ namespace Network
         connectionAttempts++;
         isRetryPortal = true;
 
-        Serial.println("[Network] Opening portal for reconfiguration...");
-        Serial.println("[Network] Please reconnect to the AP and enter credentials again\n");
-
         portalMode = true;
         WiFiPortal::start();
 
@@ -215,11 +191,8 @@ namespace Network
         char newPassword[65];
         WiFiPortal::getNewCredentials(newSSID, sizeof(newSSID), newPassword, sizeof(newPassword));
 
-        Serial.println("[Network] ✓ Connection test passed!");
-
         if (!WiFiCredentials::save(newSSID, newPassword))
         {
-            Serial.println("[Network] Failed to save credentials");
             WiFiPortal::clearCredentials();
             return;
         }
@@ -232,8 +205,7 @@ namespace Network
         isRetryPortal = false;
         connectionAttempts = 0;
 
-        // Keep portal running so browser can see success status
-        Serial.println("[Network] Allowing browser to show success...");
+        // Keep portal running so browser can see success
         unsigned long startWait = millis();
         while (millis() - startWait < 5000)
         {
@@ -248,40 +220,22 @@ namespace Network
         // Ensure WiFi STA is still connected after portal stops
         if (WiFi.status() != WL_CONNECTED)
         {
-            Serial.println("[Network] Reconnecting to WiFi after portal...");
             WiFi.mode(WIFI_STA);
             WiFi.begin(currentSSID, currentPassword);
 
             unsigned long startConnect = millis();
             while (WiFi.status() != WL_CONNECTED && millis() - startConnect < 10000)
-            {
                 delay(100);
-            }
-
-            if (WiFi.status() == WL_CONNECTED)
-            {
-                Serial.printf("[Network] Reconnected! IP: %s\n", WiFi.localIP().toString().c_str());
-            }
-            else
-            {
-                Serial.println("[Network] Failed to reconnect WiFi");
-            }
         }
 
-        // Remount LittleFS (portal may have unmounted it)
-        if (!LittleFS.begin(true))
-        {
-            Serial.println("[Network] Warning: LittleFS remount failed");
-        }
+        // Remount LittleFS
+        LittleFS.begin(true);
 
-        Serial.println("[Network] Portal complete - syncing time...");
         syncTime();
-
-        Serial.println("[Network] Starting settings server...");
         SettingsServer::start();
 
-        Serial.println("[Network] ✓ Setup complete! Device is ready.");
-        Serial.printf("[Network] Settings available at: http://%s\n", WiFi.localIP().toString().c_str());
+        // Signal to main.cpp that portal closed with WiFi success
+        portalConnectedWiFi = true;
     }
 
     bool isConnected()
@@ -289,9 +243,34 @@ namespace Network
         return WiFi.status() == WL_CONNECTED;
     }
 
+    void startPortal()
+    {
+        portalMode = true;
+        WiFiPortal::start();
+    }
+
+    void disconnect()
+    {
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            WiFi.disconnect(true);
+            WiFi.mode(WIFI_OFF);
+        }
+    }
+
     bool isPortalActive()
     {
         return portalMode;
+    }
+
+    void stopPortal()
+    {
+        if (!portalMode)
+            return;
+
+        WiFiPortal::stop();
+        portalMode = false;
+        Serial.println("[Network] Portal stopped");
     }
 
     bool isRetryConnection()
@@ -333,6 +312,16 @@ namespace Network
         }
 
         Serial.println("[NTP] Failed to sync time");
+    }
+
+    bool didPortalConnectWiFi()
+    {
+        return portalConnectedWiFi;
+    }
+
+    void clearPortalConnectFlag()
+    {
+        portalConnectedWiFi = false;
     }
 
 } // namespace Network
