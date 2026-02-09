@@ -7,10 +7,10 @@
 // Uses PRAYER_METHOD setting below for calculations
 #define TEST_MODE false
 
-// --- FORCE AP PORTAL ---
+// ---  AP PORTAL ---
 // Set to true to clear WiFi credentials on boot and force AP portal
 // Useful for testing offline mode
-#define FORCE_AP_PORTAL false
+#define FORCE_AP_PORTAL true
 
 // --- DEBUG MODE ---
 // Set to true to see detailed cache logs

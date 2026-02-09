@@ -23,6 +23,9 @@ namespace SettingsServer
 
     // Forward declarations
     static void serveSettingsPage();
+    static void serveStyleCss();
+    static void serveScriptJs();
+    static void serveGzippedFile(const char *path, const char *contentType);
     static void handleApiMode();
     static void handleGetSettings();
     static void handlePostSettings();
@@ -66,13 +69,13 @@ namespace SettingsServer
 
         server = std::make_unique<WebServer>(80);
 
-        const char *headerkeys[] = {"User-Agent"};
-        server->collectHeaders(headerkeys, 1);
+        const char *headerkeys[] = {"User-Agent", "Accept-Encoding"};
+        server->collectHeaders(headerkeys, 2);
 
         // Routes
         server->on("/", HTTP_GET, serveSettingsPage);
-        server->serveStatic("/style.css", LittleFS, "/style.css");
-        server->serveStatic("/script.js", LittleFS, "/script.js");
+        server->on("/style.css", HTTP_GET, serveStyleCss);
+        server->on("/script.js", HTTP_GET, serveScriptJs);
         server->on("/api/mode", HTTP_GET, handleApiMode);
         server->on("/api/settings", HTTP_GET, handleGetSettings);
         server->on("/api/settings", HTTP_POST, handlePostSettings);
@@ -116,29 +119,61 @@ namespace SettingsServer
 
     bool isActive() { return active; }
 
+    // Serve gzipped file if available, otherwise serve original
+    static void serveGzippedFile(const char *path, const char *contentType)
+    {
+        String gzPath = String(path) + ".gz";
+
+        // Check if browser accepts gzip
+        bool acceptsGzip = server->hasHeader("Accept-Encoding") &&
+                           server->header("Accept-Encoding").indexOf("gzip") >= 0;
+
+        // Try gzipped version first
+        if (acceptsGzip && LittleFS.exists(gzPath.c_str()))
+        {
+            File file = LittleFS.open(gzPath.c_str(), "r");
+            if (file)
+            {
+                Serial.printf("[Server] Streaming %s (%u bytes, gzip)\n", gzPath.c_str(), file.size());
+                server->sendHeader("Content-Encoding", "gzip");
+                server->sendHeader("Cache-Control", "max-age=86400"); // Cache 1 day
+                server->streamFile(file, contentType);
+                file.close();
+                return;
+            }
+        }
+
+        // Fall back to original file
+        if (LittleFS.exists(path))
+        {
+            File file = LittleFS.open(path, "r");
+            if (file)
+            {
+                Serial.printf("[Server] Streaming %s (%u bytes)\n", path, file.size());
+                server->sendHeader("Cache-Control", "max-age=86400");
+                server->streamFile(file, contentType);
+                file.close();
+                return;
+            }
+        }
+
+        server->send(404, "text/plain", "File not found");
+    }
+
     // Stream settings.html directly from flash - zero RAM usage
     static void serveSettingsPage()
     {
-        const char *path = "/settings.html";
+        serveGzippedFile("/settings.html", "text/html");
+    }
 
-        if (!LittleFS.exists(path))
-        {
-            server->send(HttpHelpers::HTTP_OK, "text/html",
-                         "<html><body><h1>Settings</h1><p>Upload settings.html to LittleFS.</p></body></html>");
-            return;
-        }
+    static void serveStyleCss()
+    {
+        serveGzippedFile("/style.css", "text/css");
+    }
 
-        File file = LittleFS.open(path, "r");
-        if (!file)
-        {
-            server->send(HttpHelpers::HTTP_OK, "text/html",
-                         "<html><body><h1>Settings</h1><p>Failed to open file.</p></body></html>");
-            return;
-        }
-
-        Serial.printf("[Settings] Streaming %s (%u bytes)\n", path, file.size());
-        server->streamFile(file, "text/html");
-        file.close();
+    static void serveScriptJs()
+    {
+        serveGzippedFile("/script.js", "application/javascript");
     }
 
     // API endpoint to return current mode

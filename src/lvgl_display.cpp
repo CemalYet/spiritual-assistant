@@ -219,6 +219,10 @@ namespace LvglDisplay
 
         initialized = true;
         Serial.println("[Display] LVGL initialized with touch");
+
+        // Initialize state reader early so state-driven UI works from the start
+        UiStateReader::init();
+
         return true;
     }
 

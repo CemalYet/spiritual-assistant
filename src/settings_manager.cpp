@@ -61,7 +61,6 @@ namespace SettingsManager
 
     // Action flags
     static volatile bool flagRecalculation = false;
-    static volatile bool flagWiFiReconnect = false;
 
     // Available calculation methods
     static const MethodInfo methods[] = {
@@ -207,15 +206,6 @@ namespace SettingsManager
         size_t len = preferences.getString(KEY_CONNECTION_MODE, buffer, sizeof(buffer));
         cachedConnectionMode.assign(len > 0 ? buffer : MODE_WIFI);
         return cachedConnectionMode.c_str();
-    }
-
-    static bool isValidConnectionMode(const char *mode)
-    {
-        if (!mode)
-            return false;
-        return cachedConnectionMode.compare(MODE_WIFI) == 0 ||
-               etl::string_view(mode) == MODE_OFFLINE ||
-               etl::string_view(mode) == MODE_WIFI;
     }
 
     bool setConnectionMode(const char *mode)
@@ -381,16 +371,6 @@ namespace SettingsManager
     void clearRecalculationFlag()
     {
         flagRecalculation = false;
-    }
-
-    bool needsWiFiReconnect()
-    {
-        return flagWiFiReconnect;
-    }
-
-    void clearWiFiReconnectFlag()
-    {
-        flagWiFiReconnect = false;
     }
 
     // --- Location Implementation ---

@@ -61,8 +61,4 @@ namespace SettingsManager
     // Check if prayer times need recalculation (method or location changed)
     bool needsRecalculation();
     void clearRecalculationFlag();
-
-    // Check if WiFi needs reconnection (credentials changed)
-    bool needsWiFiReconnect();
-    void clearWiFiReconnectFlag();
 }

@@ -33,10 +33,8 @@ namespace Network
     constexpr int NTP_SYNC_TIMEOUT_ATTEMPTS = 60; // 60 * 500ms = 30 seconds
 
     static bool portalMode = false;
-    static char currentSSID[33] = "";     // Max SSID: 32 + null
-    static char currentPassword[65] = ""; // Max WPA2: 64 + null
-    static int connectionAttempts = 0;
-    static bool isRetryPortal = false;       // True if portal opened after failed connection
+    static char currentSSID[33] = "";        // Max SSID: 32 + null
+    static char currentPassword[65] = "";    // Max WPA2: 64 + null
     static bool portalConnectedWiFi = false; // True if portal just closed with WiFi success
 
     void init(bool skipHardcodedCredentials)
@@ -69,10 +67,8 @@ namespace Network
     {
         if (strlen(currentSSID) == 0)
         {
-            Serial.println("[Network] No credentials - starting configuration portal");
-            portalMode = true;
-            WiFiPortal::start();
-            return false; // Portal started, but WiFi not connected
+            Serial.println("[Network] No credentials available");
+            return false;
         }
 
         if (WiFi.status() == WL_CONNECTED)
@@ -123,8 +119,6 @@ namespace Network
                         WiFiCredentials::save(currentSSID, currentPassword);
 
                     portalMode = false;
-                    isRetryPortal = false;
-                    connectionAttempts = 0;
                     return true;
                 }
                 delay(pollIntervalMs);
@@ -139,7 +133,7 @@ namespace Network
         wl_status_t status = WiFi.status();
         Serial.println("\n═════════════════════════════════════════");
         Serial.println("[WiFi] ❌ CONNECTION FAILED");
-        Serial.printf("[WiFi] Attempts: %d\n", connectionAttempts + 1);
+
         Serial.printf("[WiFi] Status Code: %d - ", status);
 
         switch (status)
@@ -161,12 +155,6 @@ namespace Network
             break;
         }
         Serial.println("═════════════════════════════════════════\n");
-
-        connectionAttempts++;
-        isRetryPortal = true;
-
-        portalMode = true;
-        WiFiPortal::start();
 
         return false;
     }
@@ -202,9 +190,6 @@ namespace Network
         memcpy(currentSSID, newSSID, ssidLen + 1);
         memcpy(currentPassword, newPassword, passLen + 1);
 
-        isRetryPortal = false;
-        connectionAttempts = 0;
-
         // Keep portal running so browser can see success
         unsigned long startWait = millis();
         while (millis() - startWait < 5000)
@@ -228,13 +213,10 @@ namespace Network
                 delay(100);
         }
 
-        // Remount LittleFS
+        // Remount LittleFS (portal mode change can corrupt mount)
         LittleFS.begin(true);
 
-        syncTime();
-        SettingsServer::start();
-
-        // Signal to main.cpp that portal closed with WiFi success
+        // Signal to caller that portal closed with WiFi success
         portalConnectedWiFi = true;
     }
 
@@ -271,16 +253,6 @@ namespace Network
         WiFiPortal::stop();
         portalMode = false;
         Serial.println("[Network] Portal stopped");
-    }
-
-    bool isRetryConnection()
-    {
-        return isRetryPortal;
-    }
-
-    int getConnectionAttempts()
-    {
-        return connectionAttempts;
     }
 
     void syncTime()

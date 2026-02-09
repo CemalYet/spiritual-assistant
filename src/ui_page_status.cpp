@@ -6,6 +6,8 @@
 #include "ui_page_status.h"
 #include "ui_theme.h"
 #include "ui_icons.h"
+#include <cstring>
+#include <cstdio>
 
 namespace UiPageStatus
 {
@@ -62,57 +64,57 @@ namespace UiPageStatus
 
         // Title
         lv_obj_t *lbl_title = lv_label_create(scr);
-        lv_label_set_text(lbl_title, "WiFi Ayari");
+        lv_label_set_text(lbl_title, "WiFi Ayarlari");
         lv_obj_set_style_text_color(lbl_title, COLOR_ACCENT_BRIGHT, 0);
         lv_obj_set_style_text_font(lbl_title, &lv_font_montserrat_16, 0);
         lv_obj_align(lbl_title, LV_ALIGN_TOP_MID, 0, 30);
 
-        // AP Name
-        lv_obj_t *lbl_ap_title = lv_label_create(scr);
-        lv_label_set_text(lbl_ap_title, "Ag Adi:");
-        lv_obj_set_style_text_color(lbl_ap_title, COLOR_SUBTITLE, 0);
-        lv_obj_set_style_text_font(lbl_ap_title, &lv_font_montserrat_12, 0);
-        lv_obj_align(lbl_ap_title, LV_ALIGN_TOP_LEFT, 20, 70);
+        // WiFi icon (simple visual)
+        lv_obj_t *wifi_icon = lv_label_create(scr);
+        lv_label_set_text(wifi_icon, LV_SYMBOL_WIFI);
+        lv_obj_set_style_text_color(wifi_icon, COLOR_ACCENT, 0);
+        lv_obj_set_style_text_font(wifi_icon, &lv_font_montserrat_24, 0);
+        lv_obj_align(wifi_icon, LV_ALIGN_TOP_MID, 0, 60);
 
-        lv_obj_t *lbl_ap = lv_label_create(scr);
-        lv_label_set_text(lbl_ap, apName ? apName : "");
-        lv_obj_set_style_text_color(lbl_ap, COLOR_TEXT, 0);
-        lv_obj_set_style_text_font(lbl_ap, &lv_font_montserrat_14, 0);
-        lv_obj_align(lbl_ap, LV_ALIGN_TOP_LEFT, 20, 88);
-
-        // Password
-        lv_obj_t *lbl_pw_title = lv_label_create(scr);
-        lv_label_set_text(lbl_pw_title, "Sifre:");
-        lv_obj_set_style_text_color(lbl_pw_title, COLOR_SUBTITLE, 0);
-        lv_obj_set_style_text_font(lbl_pw_title, &lv_font_montserrat_12, 0);
-        lv_obj_align(lbl_pw_title, LV_ALIGN_TOP_LEFT, 20, 120);
-
-        lv_obj_t *lbl_pw = lv_label_create(scr);
-        lv_label_set_text(lbl_pw, password ? password : "");
-        lv_obj_set_style_text_color(lbl_pw, COLOR_TEXT, 0);
-        lv_obj_set_style_text_font(lbl_pw, &lv_font_montserrat_14, 0);
-        lv_obj_align(lbl_pw, LV_ALIGN_TOP_LEFT, 20, 138);
-
-        // IP Address
-        lv_obj_t *lbl_ip_title = lv_label_create(scr);
-        lv_label_set_text(lbl_ip_title, "Adres:");
-        lv_obj_set_style_text_color(lbl_ip_title, COLOR_SUBTITLE, 0);
-        lv_obj_set_style_text_font(lbl_ip_title, &lv_font_montserrat_12, 0);
-        lv_obj_align(lbl_ip_title, LV_ALIGN_TOP_LEFT, 20, 170);
-
-        lv_obj_t *lbl_ip = lv_label_create(scr);
-        lv_label_set_text(lbl_ip, ip ? ip : "");
-        lv_obj_set_style_text_color(lbl_ip, COLOR_ACCENT, 0);
-        lv_obj_set_style_text_font(lbl_ip, &lv_font_montserrat_14, 0);
-        lv_obj_align(lbl_ip, LV_ALIGN_TOP_LEFT, 20, 188);
-
-        // Instructions
+        // Instruction text
         lv_obj_t *lbl_inst = lv_label_create(scr);
-        lv_label_set_text(lbl_inst, "Telefonunuzdan\nbu aga baglanin");
+        lv_label_set_text(lbl_inst, "Telefonunuzdan bu WiFi'ye baglanin:");
         lv_obj_set_style_text_color(lbl_inst, COLOR_DIM, 0);
         lv_obj_set_style_text_font(lbl_inst, &lv_font_montserrat_12, 0);
         lv_obj_set_style_text_align(lbl_inst, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(lbl_inst, LV_ALIGN_BOTTOM_MID, 0, -40);
+        lv_obj_set_width(lbl_inst, 220);
+        lv_obj_align(lbl_inst, LV_ALIGN_CENTER, 0, -30);
+
+        // SSID (network name) - large and prominent
+        lv_obj_t *lbl_ssid = lv_label_create(scr);
+        lv_label_set_text(lbl_ssid, apName ? apName : "AdhanSettings");
+        lv_obj_set_style_text_color(lbl_ssid, COLOR_TEXT, 0);
+        lv_obj_set_style_text_font(lbl_ssid, &lv_font_montserrat_20, 0);
+        lv_obj_align(lbl_ssid, LV_ALIGN_CENTER, 0, 5);
+
+        // Password label
+        lv_obj_t *lbl_pass_title = lv_label_create(scr);
+        lv_label_set_text(lbl_pass_title, "Sifre:");
+        lv_obj_set_style_text_color(lbl_pass_title, COLOR_SUBTITLE, 0);
+        lv_obj_set_style_text_font(lbl_pass_title, &lv_font_montserrat_12, 0);
+        lv_obj_align(lbl_pass_title, LV_ALIGN_CENTER, 0, 40);
+
+        // Password value
+        lv_obj_t *lbl_pass = lv_label_create(scr);
+        lv_label_set_text(lbl_pass, password ? password : "12345678");
+        lv_obj_set_style_text_color(lbl_pass, COLOR_ACCENT, 0);
+        lv_obj_set_style_text_font(lbl_pass, &lv_font_montserrat_16, 0);
+        lv_obj_align(lbl_pass, LV_ALIGN_CENTER, 0, 60);
+
+        // IP address hint
+        lv_obj_t *lbl_ip = lv_label_create(scr);
+        char ipText[64];
+        snprintf(ipText, sizeof(ipText), "Sonra tarayicida: %s", ip ? ip : "192.168.4.1");
+        lv_label_set_text(lbl_ip, ipText);
+        lv_obj_set_style_text_color(lbl_ip, COLOR_DIM, 0);
+        lv_obj_set_style_text_font(lbl_ip, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_text_align(lbl_ip, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(lbl_ip, LV_ALIGN_BOTTOM_MID, 0, -30);
 
         lv_scr_load(scr);
     }

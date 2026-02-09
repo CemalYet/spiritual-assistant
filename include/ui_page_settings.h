@@ -7,19 +7,10 @@
 #define UI_PAGE_SETTINGS_H
 
 #include <lvgl.h>
+#include "app_state.h" // WifiState
 
 namespace UiPageSettings
 {
-    // WiFi button states
-    enum class WiFiButtonState
-    {
-        DISCONNECTED, // Blue - "Ayarlar"
-        CONNECTING,   // Yellow - "Baglaniyor..."
-        CONNECTED,    // Green - "Bagli: IP"
-        FAILED,       // Red - "Baglanamadi"
-        PORTAL        // Cyan - AP info display
-    };
-
     using AdvancedCallback = void (*)();
 
     // Create/recreate settings screen
@@ -35,9 +26,8 @@ namespace UiPageSettings
     void setVolumeLevel(int level);
     int getVolumeLevel();
 
-    // WiFi button state
-    void setWiFiButtonState(WiFiButtonState state, const char *ip = nullptr);
-    void updateWiFiButton(bool connected, const char *ip);
+    // WiFi button state (handles button style + portal overlay internally)
+    void setWiFiButtonState(WifiState state, const char *ip = nullptr);
 
 } // namespace UiPageSettings
 
