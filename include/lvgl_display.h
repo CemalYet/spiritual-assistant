@@ -8,6 +8,8 @@
 #ifndef LVGL_DISPLAY_H
 #define LVGL_DISPLAY_H
 
+#include <stdint.h>
+
 namespace LvglDisplay
 {
     /// Initialize LVGL and display hardware
@@ -23,8 +25,16 @@ namespace LvglDisplay
     /// Update time display (called every minute)
     void updateTime();
 
+    /// Force date update (called after portal closes or time sync)
+    void updateDate();
+
     /// Update status icons (WiFi, NTP, Adhan)
     void updateStatus();
+
+    /// Format prayer date string (e.g. "1 Subat Cumartesi")
+    /// dayOffset: 0 = today, 1 = tomorrow
+    /// Returns pointer to static buffer (valid until next call)
+    const char *formatPrayerDate(int dayOffset = 0);
 
 } // namespace LvglDisplay
 

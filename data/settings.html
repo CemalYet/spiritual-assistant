@@ -54,6 +54,12 @@
             position: relative;
             overflow: hidden;
             margin-top: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .container.ready {
+            opacity: 1;
         }
 
         .header {
@@ -248,10 +254,12 @@
         }
 
         .input-base {
+            width: 100%;
             padding: 10px 14px;
             font-size: 14px;
             border: 2px solid var(--border-input);
             border-radius: 6px;
+            box-sizing: border-box;
         }
 
         .input-base:focus {
@@ -296,6 +304,10 @@
             color: var(--text-muted);
             align-self: center;
             font-size: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
         }
 
         .volume-container {
@@ -998,6 +1010,435 @@
             font-weight: 600;
         }
 
+        /* AP Mode Selection Tiles */
+        .mode-tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 20px;
+            background: #fff;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            min-height: 140px;
+        }
+
+        .mode-tile:hover {
+            border-color: var(--blue);
+            background: #f0f7ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+        }
+
+        .mode-tile:active {
+            transform: scale(0.98);
+        }
+
+        .mode-tile .tile-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            stroke: var(--blue);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .mode-tile .tile-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .mode-tile .tile-desc {
+            font-size: 13px;
+            color: var(--gray);
+            line-height: 1.4;
+        }
+
+        .mode-tiles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .change-mode-link {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin-top: 16px;
+            padding: 10px;
+            color: var(--blue);
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            border-radius: var(--radius);
+            transition: background 0.2s;
+        }
+
+        .change-mode-link:hover {
+            background: rgba(0, 123, 255, 0.08);
+        }
+
+        .change-mode-link svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        /* Radio Group for Connection Mode */
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            background: #fff;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .radio-option:hover {
+            border-color: var(--blue);
+            background: #f0f7ff;
+        }
+
+        .radio-option.selected {
+            border-color: var(--blue);
+            background: #EFF6FF;
+        }
+
+        .radio-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            margin: 2px 0 0 0;
+            accent-color: var(--blue);
+            flex-shrink: 0;
+        }
+
+        .radio-option-content {
+            flex: 1;
+        }
+
+        .radio-option-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radio-option-desc {
+            font-size: 13px;
+            color: var(--gray);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .badge-recommended {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-offline {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* WiFi Setup Styles */
+        .wifi-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn-scan {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-scan:hover {
+            background: #0056b3;
+        }
+
+        .btn-scan:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .network-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+
+        .network-item {
+            padding: 12px 14px;
+            background: #fff;
+            border-radius: var(--radius);
+            margin-bottom: 6px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .network-item:hover {
+            background: #e3f2fd;
+            border-color: var(--blue);
+        }
+
+        .network-item:active {
+            background: var(--blue);
+            transform: scale(0.99);
+        }
+
+        .network-item:active .network-name,
+        .network-item:active .network-info {
+            color: #fff;
+        }
+
+        .network-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .network-info {
+            font-size: 13px;
+            color: var(--gray);
+        }
+
+        .wifi-status {
+            text-align: center;
+            color: var(--blue);
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 12px;
+            min-height: 20px;
+        }
+
+        .wifi-form {
+            margin-top: 16px;
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper input {
+            padding-right: 60px;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--blue);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px;
+        }
+
+        .wifi-message {
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-top: 12px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .wifi-message.show {
+            display: block;
+        }
+
+        .wifi-message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .wifi-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .wifi-message.loading {
+            background: #e0e7ff;
+            color: #3730a3;
+            border: 1px solid #a5b4fc;
+        }
+
+        /* Date Time Styles */
+        .datetime-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .time-sync-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border-radius: var(--radius-lg);
+            border: 1px solid #bbf7d0;
+            text-align: center;
+        }
+
+        .time-sync-icon {
+            margin-bottom: 12px;
+        }
+
+        .time-sync-info {
+            margin-bottom: 12px;
+        }
+
+        .time-sync-label {
+            font-size: 12px;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .time-sync-value {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .time-sync-tz {
+            font-size: 13px;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+
+        .time-sync-status {
+            font-size: 13px;
+            color: var(--green);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-sync-status.synced {
+            color: var(--green);
+        }
+
+        .time-sync-status.error {
+            color: #dc2626;
+        }
+
+        .datetime-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .datetime-field {
+            flex: 1;
+        }
+
+        .datetime-field.small {
+            flex: 0 0 80px;
+        }
+
+        .datetime-field input,
+        .datetime-field select {
+            width: 100%;
+        }
+
+        .btn-apply-time {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            background: var(--green);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-apply-time:hover {
+            background: #218838;
+        }
+
+        .time-status {
+            text-align: center;
+            font-size: 13px;
+            color: var(--gray);
+            margin-top: 12px;
+        }
+
+        .time-status.synced {
+            color: var(--green);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(0, 123, 255, 0.3);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         /* Skeleton loader */
         .skeleton {
             background: linear-gradient(90deg, var(--gray-bg) 25%, #e8ecf1 50%, var(--gray-bg) 75%);
@@ -1059,6 +1500,157 @@
             </div>
             <h1>Settings</h1>
             <p class="subtitle">Spiritual Assistant Configuration</p>
+        </div>
+
+        <!-- AP MODE SELECTION (only visible in AP portal mode) -->
+        <div class="section" id="modeSelectionSection" style="display:none;">
+            <div class="section-title">
+                <span class="icon"><svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                    </svg></span>
+                Choose Setup Mode
+            </div>
+            <div class="mode-tiles" id="modeTiles">
+                <div class="mode-tile" onclick="selectAPMode('online')">
+                    <svg class="tile-icon" viewBox="0 0 24 24">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="#007BFF" />
+                    </svg>
+                    <div class="tile-title">Connect to WiFi</div>
+                    <div class="tile-desc">Auto time sync & online features</div>
+                </div>
+                <div class="mode-tile" onclick="selectAPMode('offline')">
+                    <svg class="tile-icon" viewBox="0 0 24 24">
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                        <path d="M9 9h6M9 13h6M9 17h4" />
+                    </svg>
+                    <div class="tile-title">Offline Mode</div>
+                    <div class="tile-desc">No WiFi needed, manual setup</div>
+                </div>
+            </div>
+            <div id="changeModeLink" class="change-mode-link" style="display:none;" onclick="resetAPMode()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                Change Mode
+            </div>
+        </div>
+
+        <!-- CONNECTION MODE SECTION -->
+        <div class="section" id="connectionSection">
+            <div class="section-title">
+                <span class="icon"><svg viewBox="0 0 24 24">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="#007BFF" />
+                    </svg></span>
+                Connection
+            </div>
+
+            <div class="radio-group">
+                <label class="radio-option selected" id="optionWifi">
+                    <input type="radio" name="connectionMode" value="wifi" checked>
+                    <div class="radio-option-content">
+                        <div class="radio-option-title">
+                            <svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"
+                                viewBox="0 0 24 24">
+                                <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                                <circle cx="12" cy="20" r="1" fill="currentColor" />
+                            </svg>
+                            WiFi Mode
+                            <span class="badge badge-recommended">Recommended</span>
+                        </div>
+                        <div class="radio-option-desc">Connect to WiFi for automatic time sync, Diyanet API access, and
+                            online features.</div>
+                    </div>
+                </label>
+                <label class="radio-option" id="optionOffline">
+                    <input type="radio" name="connectionMode" value="offline">
+                    <div class="radio-option-content">
+                        <div class="radio-option-title">
+                            <svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"
+                                viewBox="0 0 24 24">
+                                <rect x="4" y="4" width="16" height="16" rx="2" />
+                                <path d="M9 9h6M9 13h6M9 17h4" />
+                            </svg>
+                            Offline Mode
+                            <span class="badge badge-offline">Manual</span>
+                        </div>
+                        <div class="radio-option-desc">No internet required. Set date/time manually. Uses local prayer
+                            calculation.</div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- WiFi Setup (shown when WiFi mode selected) -->
+            <div id="wifiSetup" class="wifi-section">
+                <label>WiFi Network</label>
+                <button type="button" id="scanBtn" class="btn-scan" onclick="scanNetworks()">
+                    <svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"
+                        viewBox="0 0 24 24">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                        <circle cx="12" cy="20" r="1" fill="currentColor" />
+                    </svg>
+                    Scan Networks
+                </button>
+                <div id="wifiStatus" class="wifi-status"></div>
+                <div id="networkList" class="network-list" style="display:none;"></div>
+
+                <div class="wifi-form">
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="wifiSsid">Network Name (SSID)</label>
+                        <input type="text" id="wifiSsid" class="input-base" placeholder="Enter or select network"
+                            maxlength="32" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="wifiPassword">Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="wifiPassword" class="input-base" placeholder="Enter password"
+                                maxlength="64">
+                            <button type="button" class="toggle-password" onclick="toggleWifiPassword()">SHOW</button>
+                        </div>
+                    </div>
+                    <button type="button" id="connectBtn" class="btn-scan" onclick="connectWifi()"
+                        style="background:var(--green);">
+                        <svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2"
+                            viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        Connect
+                    </button>
+                    <div id="wifiMessage" class="wifi-message"></div>
+                </div>
+                <p class="helper-text">WiFi credentials are stored securely on device</p>
+            </div>
+
+            <!-- DateTime Setup (shown when Offline mode selected) -->
+            <div id="datetimeSetup" class="datetime-section" style="display:none;">
+                <div id="timeSyncDisplay" class="time-sync-display">
+                    <div class="time-sync-icon">
+                        <svg viewBox="0 0 24 24"
+                            style="width:48px;height:48px;stroke:var(--green);fill:none;stroke-width:1.5">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                    </div>
+                    <div class="time-sync-info">
+                        <div class="time-sync-label">Date & Time</div>
+                        <div id="syncedDateTime" class="time-sync-value">Syncing...</div>
+                        <div id="syncedTimezone" class="time-sync-tz"></div>
+                    </div>
+                    <div id="timeSyncStatus" class="time-sync-status">
+                        <span class="spinner"></span> Syncing from phone...
+                    </div>
+                </div>
+                <p class="helper-text" style="margin-top:12px;">Time synced automatically from your phone. Device will
+                    keep time while powered on.</p>
+            </div>
         </div>
 
         <div class="section collapsed" id="methodSection">
@@ -1183,8 +1775,9 @@
                                 <input type="number" id="manualLng" class="input-base" step="0.0001"
                                     placeholder="28.9784">
                             </div>
-                            <button type="button" id="applyManualBtn" class="btn-small">Apply</button>
                         </div>
+                        <p class="helper-text" style="margin-top:8px;">Enter coordinates and click "Apply Changes" to
+                            save</p>
                     </div>
                 </div>
                 <p class="helper-text">Used to calculate accurate prayer times</p>
@@ -1299,7 +1892,7 @@
                         <polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
                     Device Health
-                    <span id="statusIndicator" class="status-ok">✓</span>
+                    <span id="statusIndicator" class="status-ok"></span>
                 </div>
                 <svg class="status-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2">
@@ -1348,10 +1941,404 @@
     <div id="toast" class="toast"></div>
 
     <script>
+        // Mode will be fetched from /api/mode endpoint
+        let isAPMode = false;
+
         const $ = id => document.getElementById(id);
         const show = el => el.style.display = 'block';
         const hide = el => el.style.display = 'none';
         const toggle = (el, force) => el.classList.toggle('collapsed', force);
+
+        // SVG icon helper for consistent icons
+        const svgIcons = {
+            check: '<svg style="width:16px;height:16px;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
+            x: '<svg style="width:16px;height:16px;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+            warning: '<svg style="width:16px;height:16px;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            spinner: '<span class="spinner"></span>'
+        };
+        const svgIcon = (name) => svgIcons[name] || '';
+
+        // ===== AP MODE STATE =====
+        let selectedAPMode = null; // 'online' or 'offline' - only used in AP mode
+
+        // ===== AP MODE FUNCTIONS =====
+        function selectAPMode(mode) {
+            selectedAPMode = mode;
+            refreshSections();
+        }
+
+        function resetAPMode() {
+            selectedAPMode = null;
+            refreshSections();
+        }
+
+        // Helper: Apply visibility config to multiple elements
+        function applyVisibility(config) {
+            Object.entries(config).forEach(([selector, display]) => {
+                const el = selector.startsWith('#') ? $(selector.slice(1)) : document.querySelector(selector);
+                if (el) el.style.display = display;
+            });
+        }
+
+        // Helper: Get current UI context
+        function getUIContext() {
+            if (!isAPMode) return 'settings';
+            if (!selectedAPMode) return 'ap-select';
+            return 'ap-' + selectedAPMode;
+        }
+
+        function refreshSections() {
+            const ctx = getUIContext();
+
+            // Visibility configs per context
+            const configs = {
+                'settings': {
+                    '#modeSelectionSection': 'none',
+                    '#modeTiles': 'grid',
+                    '#changeModeLink': 'none',
+                    '#connectionSection': 'none',
+                    '#methodSection': 'block',
+                    '#locationSection': 'block',
+                    '#statusSection': 'block',
+                    '.save-container': 'block',
+                    '.back-link': 'flex',
+                    '.info-box': 'flex'
+                },
+                'ap-select': {
+                    '#modeSelectionSection': 'block',
+                    '#modeTiles': 'grid',
+                    '#changeModeLink': 'none',
+                    '#connectionSection': 'none',
+                    '#methodSection': 'none',
+                    '#locationSection': 'none',
+                    '#statusSection': 'none',
+                    '.save-container': 'none',
+                    '.back-link': 'none',
+                    '.info-box': 'none'
+                },
+                'ap-online': {
+                    '#modeSelectionSection': 'block',
+                    '#modeTiles': 'none',
+                    '#changeModeLink': 'flex',
+                    '#connectionSection': 'block',
+                    '#wifiSetup': 'block',
+                    '#datetimeSetup': 'none',
+                    '#methodSection': 'none',
+                    '#locationSection': 'none',
+                    '#statusSection': 'none',
+                    '.save-container': 'none',
+                    '.back-link': 'none',
+                    '.info-box': 'none'
+                },
+                'ap-offline': {
+                    '#modeSelectionSection': 'block',
+                    '#modeTiles': 'none',
+                    '#changeModeLink': 'flex',
+                    '#connectionSection': 'block',
+                    '#wifiSetup': 'none',
+                    '#datetimeSetup': 'block',
+                    '#methodSection': 'block',
+                    '#locationSection': 'block',
+                    '#diyanetLocation': 'none',
+                    '#gpsLocation': 'block',
+                    '#citySearchSection': 'none',
+                    '#manualEntrySection': 'block',
+                    '#statusSection': 'none',
+                    '.save-container': 'block',
+                    '.back-link': 'none',
+                    '.info-box': 'flex'
+                }
+            };
+
+            applyVisibility(configs[ctx]);
+
+            // Handle volume/adhan sections (found by child element)
+            const volumeSection = $('volume')?.closest('.section');
+            const adhanSection = $('adhanFajr')?.closest('.section');
+            const showExtras = (ctx === 'settings' || ctx === 'ap-offline');
+            if (volumeSection) volumeSection.style.display = showExtras ? 'block' : 'none';
+            if (adhanSection) adhanSection.style.display = showExtras ? 'block' : 'none';
+
+            // Radio group always hidden - mode tiles handle selection in AP portal
+            const radioGroup = $('connectionSection')?.querySelector('.radio-group');
+            if (radioGroup) radioGroup.style.display = 'none';
+
+            // Expand collapsed sections in offline mode
+            if (ctx === 'ap-offline') {
+                $('methodSection')?.classList.remove('collapsed');
+                $('locationSection')?.classList.remove('collapsed');
+                // Auto-sync time from phone when entering offline mode
+                syncTimeFromPhone();
+            }
+        }
+
+        // ===== CONNECTION MODE =====
+        let connectionMode = 'wifi';
+        let isScanning = false;
+
+        // Radio option handlers
+        document.querySelectorAll('input[name="connectionMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                connectionMode = e.target.value;
+                updateConnectionUI();
+                markUnsaved();
+            });
+        });
+
+        function updateConnectionUI() {
+            const wifiSetup = $('wifiSetup');
+            const datetimeSetup = $('datetimeSetup');
+            const optionWifi = $('optionWifi');
+            const optionOffline = $('optionOffline');
+
+            if (connectionMode === 'wifi') {
+                wifiSetup.style.display = 'block';
+                datetimeSetup.style.display = 'none';
+                optionWifi.classList.add('selected');
+                optionOffline.classList.remove('selected');
+            } else {
+                wifiSetup.style.display = 'none';
+                datetimeSetup.style.display = 'block';
+                optionWifi.classList.remove('selected');
+                optionOffline.classList.add('selected');
+            }
+        }
+
+        // ===== WIFI FUNCTIONS =====
+        function scanNetworks() {
+            if (isScanning) return;
+            isScanning = true;
+            const btn = $('scanBtn');
+            const status = $('wifiStatus');
+            const list = $('networkList');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Scanning...';
+            status.innerHTML = '<span class="spinner"></span>Searching...';
+            list.style.display = 'none';
+
+            fetch('/scan', { cache: 'no-cache' })
+                .then(r => r.json())
+                .then(networks => {
+                    if (networks.length === 0) {
+                        status.innerHTML = '<svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;stroke:var(--orange);fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>No networks found';
+                    } else {
+                        status.innerHTML = '<svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;stroke:var(--green);fill:none;stroke-width:2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Found ' + networks.length + ' network(s)';
+                        list.innerHTML = '';
+                        networks.forEach(net => {
+                            const div = document.createElement('div');
+                            div.className = 'network-item';
+                            div.onclick = () => selectNetwork(net.ssid);
+                            div.innerHTML = '<span class="network-name">' + escapeHtml(net.ssid) + '</span>' +
+                                '<span class="network-info">' + getLockIcon(net.secure) + ' ' + getSignalIcon(net.rssi) + '</span>';
+                            list.appendChild(div);
+                        });
+                        list.style.display = 'block';
+                    }
+                })
+                .catch(() => { status.innerHTML = '<svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;stroke:#dc2626;fill:none;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Scan failed'; })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg> Scan Networks';
+                    isScanning = false;
+                });
+        }
+
+        function getLockIcon(secure) {
+            if (secure) {
+                return '<svg style="width:14px;height:14px;stroke:var(--gray);fill:none;stroke-width:2;vertical-align:middle" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+            }
+            return '<svg style="width:14px;height:14px;stroke:var(--orange);fill:none;stroke-width:2;vertical-align:middle" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
+        }
+
+        function getSignalIcon(rssi) {
+            // Strong signal
+            if (rssi >= -60) {
+                return '<svg style="width:16px;height:16px;stroke:var(--green);fill:none;stroke-width:2;vertical-align:middle" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="var(--green)"/></svg>';
+            }
+            // Medium signal
+            if (rssi >= -70) {
+                return '<svg style="width:16px;height:16px;stroke:var(--blue);fill:none;stroke-width:2;vertical-align:middle" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="var(--blue)"/></svg>';
+            }
+            // Weak signal
+            return '<svg style="width:16px;height:16px;stroke:var(--orange);fill:none;stroke-width:2;vertical-align:middle" viewBox="0 0 24 24"><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="var(--orange)"/></svg>';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function selectNetwork(ssid) {
+            $('wifiSsid').value = ssid;
+            $('wifiPassword').focus();
+            $('networkList').style.display = 'none';
+            $('wifiStatus').innerHTML = '<svg style="width:16px;height:16px;vertical-align:middle;margin-right:4px;stroke:var(--green);fill:none;stroke-width:2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Selected: <strong>' + escapeHtml(ssid) + '</strong>';
+        }
+
+        function toggleWifiPassword() {
+            const input = $('wifiPassword');
+            const btn = event.target;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'HIDE';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'SHOW';
+            }
+        }
+
+        function showWifiMessage(text, type) {
+            const msg = $('wifiMessage');
+            const iconMap = { success: 'check', error: 'x', loading: 'spinner' };
+            const icon = iconMap[type] ? svgIcon(iconMap[type]) + ' ' : '';
+            msg.innerHTML = icon + text;
+            msg.className = 'wifi-message show ' + type;
+        }
+
+        function handleWifiError(msg = 'Failed to save credentials') {
+            showWifiMessage(msg, 'error');
+            resetConnectBtn();
+        }
+
+        function connectWifi() {
+            const ssid = $('wifiSsid').value.trim();
+            const password = $('wifiPassword').value;
+
+            if (!ssid) return showWifiMessage('Enter network name', 'error');
+            if (password.length < 8) return showWifiMessage('Password must be 8+ characters', 'error');
+
+            const btn = $('connectBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Saving...';
+
+            const endpoint = isAPMode ? '/save' : '/api/wifi';
+            const contentType = isAPMode ? 'application/x-www-form-urlencoded' : 'application/json';
+            const body = isAPMode
+                ? 'ssid=' + encodeURIComponent(ssid) + '&password=' + encodeURIComponent(password)
+                : JSON.stringify({ ssid, password });
+
+            fetch(endpoint, { method: 'POST', headers: { 'Content-Type': contentType }, body })
+                .then(r => r.json())
+                .then(data => {
+                    if (isAPMode) {
+                        if (data.status !== 'connecting') return handleWifiError('Unexpected response');
+                        btn.innerHTML = '<span class="spinner"></span>Testing...';
+                        showWifiMessage('Testing WiFi connection...', 'loading');
+                        pollAPWifiStatus(1);
+                    } else {
+                        if (!data.success) return handleWifiError(data.error || 'Failed to save');
+                        showWifiMessage('WiFi saved! Restart to connect.', 'success');
+                        btn.innerHTML = svgIcon('check') + ' Saved';
+                        btn.style.background = 'var(--green)';
+                        toast('WiFi credentials saved.', 'success');
+                        setTimeout(resetConnectBtn, 3000);
+                    }
+                })
+                .catch(() => handleWifiError());
+        }
+
+        function pollAPWifiStatus(pollCount) {
+            const MAX_POLLS = 60;
+            const btn = $('connectBtn');
+
+            if (pollCount > MAX_POLLS) {
+                return handleWifiError('Connection timeout. Please try again.');
+            }
+
+            fetch('/status', { cache: 'no-cache' })
+                .then(r => r.json())
+                .then(data => {
+                    switch (data.state) {
+                        case 'connecting':
+                            const { attempt = 1, maxAttempts = 3 } = data;
+                            btn.innerHTML = `<span class="spinner"></span>Attempt ${attempt}/${maxAttempts}`;
+                            showWifiMessage(`Testing connection - attempt ${attempt} of ${maxAttempts}...`, 'loading');
+                            setTimeout(() => pollAPWifiStatus(pollCount + 1), 1000);
+                            break;
+                        case 'success':
+                            btn.innerHTML = svgIcon('check') + ' Connected!';
+                            btn.style.background = 'var(--green)';
+                            showWifiMessage('Connected! Reconnect to your home WiFi to access settings.', 'success');
+                            break;
+                        case 'failed':
+                            handleWifiError(data.error || 'Connection failed. Check password.');
+                            break;
+                        default:
+                            setTimeout(() => pollAPWifiStatus(pollCount + 1), 1000);
+                    }
+                })
+                .catch(() => {
+                    // Connection lost = device restarted successfully
+                    showWifiMessage('Setup complete! Reconnect to your home WiFi.', 'success');
+                    btn.innerHTML = svgIcon('check') + ' Done';
+                });
+        }
+
+        function pollWifiStatus(count) {
+            // Legacy - kept for compatibility
+            resetConnectBtn();
+        }
+
+        function resetConnectBtn() {
+            const btn = $('connectBtn');
+            btn.disabled = false;
+            btn.style.background = 'var(--green)';
+            btn.innerHTML = '<svg style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Connect';
+        }
+
+        // ===== DATETIME FUNCTIONS =====
+        let timeSynced = false;
+
+        function getTimezoneLabel(offset) {
+            const sign = offset >= 0 ? '+' : '';
+            const hrs = Math.floor(Math.abs(offset));
+            const mins = (Math.abs(offset) % 1) * 60;
+            return `UTC${sign}${hrs}${mins ? ':' + mins.toString().padStart(2, '0') : ':00'}`;
+        }
+
+        async function syncTimeFromPhone() {
+            if (timeSynced) return; // Already synced
+
+            const now = new Date();
+            const day = now.getDate();
+            const month = now.getMonth() + 1;
+            const year = now.getFullYear();
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const second = now.getSeconds();
+            const timezone = -now.getTimezoneOffset() / 60;
+
+            const statusEl = $('timeSyncStatus');
+            const dateTimeEl = $('syncedDateTime');
+            const tzEl = $('syncedTimezone');
+
+            try {
+                const res = await fetch('/api/time', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ day, month, year, hour, minute, second, timezone })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    timeSynced = true;
+                    // Format display
+                    const dateStr = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                    const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    dateTimeEl.textContent = `${dateStr}, ${timeStr}`;
+                    tzEl.textContent = getTimezoneLabel(timezone);
+                    statusEl.innerHTML = svgIcon('check') + ' Synced from phone';
+                    statusEl.className = 'time-sync-status synced';
+                } else {
+                    statusEl.innerHTML = '⚠ Sync failed - try again';
+                    statusEl.className = 'time-sync-status error';
+                }
+            } catch (e) {
+                statusEl.innerHTML = '⚠ Connection error';
+                statusEl.className = 'time-sync-status error';
+            }
+        }
 
         // Toast notification
         let toastTimer;
@@ -1380,7 +2367,7 @@
         const gpsLocationDiv = $('gpsLocation'), citySearchInput = $('citySearchInput');
         const clearSearchBtn = $('clearSearchBtn'), searchResults = $('searchResults');
         const showManualEntryLink = $('showManualEntry'), manualEntrySection = $('manualEntrySection');
-        const manualLat = $('manualLat'), manualLng = $('manualLng'), applyManualBtn = $('applyManualBtn');
+        const manualLat = $('manualLat'), manualLng = $('manualLng');
         const diyanetLocationDiv = $('diyanetLocation'), diyanetStatus = $('diyanetStatus');
 
         let locationData = { latitude: null, longitude: null, cityName: '', diyanetId: null };
@@ -1411,7 +2398,7 @@
             const w = d.wifi || {}, t = d.time || {}, p = d.prayer || {};
             const wifiOk = w.connected, timeOk = t.synced;
             const allOk = wifiOk && timeOk && (p.method !== METHOD_DIYANET || p.diyanetOk);
-            $('statusIndicator').textContent = allOk ? '✓' : '!';
+            $('statusIndicator').innerHTML = allOk ? svgIcon('check') : svgIcon('warning');
             $('statusIndicator').className = allOk ? 'status-ok' : 'status-dot orange';
 
             let prayerRows = p.method === METHOD_DIYANET
@@ -1518,8 +2505,8 @@
             cityNameDisplay.textContent = locationData.cityName || 'Location set';
             coordsDisplay.textContent = `${locationData.latitude.toFixed(4)}°, ${locationData.longitude.toFixed(4)}°`;
         }
-        function setLocation(lat, lng, name) {
-            Object.assign(locationData, { latitude: lat, longitude: lng, cityName: name });
+        function setLocation(lat, lng, name, diyanetId = null) {
+            Object.assign(locationData, { latitude: lat, longitude: lng, cityName: name, diyanetId: diyanetId });
             showCurrentLocation();
             updateSummaries();
             markUnsaved();
@@ -1556,12 +2543,16 @@
         }
 
         showManualEntryLink.addEventListener('click', e => { e.preventDefault(); show(manualEntrySection); });
-        applyManualBtn.addEventListener('click', () => {
+
+        // Auto-update location when manual coordinates change
+        function updateManualLocation() {
             const lat = parseFloat(manualLat.value), lng = parseFloat(manualLng.value);
-            if (isNaN(lat) || isNaN(lng)) return alert('Please enter valid coordinates');
-            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return alert('Coordinates out of range');
+            if (isNaN(lat) || isNaN(lng)) return;
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
             setLocation(lat, lng, `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`);
-        });
+        }
+        manualLat.addEventListener('input', updateManualLocation);
+        manualLng.addEventListener('input', updateManualLocation);
 
         async function fetchDiyanet(endpoint) {
             const res = await fetch(DIYANET_API + endpoint);
@@ -1761,42 +2752,178 @@
         });
 
         async function loadSettings() {
+            // Initialize UI based on mode first
+            refreshSections();
+
             currentMethodDiv.textContent = 'Turkey (Diyanet)';
             locationSummary.textContent = 'Not configured';
+
+            // Try to load saved settings (works in both AP mode and connected mode)
             try {
                 const res = await fetch('/api/settings');
                 if (!res.ok) return;
                 const d = await res.json();
+                // Connection mode
+                if (d.connectionMode === 'offline') {
+                    connectionMode = 'offline';
+                    document.querySelector('input[name="connectionMode"][value="offline"]').checked = true;
+                    updateConnectionUI();
+                }
+
                 methodSelect.value = d.prayerMethod || 13;
                 volumeSlider.value = d.volume || 80;
                 volumeValue.textContent = volumeSlider.value + '%';
-                if (d.latitude && d.longitude) Object.assign(locationData, { latitude: d.latitude, longitude: d.longitude, cityName: d.cityName || '', diyanetId: d.diyanetId || null });
+                if (d.latitude && d.longitude) {
+                    Object.assign(locationData, { latitude: d.latitude, longitude: d.longitude, cityName: d.cityName || '', diyanetId: d.diyanetId || null });
+                    // Pre-fill manual coordinate inputs in AP mode
+                    if (isAPMode) {
+                        const latInput = $('manualLat');
+                        const lngInput = $('manualLng');
+                        if (latInput) latInput.value = d.latitude.toFixed(4);
+                        if (lngInput) lngInput.value = d.longitude.toFixed(4);
+                    }
+                }
                 if (d.adhanEnabled) Object.entries(adhanToggles).forEach(([k, el]) => el.checked = d.adhanEnabled[k] !== false);
                 updateSummaries();
                 updateLocationUI();
             } catch { currentMethodDiv.textContent = 'Turkey (Diyanet)'; }
+
+            // Load saved WiFi credentials separately
+            try {
+                const wifiRes = await fetch('/api/wifi');
+                if (wifiRes.ok) {
+                    const wifiData = await wifiRes.json();
+                    // Pre-fill SSID if we have saved credentials
+                    if (wifiData.savedSsid) {
+                        $('wifiSsid').value = wifiData.savedSsid;
+                    } else if (wifiData.currentSsid) {
+                        $('wifiSsid').value = wifiData.currentSsid;
+                    }
+                    // Show connected status
+                    if (wifiData.connected) {
+                        const statusEl = $('wifiStatus');
+                        if (statusEl) {
+                            statusEl.innerHTML = '<span style="color:var(--green)">' + svgIcon('check') + ' Connected to ' + wifiData.currentSsid + '</span>';
+                        }
+                    }
+                }
+            } catch { /* WiFi info optional */ }
+        }
+
+        // Helper: Check if we're in AP offline mode
+        function isAPOfflineMode() {
+            return isAPMode && selectedAPMode === 'offline';
+        }
+
+        // Helper: Validate location data before save
+        function validateLocationForSave() {
+            const isDiyanet = methodSelect.value === '13';
+
+            // In AP offline mode, get manual location
+            if (isAPOfflineMode()) {
+                const lat = parseFloat($('manualLat').value);
+                const lng = parseFloat($('manualLng').value);
+                if (isNaN(lat) || isNaN(lng)) {
+                    toast('Please enter latitude and longitude', 'error');
+                    return false;
+                }
+                locationData.latitude = lat;
+                locationData.longitude = lng;
+                locationData.cityName = 'Manual';
+                return true;
+            }
+
+            // In settings mode with Diyanet, need diyanetId
+            if (isDiyanet && !locationData.diyanetId) {
+                toast('Please select your city first', 'error');
+                return false;
+            }
+
+            // For non-Diyanet, need lat/lng
+            if (!isDiyanet && (!locationData.latitude || !locationData.longitude)) {
+                toast('Please set your location first', 'error');
+                return false;
+            }
+
+            return true;
         }
 
         saveBtn.addEventListener('click', async () => {
-            const isDiyanet = methodSelect.value === '13';
-            if (isDiyanet && !locationData.diyanetId) return toast('Please select your city first', 'error');
-            if (!isDiyanet && (!locationData.latitude || !locationData.longitude)) return toast('Please set your location first', 'error');
-            container.classList.add('form-disabled'); saveBtn.disabled = true; saveBtn.textContent = 'Applying...';
+            if (!validateLocationForSave()) return;
+
+            container.classList.add('form-disabled');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Applying...';
+
             try {
-                const adhan = {}; Object.entries(adhanToggles).forEach(([k, el]) => adhan[k] = el.checked);
-                const payload = { prayerMethod: parseInt(methodSelect.value), latitude: locationData.latitude, longitude: locationData.longitude, cityName: locationData.cityName, diyanetId: locationData.diyanetId, volume: parseInt(volumeSlider.value), adhanEnabled: adhan };
-                const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (res.ok) { const d = await res.json(); toast('Settings applied ✓', 'success'); currentMethodDiv.textContent = `Current: ${d.methodName}`; markSaved(); }
-                else toast('Failed to save. Try again.', 'error');
-            } catch { toast('Connection error', 'error'); }
-            container.classList.remove('form-disabled'); saveBtn.disabled = false; saveBtn.textContent = 'Apply Changes';
+                const adhan = {};
+                Object.entries(adhanToggles).forEach(([k, el]) => adhan[k] = el.checked);
+
+                const payload = {
+                    connectionMode: isAPMode ? 'offline' : connectionMode,
+                    prayerMethod: parseInt(methodSelect.value),
+                    latitude: locationData.latitude,
+                    longitude: locationData.longitude,
+                    cityName: locationData.cityName,
+                    diyanetId: locationData.diyanetId,
+                    volume: parseInt(volumeSlider.value),
+                    adhanEnabled: adhan
+                };
+
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    toast('Failed to save. Try again.', 'error');
+                    return;
+                }
+
+                const d = await res.json();
+                toast(isAPOfflineMode() ? 'Setup complete! You can close this page.' : 'Settings applied!', 'success');
+
+                if (!isAPMode) {
+                    currentMethodDiv.textContent = `Current: ${d.methodName}`;
+                }
+                markSaved();
+
+            } catch {
+                toast('Connection error', 'error');
+            } finally {
+                container.classList.remove('form-disabled');
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Apply Changes';
+            }
         });
 
         function showStatus(msg, type) { /* Legacy - use toast() instead */ }
 
-        // Load both status and settings on page load
-        refreshStatus();
-        loadSettings();
+        // Initialize page - fetch mode first, then load settings
+        async function initPage() {
+            try {
+                const res = await fetch('/api/mode');
+                if (res.ok) {
+                    const data = await res.json();
+                    isAPMode = (data.mode === 'ap');
+                }
+            } catch {
+                // Default to connected mode if fetch fails
+                isAPMode = false;
+            }
+
+            // Now initialize UI with correct mode
+            refreshSections();
+            if (!isAPMode) refreshStatus();
+            loadSettings();
+
+            // Show container after UI is ready
+            container.classList.add('ready');
+        }
+
+        // Start initialization
+        initPage();
     </script>
 </body>
 

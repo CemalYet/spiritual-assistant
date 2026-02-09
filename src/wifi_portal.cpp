@@ -1,11 +1,17 @@
 #include "wifi_portal.h"
 #include "http_helpers.h"
+#include "settings_manager.h"
+#include "prayer_types.h"
+#include "time_utils.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <LittleFS.h>
+#include <ArduinoJson.h>
 #include <memory>
 #include <vector>
+#include <etl/string.h>
+#include <esp_wifi.h>
 
 namespace WiFiPortal
 {
@@ -14,8 +20,9 @@ namespace WiFiPortal
     static std::unique_ptr<DNSServer> dnsServer;
     static bool portalActive = false;
     static bool credentialsReceived = false;
-    static char savedSSID[33] = "";
-    static char savedPassword[65] = "";
+    static bool offlineModeRequested = false; // User chose offline mode
+    static etl::string<33> savedSSID;
+    static etl::string<65> savedPassword;
     static unsigned long portalStartTime = 0;
     static int lastClientCount = 0;
 
@@ -29,8 +36,8 @@ namespace WiFiPortal
         FAILED
     };
     static ConnectState connectState = ConnectState::IDLE;
-    static char connectError[64] = "";
-    static char connectedIP[16] = "";
+    static etl::string<64> connectError;
+    static etl::string<16> connectedIP;
     static unsigned long connectStartTime = 0;
     static int connectRetryCount = 0;
     constexpr unsigned long CONNECT_TIMEOUT = 15000;
@@ -132,17 +139,51 @@ namespace WiFiPortal
         // If it's an IP but not ours, redirect
         if (isIp(host))
         {
-            Serial.printf("[Portal] Redirecting IP %s to %s\n", host.c_str(), softAP_IP.c_str());
             server->sendHeader("Location", "http://" + softAP_IP, true);
             server->send(HTTP_FOUND, "text/html", "");
             return true;
         }
 
         // If it's a hostname (connectivity check), redirect
-        Serial.printf("[Portal] Captive portal redirect from: %s\n", host.c_str());
         server->sendHeader("Location", "http://" + softAP_IP, true);
         server->send(HTTP_FOUND, "text/html", "");
         return true;
+    }
+
+    // Serve settings.html with DEVICE_MODE injected
+    // Stream settings.html directly from flash - no RAM needed
+    bool serveSettingsPage()
+    {
+        if (!server)
+            return false;
+
+        const char *path = "/settings.html";
+
+        if (!LittleFS.exists(path))
+        {
+            Serial.printf("[Portal] File not found: %s\n", path);
+            return false;
+        }
+
+        File file = LittleFS.open(path, "r");
+        if (!file)
+        {
+            Serial.printf("[Portal] Failed to open file\n");
+            return false;
+        }
+
+        // Stream file directly - zero RAM usage
+        server->streamFile(file, "text/html");
+        file.close();
+        return true;
+    }
+
+    // API endpoint to return current mode
+    void handleApiMode()
+    {
+        if (!server)
+            return;
+        server->send(HTTP_OK, "application/json", "{\"mode\":\"ap\"}");
     }
 
     // Handler functions
@@ -155,10 +196,10 @@ namespace WiFiPortal
         if (captivePortal())
             return;
 
-        // Serve the portal page with no-cache (cacheSeconds = 0)
-        if (!serveFile("/index.html", "text/html", 0))
+        // Serve the unified settings page - mode fetched via /api/mode
+        if (!serveSettingsPage())
         {
-            Serial.println("[Portal] ERROR: Failed to serve index.html");
+            Serial.println("[Portal] ERROR: Failed to serve settings.html");
             // Fallback HTML if LittleFS fails
             server->send(HTTP_OK, "text/html",
                          "<h1>WiFi Setup</h1>"
@@ -192,6 +233,159 @@ namespace WiFiPortal
         }
     }
 
+    // --- Offline Mode API Handlers ---
+
+    void handleApiTime()
+    {
+        if (!server->hasArg("plain"))
+        {
+            server->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"No body\"}");
+            return;
+        }
+
+        JsonDocument doc;
+        if (deserializeJson(doc, server->arg("plain")))
+        {
+            server->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
+            return;
+        }
+
+        auto req = TimeUtils::createFromJson(doc);
+
+        if (!TimeUtils::applySystemTime(req))
+        {
+            server->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid date/time\"}");
+            return;
+        }
+
+        server->send(HTTP_OK, "application/json", "{\"success\":true}");
+    }
+
+    // GET handler - return current saved settings for pre-filling the form
+    void handleApiGetSettings()
+    {
+        JsonDocument doc;
+        doc["prayerMethod"] = SettingsManager::getPrayerMethod();
+        doc["volume"] = SettingsManager::getVolume();
+        doc["connectionMode"] = SettingsManager::getConnectionMode();
+
+        // Location data
+        double lat = SettingsManager::getLatitude();
+        double lng = SettingsManager::getLongitude();
+        if (!std::isnan(lat) && !std::isnan(lng) && (std::abs(lat) > 0.0001 || std::abs(lng) > 0.0001))
+        {
+            doc["latitude"] = lat;
+            doc["longitude"] = lng;
+            doc["cityName"] = SettingsManager::getCityName();
+            int32_t diyanetId = SettingsManager::getDiyanetId();
+            if (diyanetId > 0)
+                doc["diyanetId"] = diyanetId;
+        }
+
+        JsonObject adhan = doc["adhanEnabled"].to<JsonObject>();
+        adhan["fajr"] = SettingsManager::getAdhanEnabled(PrayerType::Fajr);
+        adhan["dhuhr"] = SettingsManager::getAdhanEnabled(PrayerType::Dhuhr);
+        adhan["asr"] = SettingsManager::getAdhanEnabled(PrayerType::Asr);
+        adhan["maghrib"] = SettingsManager::getAdhanEnabled(PrayerType::Maghrib);
+        adhan["isha"] = SettingsManager::getAdhanEnabled(PrayerType::Isha);
+
+        String response;
+        serializeJson(doc, response);
+        server->send(HTTP_OK, "application/json", response);
+    }
+
+    // POST handler - save settings
+    void handleApiSettings()
+    {
+        if (!server || !server->hasArg("plain"))
+        {
+            server->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"No body\"}");
+            return;
+        }
+
+        JsonDocument doc;
+        if (deserializeJson(doc, server->arg("plain")))
+        {
+            server->send(HTTP_BAD_REQUEST, "application/json", "{\"error\":\"Invalid JSON\"}");
+            return;
+        }
+
+        // Save all settings (same as settings_server)
+        if (doc["prayerMethod"].is<int>())
+            SettingsManager::setPrayerMethod(doc["prayerMethod"].as<int>());
+
+        if (doc["volume"].is<int>())
+        {
+            int vol = doc["volume"].as<int>();
+            if (vol >= 0 && vol <= 100)
+                SettingsManager::setVolume(static_cast<uint8_t>(vol));
+        }
+
+        // Adhan toggles
+        if (doc["adhanEnabled"].is<JsonObject>())
+        {
+            JsonObject adhan = doc["adhanEnabled"];
+            if (adhan["fajr"].is<bool>())
+                SettingsManager::setAdhanEnabled(PrayerType::Fajr, adhan["fajr"].as<bool>());
+            if (adhan["dhuhr"].is<bool>())
+                SettingsManager::setAdhanEnabled(PrayerType::Dhuhr, adhan["dhuhr"].as<bool>());
+            if (adhan["asr"].is<bool>())
+                SettingsManager::setAdhanEnabled(PrayerType::Asr, adhan["asr"].as<bool>());
+            if (adhan["maghrib"].is<bool>())
+                SettingsManager::setAdhanEnabled(PrayerType::Maghrib, adhan["maghrib"].as<bool>());
+            if (adhan["isha"].is<bool>())
+                SettingsManager::setAdhanEnabled(PrayerType::Isha, adhan["isha"].as<bool>());
+        }
+
+        // Location data
+        if (doc["latitude"].is<double>() && doc["longitude"].is<double>())
+        {
+            SettingsManager::setLocation(
+                doc["latitude"].as<double>(),
+                doc["longitude"].as<double>());
+        }
+
+        if (doc["cityName"].is<const char *>())
+            SettingsManager::setCityName(doc["cityName"].as<const char *>());
+
+        // Handle diyanetId - can be int or null (null means manual coordinates)
+        if (doc["diyanetId"].is<int>())
+            SettingsManager::setDiyanetId(doc["diyanetId"].as<int32_t>());
+        else if (doc["diyanetId"].isNull())
+            SettingsManager::setDiyanetId(0); // Clear diyanetId for manual coords
+
+        if (doc["connectionMode"].is<const char *>())
+        {
+            const char *mode = doc["connectionMode"].as<const char *>();
+            SettingsManager::setConnectionMode(mode);
+
+            // If offline mode selected, set flag so main loop can handle transition
+            if (etl::string_view(mode) == "offline")
+            {
+                offlineModeRequested = true;
+            }
+        }
+        server->send(HTTP_OK, "application/json", "{\"success\":true}");
+    }
+
+    void handleApiRestart()
+    {
+        server->send(HTTP_OK, "application/json", "{\"success\":true,\"message\":\"Restarting...\"}");
+        delay(500);
+        ESP.restart();
+    }
+
+    // --- Offline Mode Flag Functions ---
+    bool isOfflineModeRequested()
+    {
+        return offlineModeRequested;
+    }
+
+    void clearOfflineModeFlag()
+    {
+        offlineModeRequested = false;
+    }
+
     void handleSave()
     {
         if (!server)
@@ -202,7 +396,6 @@ namespace WiFiPortal
         // Check minimum interval between attempts (overflow-safe)
         if (elapsedTime(lastSaveAttempt, now) < MIN_SAVE_INTERVAL)
         {
-            Serial.println("[Portal] Rate limit: Too many attempts too quickly");
             server->send(HTTP_TOO_MANY_REQUESTS, "text/plain", "Too many requests. Please wait.");
             return;
         }
@@ -216,7 +409,6 @@ namespace WiFiPortal
         // Check max attempts in window
         if (saveAttemptCount >= MAX_SAVE_ATTEMPTS)
         {
-            Serial.printf("[Portal] Rate limit: Max attempts (%d) reached\n", MAX_SAVE_ATTEMPTS);
             server->send(HTTP_TOO_MANY_REQUESTS, "text/plain", "Too many attempts. Please wait 60 seconds.");
             return;
         }
@@ -252,30 +444,14 @@ namespace WiFiPortal
             return;
         }
 
-        // Copy to char buffers with bounds checking
-        size_t ssidLen = ssidArg.length();
-        size_t passLen = passArg.length();
-
-        if (ssidLen >= sizeof(savedSSID))
-            ssidLen = sizeof(savedSSID) - 1;
-        if (passLen >= sizeof(savedPassword))
-            passLen = sizeof(savedPassword) - 1;
-
-        memcpy(savedSSID, ssidArg.c_str(), ssidLen);
-        savedSSID[ssidLen] = '\0';
-
-        memcpy(savedPassword, passArg.c_str(), passLen);
-        savedPassword[passLen] = '\0';
+        // Store credentials
+        savedSSID = ssidArg.c_str();
+        savedPassword = passArg.c_str();
 
         credentialsReceived = true;
         connectState = ConnectState::PENDING; // Signal to start connection test
 
-        Serial.println("[Portal] Credentials received:");
-        Serial.printf("[Portal] SSID: %s\n", savedSSID);
-        Serial.printf("[Portal] Password: ******** (hidden for security)\n");
-
         // Return JSON response - page will poll /status for result
-        Serial.println("[Portal] Starting connection test (page will poll /status)");
         server->sendHeader("Cache-Control", "no-cache");
         server->send(HTTP_OK, "application/json", "{\"status\":\"connecting\"}");
     }
@@ -306,13 +482,13 @@ namespace WiFiPortal
             break;
         case ConnectState::SUCCESS:
             json += "\"state\":\"success\",\"ip\":\"";
-            json += connectedIP;
+            json += connectedIP.c_str();
             json += "\"";
             break;
         case ConnectState::FAILED:
             json += "\"state\":\"failed\",\"error\":\"";
             // Escape any quotes in error message
-            for (size_t i = 0; i < strlen(connectError); i++)
+            for (size_t i = 0; i < connectError.size(); i++)
             {
                 if (connectError[i] == '"')
                     json += "\\\"";
@@ -332,12 +508,11 @@ namespace WiFiPortal
         if (!server)
             return;
 
-        Serial.println("[Portal] Reset requested - clearing state for retry");
         connectState = ConnectState::IDLE;
         connectRetryCount = 0;
-        memset(connectError, 0, sizeof(connectError));
-        memset(savedSSID, 0, sizeof(savedSSID));
-        memset(savedPassword, 0, sizeof(savedPassword));
+        connectError.clear();
+        savedSSID.clear();
+        savedPassword.clear();
         credentialsReceived = false;
 
         // Reset WiFi back to AP_STA mode (allows scanning)
@@ -352,8 +527,6 @@ namespace WiFiPortal
     {
         if (!server)
             return;
-
-        Serial.println("[Portal] Starting WiFi scan...");
 
         // Ensure we're in AP_STA mode for scanning (AP stays active)
         if (WiFi.getMode() != WIFI_AP_STA)
@@ -433,8 +606,6 @@ namespace WiFiPortal
         // Clean up scan results to free memory
         WiFi.scanDelete();
 
-        Serial.printf("[Portal] Scan complete, found %d networks\n", n);
-
         server->sendHeader("Cache-Control", "no-cache");
         server->send(HTTP_OK, "application/json", json);
     }
@@ -483,7 +654,6 @@ namespace WiFiPortal
     {
         if (server)
         {
-            Serial.println("[Portal] Mobile connectivity check - redirecting");
             server->sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
             server->send(HTTP_FOUND, "text/plain", "");
         }
@@ -523,12 +693,7 @@ namespace WiFiPortal
     bool start()
     {
         if (portalActive)
-        {
-            Serial.println("[Portal] Already active");
             return true;
-        }
-
-        Serial.println("[Portal] Starting WiFi configuration portal...");
 
         // Initialize LittleFS filesystem
         if (!LittleFS.begin(true))
@@ -536,16 +701,23 @@ namespace WiFiPortal
             Serial.println("[Portal] ERROR: Failed to mount LittleFS!");
             return false;
         }
-        Serial.println("[Portal] LittleFS mounted successfully");
 
-        // Full WiFi radio reset before starting AP
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
-        delay(500); // Longer delay to ensure radio fully resets
+        // Clean WiFi shutdown sequence to prevent netstack errors
+        WiFi.disconnect(true, true); // Disconnect and erase credentials from RAM
+        delay(100);
+        WiFi.mode(WIFI_OFF); // Fully stop WiFi
+        delay(300);          // Let network stack settle completely
 
-        // Use AP_STA mode to allow WiFi scanning while AP is active
-        WiFi.mode(WIFI_AP_STA);
-        delay(100); // Let mode change settle
+        // Now start fresh in AP mode
+        WiFi.mode(WIFI_AP);
+        delay(500); // Let mode change settle
+
+// ESP32-S3: Force use internal antenna (some boards default to external U.FL)
+// GPIO values: 0=internal antenna, 1=external antenna (board dependent)
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+        // ESP32-S3: Set max TX power
+        esp_wifi_set_max_tx_power(80); // 20dBm = 80 quarter-dBm units
+#endif
 
         // CRITICAL FIX FOR 2026: Define explicit IP identity
         IPAddress apIP(192, 168, 4, 1);
@@ -555,12 +727,37 @@ namespace WiFiPortal
         // Configure AP with explicit IP as both local IP AND gateway
         WiFi.softAPConfig(apIP, gateway, subnet);
 
+        // Set maximum TX power for better visibility
+        WiFi.setTxPower(WIFI_POWER_19_5dBm);
+
+        // Start AP with explicit parameters
+        // Parameters: ssid, password, channel, hidden (0=visible), max_connections
         bool apStarted = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, 0, AP_MAX_CONNECTIONS);
+
+        if (apStarted)
+        {
+            // CRITICAL FIX: Force 802.11b only mode - fixes beacon visibility on ESP32-S3
+            esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B);
+
+            // Force bandwidth to 20MHz for maximum compatibility
+            esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+
+            // Wait for beacon to start transmitting
+            delay(1000);
+
+            // Verify SSID was set correctly
+            wifi_config_t apConfig;
+            esp_wifi_get_config(WIFI_IF_AP, &apConfig);
+            if (strlen((char *)apConfig.ap.ssid) == 0)
+            {
+                Serial.println("[Portal] ERROR: SSID not set!");
+                apStarted = false;
+            }
+        }
 
         if (!apStarted)
         {
-            Serial.println("[Portal] Failed to start Access Point!");
-            Serial.println("[Portal] Restarting device to clear WiFi state...");
+            Serial.println("[Portal] ERROR: Failed to start AP - restarting...");
             delay(1000);
             ESP.restart();
         }
@@ -572,15 +769,12 @@ namespace WiFiPortal
         // Verify we got a valid IP address
         if (IP[0] == 0)
         {
-            Serial.println("[Portal] ERROR: Failed to get valid AP IP address!");
-            Serial.println("[Portal] Restarting device to clear WiFi state...");
+            Serial.println("[Portal] ERROR: Invalid AP IP - restarting...");
             delay(1000);
             ESP.restart();
         }
 
-        Serial.printf("[Portal] Access Point started: %s\n", AP_SSID);
-        Serial.printf("[Portal] Password: %s\n", AP_PASSWORD);
-        Serial.printf("[Portal] IP Address: %s\n", IP.toString().c_str());
+        Serial.printf("[Portal] AP started: %s (IP: %s)\n", AP_SSID, IP.toString().c_str());
 
         if (!dnsServer)
         {
@@ -590,14 +784,13 @@ namespace WiFiPortal
         // Start DNS server with the same explicit IP
         if (!dnsServer->start(DNS_PORT, "*", apIP))
         {
-            Serial.println("[Portal] ERROR: Failed to start DNS server!");
+            Serial.println("[Portal] ERROR: DNS server failed!");
             WiFi.softAPdisconnect(true);
             WiFi.mode(WIFI_OFF);
             LittleFS.end();
             dnsServer.reset();
             return false;
         }
-        Serial.println("[Portal] DNS server started");
 
         if (!server)
         {
@@ -615,6 +808,13 @@ namespace WiFiPortal
         server->on("/status", HTTP_GET, handleStatus);
         server->on("/reset", HTTP_POST, handleReset);
         server->on("/scan", HTTP_GET, handleScan);
+
+        // API endpoints
+        server->on("/api/mode", HTTP_GET, handleApiMode);
+        server->on("/api/time", HTTP_POST, handleApiTime);
+        server->on("/api/settings", HTTP_GET, handleApiGetSettings); // GET to load saved settings
+        server->on("/api/settings", HTTP_POST, handleApiSettings);   // POST to save settings
+        server->on("/api/restart", HTTP_POST, handleApiRestart);
 
         // Static assets
         server->on("/style.css", HTTP_GET, handleStyleCss);
@@ -637,7 +837,6 @@ namespace WiFiPortal
         server->onNotFound(handleNotFound);
 
         server->begin();
-        Serial.println("[Portal] Web server started on port 80");
 
         portalActive = true;
         portalStartTime = millis();
@@ -666,28 +865,23 @@ namespace WiFiPortal
             server.reset();
         }
 
-        // Add delay before mode change to prevent netstack error
+        // Clean WiFi shutdown - same sequence as start() to prevent netstack error
         delay(100);
-
-        // Only disconnect AP if it's actually running
-        if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA)
-        {
-            WiFi.softAPdisconnect(true);
-        }
+        WiFi.softAPdisconnect(true);
+        delay(100);
         WiFi.mode(WIFI_OFF);
-        delay(100);
+        delay(200); // Let network stack settle
 
-        // Unmount LittleFS filesystem
-        LittleFS.end();
+        // Note: LittleFS stays mounted - main app needs it for audio files
 
         // Reset rate limiting state
         lastSaveAttempt = 0;
         saveAttemptCount = 0;
 
         // Clear sensitive credentials from memory
-        memset(savedSSID, 0, sizeof(savedSSID));
-        memset(savedPassword, 0, sizeof(savedPassword));
-        memset(connectError, 0, sizeof(connectError));
+        savedSSID.clear();
+        savedPassword.clear();
+        connectError.clear();
         credentialsReceived = false;
         connectState = ConnectState::IDLE;
         connectRetryCount = 0;
@@ -714,7 +908,7 @@ namespace WiFiPortal
         WiFi.mode(WIFI_AP_STA);
         WiFi.setSleep(false);
         delay(100);
-        WiFi.begin(savedSSID, savedPassword);
+        WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
         connectStartTime = millis();
     }
 
@@ -722,11 +916,9 @@ namespace WiFiPortal
     void handleConnectionSuccess()
     {
         // Store IP before disconnecting
-        String ip = WiFi.localIP().toString();
-        strncpy(connectedIP, ip.c_str(), sizeof(connectedIP) - 1);
-        connectedIP[sizeof(connectedIP) - 1] = '\0';
+        connectedIP = WiFi.localIP().toString().c_str();
 
-        Serial.printf("[Portal] ✓ Connection successful! IP: %s\n", connectedIP);
+        Serial.printf("[Portal] ✓ Connection successful! IP: %s\n", connectedIP.c_str());
         connectState = ConnectState::SUCCESS;
         connectRetryCount = 0;
         WiFi.disconnect(false); // Keep AP for status polling
@@ -736,8 +928,7 @@ namespace WiFiPortal
     void handleConnectionFailure(const char *reason)
     {
         Serial.printf("[Portal] ✗ %s\n", reason);
-        strncpy(connectError, reason, sizeof(connectError) - 1);
-        connectError[sizeof(connectError) - 1] = '\0';
+        connectError = reason;
         connectState = ConnectState::FAILED;
         connectRetryCount = 0;
         WiFi.disconnect(true);
@@ -822,7 +1013,7 @@ namespace WiFiPortal
         case ConnectState::PENDING:
             connectRetryCount = 0;
             Serial.println("[Portal] Starting WiFi connection test...");
-            Serial.printf("[Portal] Testing connection to: %s\n", savedSSID);
+            Serial.printf("[Portal] Testing connection to: %s\n", savedSSID.c_str());
             startConnectionAttempt();
             connectState = ConnectState::CONNECTING;
             break;
@@ -842,13 +1033,8 @@ namespace WiFiPortal
             break;
         }
 
-        // Log client connection changes
-        int currentClientCount = WiFi.softAPgetStationNum();
-        if (currentClientCount != lastClientCount)
-        {
-            Serial.printf("[Portal] Connected clients: %d\n", currentClientCount);
-            lastClientCount = currentClientCount;
-        }
+        // Track client count silently
+        lastClientCount = WiFi.softAPgetStationNum();
     }
 
     bool hasNewCredentials()
@@ -858,25 +1044,25 @@ namespace WiFiPortal
 
     void getNewCredentials(char *ssidBuffer, size_t ssidSize, char *passBuffer, size_t passSize)
     {
-        size_t ssidLen = strlen(savedSSID);
-        size_t passLen = strlen(savedPassword);
+        size_t ssidLen = savedSSID.size();
+        size_t passLen = savedPassword.size();
 
         if (ssidLen >= ssidSize)
             ssidLen = ssidSize - 1;
         if (passLen >= passSize)
             passLen = passSize - 1;
 
-        memcpy(ssidBuffer, savedSSID, ssidLen);
+        savedSSID.copy(ssidBuffer, ssidLen);
         ssidBuffer[ssidLen] = '\0';
 
-        memcpy(passBuffer, savedPassword, passLen);
+        savedPassword.copy(passBuffer, passLen);
         passBuffer[passLen] = '\0';
     }
 
     void clearCredentials()
     {
         credentialsReceived = false;
-        memset(savedSSID, 0, sizeof(savedSSID));
-        memset(savedPassword, 0, sizeof(savedPassword));
+        savedSSID.clear();
+        savedPassword.clear();
     }
 }

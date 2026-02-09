@@ -13,12 +13,14 @@ namespace SettingsManager
 
     // Get method name for display
     const char *getMethodName(int method);
+    const char *getMethodShortName(int method); // Short name for compact display
 
     // List of available methods for UI
     struct MethodInfo
     {
         int id;
         const char *name;
+        const char *shortName; // Compact name (e.g., "Diyanet" instead of "Turkey (Diyanet)")
     };
 
     // Returns array of available methods (null-terminated)
@@ -37,12 +39,19 @@ namespace SettingsManager
     // Get volume mapped to hardware range (0-21)
     uint8_t getHardwareVolume();
 
+    // --- Connection Mode ---
+    // "wifi" = online mode, "offline" = manual time
+    const char *getConnectionMode();
+    bool setConnectionMode(const char *mode);
+    bool isOfflineMode();
+
     // --- Location Settings ---
     double getLatitude();
     double getLongitude();
     bool setLocation(double latitude, double longitude);
 
     const char *getCityName();
+    const char *getShortCityName(); // City name without parentheses
     bool setCityName(const char *name);
 
     int32_t getDiyanetId();

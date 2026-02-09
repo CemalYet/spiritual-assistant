@@ -4,22 +4,26 @@
 #include "http_helpers.h"
 #include "prayer_api.h"
 #include "audio_player.h"
+#include "time_utils.h"
+#include "wifi_credentials.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <memory>
 
 namespace SettingsServer
 {
-    static WebServer *server = nullptr;
+    static std::unique_ptr<WebServer> server;
     static bool active = false;
     static constexpr char DIYANET_API[] = "https://ezanvakti.emushaf.net";
     static constexpr int PROXY_TIMEOUT = 10000;
 
     // Forward declarations
     static void serveSettingsPage();
+    static void handleApiMode();
     static void handleGetSettings();
     static void handlePostSettings();
     static void handleGetStatus();
@@ -27,6 +31,10 @@ namespace SettingsServer
     static void handleTestAdhan();
     static void handleTestAudio();
     static void handleStopAdhan();
+    static void handleSetTime();
+    static void handleRestart();
+    static void handleGetWifi();
+    static void handleSaveWifi();
     static void handleNotFound();
     static void checkTestAudioTimeout();
 
@@ -56,7 +64,7 @@ namespace SettingsServer
         if (!LittleFS.begin(false) && !LittleFS.begin(true))
             Serial.println("[Settings] ERROR: Failed to mount LittleFS!");
 
-        server = new WebServer(80);
+        server = std::make_unique<WebServer>(80);
 
         const char *headerkeys[] = {"User-Agent"};
         server->collectHeaders(headerkeys, 1);
@@ -65,6 +73,7 @@ namespace SettingsServer
         server->on("/", HTTP_GET, serveSettingsPage);
         server->serveStatic("/style.css", LittleFS, "/style.css");
         server->serveStatic("/script.js", LittleFS, "/script.js");
+        server->on("/api/mode", HTTP_GET, handleApiMode);
         server->on("/api/settings", HTTP_GET, handleGetSettings);
         server->on("/api/settings", HTTP_POST, handlePostSettings);
         server->on("/api/status", HTTP_GET, handleGetStatus);
@@ -72,9 +81,13 @@ namespace SettingsServer
         server->on("/api/test-adhan", HTTP_POST, handleTestAdhan);
         server->on("/api/test-audio", HTTP_GET, handleTestAudio);
         server->on("/api/stop-adhan", HTTP_POST, handleStopAdhan);
+        server->on("/api/time", HTTP_POST, handleSetTime);
+        server->on("/api/restart", HTTP_POST, handleRestart);
+        server->on("/api/wifi", HTTP_GET, handleGetWifi);
+        server->on("/api/wifi", HTTP_POST, handleSaveWifi);
         server->onNotFound(handleNotFound);
 
-        HttpHelpers::registerBrowserResourceHandlers(server);
+        HttpHelpers::registerBrowserResourceHandlers(server.get());
 
         server->begin();
         active = true;
@@ -87,8 +100,7 @@ namespace SettingsServer
             return;
 
         server->stop();
-        delete server;
-        server = nullptr;
+        server.reset(); // Automatically deletes and sets to nullptr
         active = false;
         Serial.println("[Settings] Server stopped");
     }
@@ -104,13 +116,35 @@ namespace SettingsServer
 
     bool isActive() { return active; }
 
+    // Stream settings.html directly from flash - zero RAM usage
     static void serveSettingsPage()
     {
-        if (HttpHelpers::serveFile(server, "/settings.html", "text/html", 300)) // 5 min cache
-            return;
+        const char *path = "/settings.html";
 
-        server->send(HttpHelpers::HTTP_OK, "text/html",
-                     "<html><body><h1>Settings</h1><p>Upload settings.html to LittleFS.</p></body></html>");
+        if (!LittleFS.exists(path))
+        {
+            server->send(HttpHelpers::HTTP_OK, "text/html",
+                         "<html><body><h1>Settings</h1><p>Upload settings.html to LittleFS.</p></body></html>");
+            return;
+        }
+
+        File file = LittleFS.open(path, "r");
+        if (!file)
+        {
+            server->send(HttpHelpers::HTTP_OK, "text/html",
+                         "<html><body><h1>Settings</h1><p>Failed to open file.</p></body></html>");
+            return;
+        }
+
+        Serial.printf("[Settings] Streaming %s (%u bytes)\n", path, file.size());
+        server->streamFile(file, "text/html");
+        file.close();
+    }
+
+    // API endpoint to return current mode
+    static void handleApiMode()
+    {
+        server->send(HttpHelpers::HTTP_OK, "application/json", "{\"mode\":\"connected\"}");
     }
 
     static void handleGetSettings()
@@ -119,6 +153,7 @@ namespace SettingsServer
         doc["prayerMethod"] = SettingsManager::getPrayerMethod();
         doc["methodName"] = SettingsManager::getMethodName(SettingsManager::getPrayerMethod());
         doc["volume"] = SettingsManager::getVolume();
+        doc["connectionMode"] = SettingsManager::getConnectionMode();
 
         // Location data
         doc["latitude"] = SettingsManager::getLatitude();
@@ -184,6 +219,10 @@ namespace SettingsServer
             }
         }
 
+        // Connection mode
+        if (doc["connectionMode"].is<const char *>())
+            changed |= SettingsManager::setConnectionMode(doc["connectionMode"].as<const char *>());
+
         // Location data
         if (doc["latitude"].is<double>() && doc["longitude"].is<double>())
         {
@@ -195,8 +234,11 @@ namespace SettingsServer
         if (doc["cityName"].is<const char *>())
             changed |= SettingsManager::setCityName(doc["cityName"].as<const char *>());
 
+        // Handle diyanetId - can be int or null (null means manual coordinates)
         if (doc["diyanetId"].is<int>())
             changed |= SettingsManager::setDiyanetId(doc["diyanetId"].as<int32_t>());
+        else if (doc["diyanetId"].isNull())
+            changed |= SettingsManager::setDiyanetId(0); // Clear diyanetId for manual coords
 
         if (!changed)
             return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "No valid settings");
@@ -367,38 +409,47 @@ namespace SettingsServer
 
     static unsigned long testAudioStopTime = 0;
     static constexpr unsigned long TEST_AUDIO_DURATION_MS = 5000;
+    static constexpr int MAX_VOLUME_HW = 21;   // Hardware max volume level
+    static constexpr int MAX_VOLUME_PCT = 100; // Percentage scale
 
     static bool startTestAudio()
     {
-        if (playAudioFile("/azan.mp3"))
-        {
-            testAudioStopTime = millis() + TEST_AUDIO_DURATION_MS;
-            return true;
-        }
-        return false;
+        if (!playAudioFile("/azan.mp3"))
+            return false;
+
+        testAudioStopTime = millis() + TEST_AUDIO_DURATION_MS;
+        return true;
+    }
+
+    static void applyVolumeFromRequest()
+    {
+        if (!server->hasArg("volume"))
+            return;
+
+        int vol = server->arg("volume").toInt();
+        if (vol < 0 || vol > MAX_VOLUME_PCT)
+            return;
+
+        setVolume(vol * MAX_VOLUME_HW / MAX_VOLUME_PCT);
+    }
+
+    static void sendTestAudioResponse()
+    {
+        if (startTestAudio())
+            sendJson(HttpHelpers::HTTP_OK, "{\"success\":true,\"message\":\"Playing 5 sec preview\"}");
+        else
+            sendJsonError(HttpHelpers::HTTP_INTERNAL_ERROR, "Failed to play audio");
     }
 
     static void handleTestAdhan()
     {
-        if (startTestAudio())
-            sendJson(200, "{\"success\":true,\"message\":\"Playing 5 sec preview\"}");
-        else
-            sendJsonError(500, "Failed to play adhan");
+        sendTestAudioResponse();
     }
 
     static void handleTestAudio()
     {
-        if (server->hasArg("volume"))
-        {
-            int vol = server->arg("volume").toInt();
-            if (vol >= 0 && vol <= 100)
-                setVolume(vol * 21 / 100);
-        }
-
-        if (startTestAudio())
-            sendJson(200, "{\"success\":true,\"message\":\"Playing 5 sec preview\"}");
-        else
-            sendJsonError(500, "Failed to play audio");
+        applyVolumeFromRequest();
+        sendTestAudioResponse();
     }
 
     static void handleStopAdhan()
@@ -406,6 +457,107 @@ namespace SettingsServer
         testAudioStopTime = 0;
         stopAudio();
         sendJson(200, "{\"success\":true,\"message\":\"Adhan stopped\"}");
+    }
+
+    static void handleSetTime()
+    {
+        if (!server->hasArg("plain"))
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "No body");
+
+        JsonDocument doc;
+        if (deserializeJson(doc, server->arg("plain")))
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "Invalid JSON");
+
+        auto req = TimeUtils::createFromJson(doc);
+
+        if (!TimeUtils::applySystemTime(req))
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "Invalid date/time values");
+
+        JsonDocument response;
+        response["success"] = true;
+        response["deviceTime"] = TimeUtils::getFormattedTime();
+
+        String responseStr;
+        serializeJson(response, responseStr);
+        sendJson(HttpHelpers::HTTP_OK, responseStr);
+    }
+
+    static void handleRestart()
+    {
+        sendJson(HttpHelpers::HTTP_OK, "{\"success\":true,\"message\":\"Restarting...\"}");
+        delay(500);
+        ESP.restart();
+    }
+
+    static void handleGetWifi()
+    {
+        JsonDocument doc;
+
+        // Get saved WiFi credentials (SSID only for security, not password)
+        char ssidBuffer[33] = "";
+        char passBuffer[65] = "";
+
+        bool hasCredentials = WiFiCredentials::load(ssidBuffer, sizeof(ssidBuffer), passBuffer, sizeof(passBuffer));
+
+        doc["hasSavedCredentials"] = hasCredentials;
+        if (hasCredentials && strlen(ssidBuffer) > 0)
+        {
+            doc["savedSsid"] = ssidBuffer;
+        }
+
+        // Current connection status
+        doc["connected"] = WiFi.isConnected();
+        if (WiFi.isConnected())
+        {
+            doc["currentSsid"] = WiFi.SSID();
+            doc["ip"] = WiFi.localIP().toString();
+            doc["rssi"] = WiFi.RSSI();
+        }
+
+        String response;
+        serializeJson(doc, response);
+        sendJson(HttpHelpers::HTTP_OK, response);
+    }
+
+    static void handleSaveWifi()
+    {
+        if (!server->hasArg("plain"))
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "No body");
+
+        JsonDocument doc;
+        if (deserializeJson(doc, server->arg("plain")))
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "Invalid JSON");
+
+        const char *ssid = doc["ssid"] | "";
+        const char *password = doc["password"] | "";
+
+        if (strlen(ssid) == 0 || strlen(ssid) > 32)
+        {
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "Invalid SSID");
+        }
+        if (strlen(password) < 8 || strlen(password) > 64)
+        {
+            return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "Password must be 8-64 characters");
+        }
+
+        // Save credentials
+        if (!WiFiCredentials::save(ssid, password))
+        {
+            sendJsonError(HttpHelpers::HTTP_INTERNAL_ERROR, "Failed to save credentials");
+            return;
+        }
+
+        Serial.printf("[Settings] WiFi credentials saved: %s\n", ssid);
+
+        // Return success - device needs restart to apply
+        JsonDocument response;
+        response["success"] = true;
+        response["message"] = "WiFi credentials saved. Restart to apply.";
+        response["ssid"] = ssid;
+
+        String responseStr;
+        serializeJson(response, responseStr);
+        sendJson(HttpHelpers::HTTP_OK, responseStr);
     }
 
     void checkTestAudioTimeout()

@@ -16,7 +16,12 @@
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
-#include "ui_home.h"
+#include "app_state.h"
+#include "ui_state_reader.h"
+#include "ui_page_home.h"
+#include "ui_page_prayer.h"
+#include "ui_page_settings.h"
+#include "ui_components.h"
 #include "network.h"
 
 // ═══════════════════════════════════════════════════════════════
@@ -167,6 +172,9 @@ static void formatTurkishDate(char *buffer, size_t size)
     }
 }
 
+// Static buffer for prayer date (used by formatPrayerDate)
+static char prayerDateBuffer[48];
+
 namespace LvglDisplay
 {
     bool begin()
@@ -224,33 +232,58 @@ namespace LvglDisplay
 
     void showPrayerScreen()
     {
-        // Create home screen UI
-        UiHome::init();
+        // Clear any status screen state before initializing
+        g_state.statusScreen = StatusScreenType::NONE;
+        g_state.clearDirty(DirtyFlag::STATUS_SCREEN);
 
-        // Set time
+        // Initialize state reader (creates LVGL timer for state polling)
+        UiStateReader::init();
+
+        // Create all pages once (they stay in memory)
+        UiPageHome::create();
+        UiPagePrayer::create();
+        UiPageSettings::create();
+
+        // Load home screen (pages created above, this just displays home)
+        lv_scr_load(UiPageHome::getScreen());
+
+        // Set time via shared state
         struct tm timeinfo;
         if (getLocalTime(&timeinfo))
         {
-            UiHome::setTime(timeinfo.tm_hour, timeinfo.tm_min);
+            AppStateHelper::setTime(timeinfo.tm_hour, timeinfo.tm_min);
         }
         else
         {
-            UiHome::setTime(0, 0);
+            AppStateHelper::setTime(0, 0);
         }
 
-        // Set Turkish date
+        // Set Turkish date via shared state
         char dateBuffer[64];
         formatTurkishDate(dateBuffer, sizeof(dateBuffer));
-        UiHome::setDate(dateBuffer);
+        AppStateHelper::setDate(dateBuffer);
 
-        // Prayer data will be set by main.cpp via displayNextPrayer()
-        UiHome::setNextPrayer("YUKLENIYOR", "--:--");
+        // Initial loading state
+        AppStateHelper::setNextPrayer("YUKLENIYOR", "--:--");
 
-        // Update status icons
+        // Update status icons via shared state
         updateStatus();
 
-        // Set nav callback (empty - pages not implemented yet)
-        UiHome::setNavCallback([](int page) {});
+        // Navigation callback - just switch screens, no recreation
+        UiComponents::setNavClickCallback([](int page)
+                                          {
+            switch (page)
+            {
+            case 0:
+                lv_scr_load(UiPageHome::getScreen());
+                break;
+            case 1:
+                lv_scr_load(UiPagePrayer::getScreen());
+                break;
+            case 2:
+                lv_scr_load(UiPageSettings::getScreen());
+                break;
+            } });
     }
 
     void updateTime()
@@ -258,34 +291,65 @@ namespace LvglDisplay
         struct tm timeinfo;
         if (getLocalTime(&timeinfo))
         {
-            UiHome::setTime(timeinfo.tm_hour, timeinfo.tm_min);
+            AppStateHelper::setTime(timeinfo.tm_hour, timeinfo.tm_min);
 
             // Update date at midnight
             if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0)
             {
                 char dateBuffer[64];
                 formatTurkishDate(dateBuffer, sizeof(dateBuffer));
-                UiHome::setDate(dateBuffer);
-                // Prayer reload handled by main.cpp
+                AppStateHelper::setDate(dateBuffer);
             }
         }
     }
 
+    void updateDate()
+    {
+        struct tm timeinfo;
+        if (!getLocalTime(&timeinfo))
+        {
+            Serial.println("[Display] updateDate: Failed to get time");
+            return;
+        }
+        char dateBuffer[64];
+        formatTurkishDate(dateBuffer, sizeof(dateBuffer));
+        AppStateHelper::setDate(dateBuffer);
+    }
+
     void updateStatus()
     {
-        // WiFi status with RSSI for signal strength color
-        bool connected = Network::isConnected();
-        int rssi = connected ? WiFi.RSSI() : -100;
-        UiHome::setWifiConnected(connected, rssi);
-
         // NTP sync status
         struct tm timeinfo;
         bool ntpSynced = getLocalTime(&timeinfo, 0);
-        UiHome::setNtpSynced(ntpSynced);
+        AppStateHelper::setNtpSynced(ntpSynced);
 
-        // Adhan file status - check for azan.mp3 (actual file name used)
+        // Adhan file status
         bool adhanExists = LittleFS.exists("/azan.mp3") || LittleFS.exists("/azan.wav");
-        UiHome::setAdhanAvailable(adhanExists);
+        AppStateHelper::setAdhanAvailable(adhanExists);
+    }
+
+    const char *formatPrayerDate(int dayOffset)
+    {
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo))
+        {
+            // Add dayOffset using tm_mday - mktime normalizes automatically
+            // Handles: 31 Jan + 1 = 1 Feb, 28/29 Feb + 1 = 1 Mar, 31 Dec + 1 = 1 Jan
+            if (dayOffset > 0)
+            {
+                timeinfo.tm_mday += dayOffset;
+                mktime(&timeinfo); // Normalizes overflows (e.g., day 32 → next month)
+            }
+            snprintf(prayerDateBuffer, sizeof(prayerDateBuffer), "%d %s %s",
+                     timeinfo.tm_mday,
+                     TURKISH_MONTHS[timeinfo.tm_mon],
+                     TURKISH_DAYS[timeinfo.tm_wday]);
+        }
+        else
+        {
+            prayerDateBuffer[0] = '\0';
+        }
+        return prayerDateBuffer;
     }
 
 } // namespace LvglDisplay
