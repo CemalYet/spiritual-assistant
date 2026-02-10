@@ -6,7 +6,7 @@ namespace Network
     // If skipHardcodedCredentials is true, only use stored NVS credentials (for FORCE_AP_PORTAL)
     void init(bool skipHardcodedCredentials = false);
 
-    // Connect to WiFi (uses stored credentials or starts portal)
+    // Connect to WiFi using stored credentials. Returns true on success.
     bool connectWiFi();
 
     // Sync time via NTP
@@ -29,12 +29,6 @@ namespace Network
 
     // Start portal for settings (no restart needed)
     void startPortal();
-
-    // Returns true if portal opened after failed connection
-    bool isRetryConnection();
-
-    // Returns number of failed connection attempts
-    int getConnectionAttempts();
 
     // Returns true if portal just closed with successful WiFi connection
     bool didPortalConnectWiFi();

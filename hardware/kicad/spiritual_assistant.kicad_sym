@@ -1,0 +1,244 @@
+(kicad_symbol_lib
+  (version 20231120)
+  (generator "spiritual_assistant")
+  (generator_version "8.0")
+
+  (symbol "WT32S3-28S_PLUS"
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "U"
+      (at 0 26.67 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Value" "WT32S3-28S_PLUS"
+      (at 0 24.13 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Footprint" "spiritual_assistant:WT32S3-28S_PLUS"
+      (at 0 -26.67 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "https://www.waveshare.com/wiki/WT32-SC01_Plus"
+      (at 0 -29.21 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Description" "ESP32-S3 2.8inch IPS Capacitive Touch Display Module"
+      (at 0 -31.75 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (symbol "WT32S3-28S_PLUS_0_1"
+      (rectangle
+        (start -12.7 22.86)
+        (end 12.7 -22.86)
+        (stroke (width 0.254) (type default))
+        (fill (type background))
+      )
+    )
+    (symbol "WT32S3-28S_PLUS_1_1"
+      ;; Row 1 - Left side (pins 1-10)
+      (pin power_in line
+        (at -15.24 20.32 0)
+        (length 2.54)
+        (name "3V3"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "1"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 17.78 0)
+        (length 2.54)
+        (name "GPIO7/SCL"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "2"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 15.24 0)
+        (length 2.54)
+        (name "GPIO15/SDA"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "3"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 12.7 0)
+        (length 2.54)
+        (name "GPIO16"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "4"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 10.16 0)
+        (length 2.54)
+        (name "GPIO17"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "5"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 7.62 0)
+        (length 2.54)
+        (name "GPIO18"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "6"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 5.08 0)
+        (length 2.54)
+        (name "GPIO8/BTN"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "7"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin output line
+        (at -15.24 2.54 0)
+        (length 2.54)
+        (name "GPIO3/BCLK"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "8"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at -15.24 0 0)
+        (length 2.54)
+        (name "GPIO46"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "9"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin power_in line
+        (at -15.24 -2.54 0)
+        (length 2.54)
+        (name "GND"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "10"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+
+      ;; Row 2 - Right side (pins 11-20)
+      (pin power_in line
+        (at 15.24 20.32 180)
+        (length 2.54)
+        (name "5V"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "11"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at 15.24 17.78 180)
+        (length 2.54)
+        (name "GPIO6"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "12"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at 15.24 15.24 180)
+        (length 2.54)
+        (name "GPIO5"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "13"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin input line
+        (at 15.24 12.7 180)
+        (length 2.54)
+        (name "GPIO4/DIN"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "14"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin output line
+        (at 15.24 10.16 180)
+        (length 2.54)
+        (name "GPIO2/LRCK"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "15"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin output line
+        (at 15.24 7.62 180)
+        (length 2.54)
+        (name "GPIO1/AMP_EN"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "16"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at 15.24 5.08 180)
+        (length 2.54)
+        (name "GPIO42"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "17"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at 15.24 2.54 180)
+        (length 2.54)
+        (name "GPIO41"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "18"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin bidirectional line
+        (at 15.24 0 180)
+        (length 2.54)
+        (name "GPIO40"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "19"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+      (pin power_in line
+        (at 15.24 -2.54 180)
+        (length 2.54)
+        (name "GND"
+          (effects (font (size 1.016 1.016)))
+        )
+        (number "20"
+          (effects (font (size 1.016 1.016)))
+        )
+      )
+    )
+  )
+)

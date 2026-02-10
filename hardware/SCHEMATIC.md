@@ -1,24 +1,24 @@
 # Spiritual Assistant - Hardware Design
 
-> **Battery-Powered Prayer Clock with TFT Display**  
-> ESP32-C3 based, 4×AA batteries, ~2.8 months battery life
+> **Battery-Powered Smart Adhan Desk Clock with Integrated Touch Display**  
+> WT32S3-28S PLUS Module | ESP32-S3 | 4×AA Batteries | 2.8" IPS Capacitive Touch | ~4 months battery life
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
-2. [Bill of Materials (BOM)](#bill-of-materials-bom)
-3. [Power System](#power-system)
-4. [Main MCU - ESP32-C3](#main-mcu---esp32-c3)
-5. [Display - TFT 2.4" ILI9341](#display---tft-24-ili9341)
-6. [RTC - DS3231M](#rtc---ds3231m)
-7. [Audio - MAX98357A](#audio---max98357a)
-8. [Buttons](#buttons)
-9. [USB-C Connector](#usb-c-connector)
-10. [Pin Assignment Table](#pin-assignment-table)
-11. [Power Logic](#power-logic)
-12. [PCB Layout](#pcb-layout)
+2. [Bill of Materials](#bill-of-materials)
+3. [System Architecture](#system-architecture)
+4. [WT32S3-28S PLUS Module](#wt32s3-28s-plus-module)
+5. [Power Management](#power-management-4aa)
+6. [Audio System](#audio-system-max98357a)
+7. [Physical Button](#physical-button-wakemutesettings)
+8. [Power Switch](#power-switch-onoff)
+9. [RTC Module](#rtc-module-ds3231sn)
+10. [Carrier Board Pin Mapping](#carrier-board-pin-mapping)
+11. [PCB Layout Guidelines](#pcb-layout-guidelines-jlcpcb)
+12. [Manufacturing Files](#manufacturing-files)
 
 ---
 
@@ -26,75 +26,352 @@
 
 | Specification | Value |
 |---------------|-------|
-| **MCU** | ESP32-C3-WROOM-02 (8MB Flash) |
-| **Display** | TFT 2.4" ILI9341 (320×240) |
-| **Power** | 4×AA Batteries (6V) + USB-C |
-| **Battery Life** | ~2.8 months |
-| **Deep Sleep Current** | ~8µA |
-| **Audio** | I2S DAC + 3W Speaker |
-| **RTC** | DS3231M with CR1220 backup |
-| **Total Cost** | €14.05 |
+| **Main Module** | WT32S3-28S PLUS (SC05 Plus) |
+| **MCU** | ESP32-S3R8 (8MB PSRAM, 16MB Flash) |
+| **Display** | 2.8" IPS 320×240 Capacitive Touch |
+| **Power** | 4×AA Batteries (6V) via MP2359 Buck |
+| **Programming** | Via module's USB-C (native USB) |
+| **Battery Life** | ~4 months (optimized usage) |
+| **Audio** | MAX98357A I2S + 3W Speaker |
+| **RTC** | DS3231SN + CR1220 backup |
+| **Estimated Cost** | ~€16.36 |
 
 ---
 
-## Bill of Materials (BOM)
+## Bill of Materials
 
-| Part | Description | Price |
-|------|-------------|-------|
-| ESP32-C3-WROOM-02 | 8MB Flash, WiFi/BLE | €2.20 |
-| TFT 2.4" ILI9341 | 320×240 bare panel | €2.80 |
-| FPC 40-pin connector | Display connector | €0.25 |
-| DS3231M | RTC with TCXO | €1.50 |
-| CR1220 holder | RTC backup battery | €0.10 |
-| MAX98357A | I2S Audio Amplifier | €0.80 |
-| Speaker 3W 4Ω | Mini speaker | €0.60 |
-| MP2359 | Buck converter IC | €0.30 |
-| AP2112K-3.3 | LDO regulator | €0.10 |
-| USB-C Connector | 16-pin SMD | €0.15 |
-| Tactile Switch ×3 | 6×6mm buttons | €0.15 |
-| AO3400 MOSFET ×2 | N-channel SOT-23 | €0.10 |
-| SS14 Schottky ×3 | 1A 40V diodes | €0.15 |
-| 10µH Inductor | Power inductor | €0.10 |
-| USBLC6-2 | USB ESD protection | €0.15 |
-| Passives | Caps, resistors | €0.50 |
-| 4×AA Holder | Battery holder | €0.40 |
-| PCB + Assembly | 2-layer PCB | €3.70 |
-| **TOTAL** | | **€14.05** |
+| Part | LCSC Part # | Description | Type | Price |
+|------|-------------|-------------|------|-------|
+| WT32S3-28S PLUS | - | ESP32-S3 + 2.8" IPS Touch Module | Module | €12.00 |
+| MAX98357AETE+T | C910544 | I2S 3W Audio Amplifier | Extended | €0.80 |
+| DS3231SN | C9866 | Precision RTC ±2ppm | Extended | €2.50 |
+| CR1220 Holder | C14488 | RTC Backup Battery Holder | Basic | €0.05 |
+| MP2359DJ | C14259 | Buck Converter IC (SOT-23-6) | Basic | €0.30 |
+| 10µH Inductor | C1046 | Power inductor for buck | Basic | €0.10 |
+| SS14 Schottky ×2 | C2480 | 1A 40V diode (power path isolation) | Basic | €0.10 |
+| SPST Slide Switch | C431540 | SS-12D00 ON/OFF power switch | Basic | €0.10 |
+| Tactile Switch ×1 | C318884 | 6×6mm push button (wake/mute) | Basic | €0.05 |
+| 10K Resistor ×1 | C25744 | Pull-up for button | Basic | €0.01 |
+| Speaker 3W 4Ω | - | 28mm Mini Speaker | - | €0.60 |
+| 4×AA Holder | C720557 | 4×AA Battery Holder with leads | - | €0.40 |
+| Passives | Various | Caps, Resistors | Basic | €0.40 |
+| PCB 2-layer | - | 65×50mm Carrier Board | - | €2.00 |
+| **TOTAL** | | | | **~€16.41** |
+
+### JLCPCB Part Classification
+
+| Category | Parts | Notes |
+|----------|-------|-------|
+| **Basic** | MP2359, SS14, Slide Switch, Tactile Switch, Passives | No extra fee |
+| **Extended** | MAX98357A, DS3231SN | +€3 per unique part |
 
 ---
 
-## Power System
-
-### Dual Power Path Architecture
-
-The system supports both battery and USB power with automatic switching.
+## System Architecture
 
 ```
-4×AA BATTERIES (6V)                              USB-C (5V)
-        │                                            │
-        │                                            │
-        ▼                                            ▼
-┌───────────────┐                           ┌───────────────┐
-│    MP2359     │                           │   AP2112K     │
-│  Buck Conv.   │                           │     LDO       │
-│   6V → 3.3V   │                           │  5V → 3.3V    │
-│   η = 90%     │                           │   η = 66%     │
-└───────┬───────┘                           └───────┬───────┘
-        │                                           │
-        │    SS14                          SS14     │
-        └────▶├────┬────────────────────────├◀─────┘
-                   │
-                   ▼
-            ┌─────────────┐
-            │  3.3V RAIL  │
-            └──────┬──────┘
-                   │
-        ┌──────────┼──────────┐
-        │          │          │
-        ▼          ▼          ▼
-    ESP32-C3    DS3231     Display
-                 RTC
+┌───────────────────────────────────────────────────────────────────────────┐
+│                        SYSTEM BLOCK DIAGRAM                               │
+│                    (Simplified Single Power Path)                         │
+└───────────────────────────────────────────────────────────────────────────┘
+
+                        4×AA BATTERY HOLDER
+                    ┌─────────────────────────┐
+                    │   ═╤═  ═╤═  ═╤═  ═╤═   │
+                    │   AA   AA   AA   AA    │  ← 4×1.5V = 6V (fresh)
+                    │   ═╧═  ═╧═  ═╧═  ═╧═   │    4×1.0V = 4V (depleted)
+                    └─────┬───────────┬──────┘
+                          │           │
+                      BATT+ (Red)  BATT- (Black)
+                          │           │
+                       ┌──┴──┐        │
+                       │ ON  │  SPST Slide Switch
+                       │ OFF │  (Power ON/OFF)
+                       └──┬──┘        │
+                          │           │
+                          ▼           ▼
+                    ┌─────────────────────────┐
+                    │       CARRIER PCB       │
+                    │  ┌──────────────────┐   │
+                    │  │     MP2359       │   │
+                    │  │   Buck Conv.     │   │
+                    │  │   6V → 3.3V      │   │
+                    │  │    η = 90%       │   │
+                    │  └────────┬─────────┘   │
+                    │           │             │
+                    │           ▼             │
+                    │    ┌─────────────┐      │
+                    │    │  3.3V RAIL  │      │
+                    │    └──────┬──────┘      │
+                    │           │             │
+                    │  ┌────────┼────────┐    │
+                    │  │        │        │    │
+                    │  ▼        ▼        ▼    │
+                    │ RTC    Module   Audio   │
+                    │                         │
+                    │  ┌──────────────────┐   │
+                    │  │  Physical Button │   │
+                    │  │  GPIO8 (Wake/    │   │
+                    │  │   Mute/Settings) │   │
+                    │  └──────────────────┘   │
+                    └─────────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────────────────────────┐   ┌──────────────────┐
+│     WT32S3-28S PLUS MODULE          │   │    DS3231SN      │
+│  ┌───────────────────────────────┐  │   │    RTC + Backup  │
+│  │  ESP32-S3R8 (8MB PSRAM)       │  │   └────────┬─────────┘
+│  │  16MB Flash                   │  │            │
+│  │  2.4GHz WiFi + BLE 5.0        │  │   ┌────────┴─────────┐
+│  └───────────────────────────────┘  │   │   MAX98357A      │
+│  ┌───────────────────────────────┐  │   │   I2S Amplifier  │
+│  │  2.8" IPS 320×240 Display     │  │   └────────┬─────────┘
+│  │  ST7789V Driver               │  │            │
+│  │  Capacitive Touch (GT911)     │  │            ▼
+│  └───────────────────────────────┘  │   ┌─────────────────┐
+│                                     │   │  3W 4Ω Speaker  │
+│  ┌───────────────────────────────┐  │   └─────────────────┘
+│  │  USB-C (Power + Programming)  │  │
+│  │  Used for: Firmware upload    │  │
+│  │           Debug/Serial        │  │
+│  │           USB power source    │  │
+│  └───────────────────────────────┘  │
+│                                     │
+│  Expansion Header (2×10 pins)       │
+└─────────────────────────────────────┘
+
+              ╔════════════════════════════════════╗
+              ║  USB-C works as power source     ║
+              ║  AND for programming/debug.       ║
+              ║  2nd SS14 feeds RTC + Audio       ║
+              ║  from module 3V3 when on USB.     ║
+              ╚════════════════════════════════════╝
 ```
+
+---
+
+## WT32S3-28S PLUS Module
+
+### Module Specifications
+
+| Feature | Value |
+|---------|-------|
+| **MCU** | ESP32-S3R8N16 |
+| **Flash** | 16MB (Quad SPI) |
+| **PSRAM** | 8MB (Octal SPI) |
+| **Display** | 2.8" IPS, 320×240, ST7789V |
+| **Touch** | Capacitive, GT911 Controller |
+| **WiFi** | 2.4GHz 802.11 b/g/n |
+| **Bluetooth** | BLE 5.0 |
+| **USB** | Native USB-OTG |
+| **Operating Voltage** | 3.3V |
+| **Dimensions** | 77 × 47 × 9 mm |
+
+### Expansion Header Pinout (20-pin)
+
+```
+                    WT32S3-28S PLUS
+                  Expansion Header
+            ┌─────────────────────────┐
+            │    ○ ○ ○ ○ ○ ○ ○ ○ ○ ○  │  ← Row 1
+            │    ○ ○ ○ ○ ○ ○ ○ ○ ○ ○  │  ← Row 2
+            └─────────────────────────┘
+                   BOTTOM VIEW
+
+Pin Map (Row 1 - Top):
+┌─────┬────────┬────────────────────────────────────┐
+│ Pin │ Name   │ Function                           │
+├─────┼────────┼────────────────────────────────────┤
+│ 1   │ 3V3    │ 3.3V Power Output                  │
+│ 2   │ GPIO7  │ I2C SCL → DS3231 SCL               │
+│ 3   │ GPIO15 │ I2C SDA → DS3231 SDA               │
+│ 4   │ GPIO16 │ Available (RTC INT optional)       │
+│ 5   │ GPIO17 │ Available                          │
+│ 6   │ GPIO18 │ Available                          │
+│ 7   │ GPIO8  │ Available                          │
+│ 8   │ GPIO3  │ I2S BCLK → MAX98357 BCLK           │
+│ 9   │ GPIO46 │ Available                          │
+│ 10  │ GND    │ Ground                             │
+└─────┴────────┴────────────────────────────────────┘
+
+Pin Map (Row 2 - Bottom):
+┌─────┬────────┬────────────────────────────────────┐
+│ Pin │ Name   │ Function                           │
+├─────┼────────┼────────────────────────────────────┤
+│ 11  │ 5V     │ 5V Input (from USB/Battery system) │
+│ 12  │ GPIO6  │ Available                          │
+│ 13  │ GPIO5  │ Available                          │
+│ 14  │ GPIO4  │ I2S DIN → MAX98357 DIN             │
+│ 15  │ GPIO2  │ I2S LRCK → MAX98357 LRC            │
+│ 16  │ GPIO1  │ AMP Enable → MAX98357 SD           │
+│ 17  │ GPIO42 │ Available                          │
+│ 18  │ GPIO41 │ Available                          │
+│ 19  │ GPIO40 │ Available                          │
+│ 20  │ GND    │ Ground                             │
+└─────┴────────┴────────────────────────────────────┘
+```
+
+### Internal Display Pins (Pre-wired, NOT on header)
+
+| Function | GPIO | Notes |
+|----------|------|-------|
+| TFT_CS | GPIO10 | Display Chip Select |
+| TFT_DC | GPIO11 | Data/Command |
+| TFT_RST | GPIO12 | Reset |
+| TFT_BL | GPIO45 | Backlight (PWM) |
+| TFT_CLK | GPIO14 | SPI Clock |
+| TFT_MOSI | GPIO13 | SPI Data |
+| TOUCH_SDA | GPIO38 | I2C Touch Data |
+| TOUCH_SCL | GPIO39 | I2C Touch Clock |
+| TOUCH_INT | GPIO21 | Touch Interrupt |
+| TOUCH_RST | GPIO47 | Touch Reset |
+
+---
+
+## Power Management (4×AA)
+
+### Power Architecture with USB Isolation
+
+The system runs from 4×AA batteries or USB-C. Two SS14 Schottky diodes provide bidirectional isolation: D1 isolates battery power from the module, D2 allows USB power (via module 3V3) to feed RTC and Audio when batteries are off.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    POWER PATH WITH USB ISOLATION                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    4×AA BATTERIES (6V)                    MODULE USB-C (5V)
+           │                                     │
+        ┌──┴──┐                                  │
+        │ ON  │  SPST Slide Switch               │
+        │ OFF │  (Power ON/OFF)                  │
+        └──┬──┘                                  │
+           ▼                                     ▼
+    ┌─────────────┐                      ┌──────────────────┐
+    │   MP2359    │                      │ Module Internal  │
+    │  Buck Conv  │                      │ LDO (AMS1117?)   │
+    │  6V → 3.3V  │                      │  5V → 3.3V       │
+    └──────┬──────┘                      └────────┬─────────┘
+           │                                      │
+           │ 3.31V                                │ 3.3V
+           │                                      │
+           │  SS14 (Schottky)                     │
+           ├───▶├──────────┐                      │
+           │               │       ⚡ Diode       │
+           │          3.0V │       blocks        │
+           │   (after drop)│       reverse!      │
+           │               │                      │
+           │               │                      │
+           │          ┌────┴──────────────────────┤
+           │          │                           │
+           │          │    WT32S3-28S MODULE      │
+           │          │    ┌─────────────────┐    │
+           │          └───▶│ 3V3 Pin (I/O)   │◀───┘
+           │               │                 │
+           │               │ ESP32-S3 Core   │
+           │               │ Display Driver  │
+           │               │ Touch IC        │
+           │               └─────────────────┘
+           │
+           │ (Direct 3.3V - no diode drop)
+           │
+    ┌──────┴──────────────────────────┐
+    │                                 │
+    ▼                                 ▼
+┌─────────────┐               ┌───────────────┐
+│  DS3231SN   │               │  MAX98357A    │
+│    RTC      │               │    Audio      │
+│ (3.3V VCC)  │               │  (3.3V VDD)   │
+└─────────────┘               └───────────────┘
+```
+
+### Operating Scenarios
+
+| Scenario | Battery | USB-C | Switch | What Happens |
+|----------|---------|-------|--------------|
+| **Normal Operation** | ✅ Inserted | ❌ Disconnected | ON | MP2359 powers everything directly |
+| **USB Powered** | ❌ Removed | ✅ Connected | - | Module LDO powers everything via D2 |
+| **Both Connected** | ✅ Inserted | ✅ Connected | ON | Battery powers peripherals, module uses USB (D1+D2 isolate) |
+| **Sleep Mode** | ✅ Inserted | ❌ Disconnected | ON | MP2359 in PFM mode, ~40µA total |
+| **Power OFF** | ✅ Inserted | ❌ Disconnected | OFF | 0µA draw — battery lasts years in storage |
+
+### Why SS14 Diodes are Critical
+
+```
+D1: Battery → Module (prevents regulator conflict)
+
+  MP2359 ──┬── 3.31V          ▶├ (SS14 D1, 0.3V drop)
+         │                    │
+         │               3.0V │ → Module 3V3 pin
+         │                    │
+         │               Module internal LDO = 3.3V
+         │               D1 blocks reverse from module
+
+D2: Module → Peripherals (USB powers RTC + Audio)
+
+  Module 3V3 ── 3.3V          ▶├ (SS14 D2, 0.3V drop)
+                                │
+                           3.0V │ → RTC + Audio
+                                │
+  When battery ON: MP2359 3.31V > 3.0V, so battery dominates
+  When USB only:   D2 feeds 3.0V to peripherals ✔️
+```
+
+### Detailed Power Flow
+
+```
+              ┌─────────────────────────────────────────────────────────┐
+              │              4×AA BATTERY HOLDER                        │
+              │                                                         │
+              │    ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐                   │
+              │    │ AA  │  │ AA  │  │ AA  │  │ AA  │  (Series)         │
+              │    │1.5V │  │1.5V │  │1.5V │  │1.5V │                   │
+              │    └──┬──┘  └──┬──┘  └──┬──┘  └──┬──┘                   │
+              │       └───┬────┴────┬───┴────┬───┘                      │
+              │           │         │        │                          │
+              │        BATT+      (series) BATT-                        │
+              │        (RED)       wiring  (BLACK)                      │
+              └───────────┬─────────────────┬───────────────────────────┘
+                          │                 │
+                          ▼                 ▼
+              ┌───────────────────────────────────────────────────────┐
+              │                   CARRIER BOARD                       │
+              │                                                       │
+              │   BATT+ ──┬──────────────────────┐                    │
+              │   (RED)   │                      │                    │
+              │        ┌──┴──┐                   │                    │
+              │        │ ON  │ SPST Switch       │                    │
+              │        │ OFF │                   │                    │
+              │        └──┬──┘                   │                    │
+              │           │                      │                    │
+              │          ═╧═ 22µF               VIN                   │
+              │           │                      │                    │
+              │          GND              ┌──────┴──────┐              │
+              │                           │   MP2359    │              │
+              │   BATT- ──────────────────┤     GND     │              │
+              │  (BLACK)      │           └──────┬──────┘              │
+              │               │                  │                    │
+              │              GND             3.31V OUT                 │
+              │                                  │                    │
+              │                    ┌─────────────┼─────────────┐       │
+              │                    │             │             │       │
+              │                    │        SS14 ▼             │       │
+              │                    │        ──▶├──             │       │
+              │                    │             │ (0.3V drop) │       │
+              │                    │             │             │       │
+              │                    ▼             ▼             ▼       │
+              │              ┌─────────┐   ┌──────────┐   ┌─────────┐  │
+              │              │ DS3231  │   │ WT32S3   │   │MAX98357A│  │
+              │              │  3.3V   │   │ 3V3 Pin  │   │  3.3V   │  │
+              │              └─────────┘   └──────────┘   └─────────┘  │
+              │                  │              │              │       │
+              │                 GND            GND            GND      │
+              └───────────────────────────────────────────────────────┘
+```
+
+> **Note:** RTC ve Audio direkt 3.3V alır (diyot yok), Module ise SS14 üzerinden alır.
+> USB bağlandığında Module kendi LDO'sunu kullanır, pil tarafından ters akım gelmez.
 
 ### MP2359 Buck Converter (Battery Path)
 
@@ -130,216 +407,152 @@ BATTERY 6V ────┬──────────────────
 
 > **Note:** Vout = 0.6V × (1 + 16K/5.6K) = **3.31V**
 
-### USB Detection Circuit
+### 4×AA Battery Holder Connection (CRITICAL)
 
 ```
-USB 5V ──┬─── 5.6K ───┬─── 10K ───┬─── GND
-         │            │           │
-         │            └───────────┴───▶ GPIO9 (USB_DETECT)
-         │                              ~3.2V when USB connected
-         ▼                              HIGH = USB, LOW = Battery
-     To AP2112K
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    4×AA BATTERY HOLDER WIRING                               │
+│                                                                             │
+│    BATTERY HOLDER                           CARRIER PCB                     │
+│                                                                             │
+│    ┌─────────────────────────┐              ┌────────────────────┐          │
+│    │                         │              │                    │          │
+│    │  ●━━  ●━━  ●━━  ●━━    │              │   BATT+ ●──┬───────┼──▶ MP2359 VIN  │
+│    │  AA   AA   AA   AA     │              │         ┌─┴─┐      │          │
+│    │  ━●━  ━●━  ━●━  ━●━    │              │         │SW │      │          │
+│    │                         │              │         └─┬─┘      │          │
+│    └──┬───────────────┬──────┘              │        ═╧═ 22µF    │          │
+│       │               │                     │         │          │          │
+│       │  RED WIRE     │  BLACK WIRE         │        GND         │          │
+│       │  (+) BATT+    │  (-) BATT-          │                    │          │
+│       │               │                     │   BATT- ●──────────┼──▶ GND   │
+│       │               │                                                     │
+│       ▼               ▼                                                     │
+│   ┌───────┐       ┌───────┐                                                 │
+│   │ BATT+ │       │ BATT- │                                                 │
+│   │ PAD   │       │ PAD   │     ← Solder pads on carrier PCB               │
+│   └───────┘       └───────┘       (2.54mm pitch holes or SMD pads)         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    VOLTAGE RANGE:
+    ┌──────────────────┬─────────────────┐
+    │ Battery State    │ Voltage         │
+    ├──────────────────┼─────────────────┤
+    │ Fresh Alkaline   │ 6.0V - 6.4V     │
+    │ Normal Use       │ 4.8V - 6.0V     │
+    │ Depleted         │ 4.0V - 4.8V     │
+    │ MP2359 Min Input │ 4.5V            │
+    └──────────────────┴─────────────────┘
 ```
 
-> **Note:** Voltage at GPIO9 = 5V × 10K/(5.6K+10K) = **3.2V** (well above 2.475V HIGH threshold, below 3.3V max)
+### PCB Pads for Battery Holder
+
+```
+    ┌─────────────────────────────────────────────┐
+    │              CARRIER PCB                    │
+    │                                             │
+    │   ┌─────┐                      ┌─────┐      │
+    │   │BATT+│ ← Red wire           │BATT-│      │
+    │   │ (+) │   from holder        │ (-) │      │
+    │   └──┬──┘                      └──┬──┘      │
+    │      │                            │         │
+    │      │   ┌────────────────────┐   │         │
+    │      │   │  SPST Slide Switch │   │         │
+    │      └──▶│  (ON/OFF Power)    │   │         │
+    │          └─────────┬──────────┘   │         │
+    │                    │              │         │
+    │          ┌─────────▼──────────┐   │         │
+    │          │    22µF INPUT CAP  │◀──┘         │
+    │          │      │    │        │             │
+    │          │     VIN  GND       │             │
+    │          │   ┌──────────┐     │             │
+    │          │   │  MP2359  │     │             │
+    │          │   │  Buck    │     │             │
+    │          │   └────┬─────┘     │             │
+    │          │        │ 3.3V     │              │
+    │          └────────┼──────────┘              │
+    │                   ▼                         │
+    │           To WT32S3-28S 3V3 pin             │
+    │           To DS3231 VCC                     │
+    │           To MAX98357A VDD                  │
+    │           To Button pull-up (GPIO8)         │
+    │                                             │
+    └─────────────────────────────────────────────┘
+```
 
 ---
 
-## Main MCU - ESP32-C3
+## Audio System (MAX98357A)
 
-### ESP32-C3-WROOM-02 Pinout
-
-```
-                              VCC 3.3V
-                                  │
-                            ┌─────┴─────┐
-                            │   100nF   │  (decoupling)
-                            └─────┬─────┘
-                                  │
-                                 GND
-
-    ┌──────────────────────────────────────────────────────┐
-    │                                                      │
-    │              ESP32-C3-WROOM-02 (8MB)                 │
-    │                                                      │
-    │   3V3 ●───────────────────────────────────● VCC 3.3V │
-    │   GND ●───────────────────────────────────● GND      │
-    │                                                      │
-    │   GPIO0  ●──────────────────▶ BTN1 (Wake/Settings)   │
-    │   GPIO1  ●──────────────────▶ BTN2 (Volume +)        │
-    │   GPIO20 ●──────────────────▶ BTN3 (Volume -)        │
-    │                                                       │
-    │   GPIO2  ●──── SDA ─────────▶ DS3231 SDA             │
-    │   GPIO3  ●──── SCL ─────────▶ DS3231 SCL             │
-    │   GPIO21 ●──── INT ─────────▶ DS3231 SQW/INT         │
-    │                                                      │
-    │   GPIO4  ●──── BCLK ────────▶ MAX98357 BCLK          │
-    │   GPIO5  ●──── LRC ─────────▶ MAX98357 LRC           │
-    │   GPIO6  ●──── DOUT ────────▶ MAX98357 DIN           │
-    │   GPIO7  ●──── AMP_EN ──────▶ MAX98357 SD            │
-    │                                                      │
-    │   GPIO10 ●──── TFT_CLK ─────▶ ILI9341 CLK            │
-    │   GPIO11 ●──── TFT_MOSI ────▶ ILI9341 MOSI           │
-    │   GPIO12 ●──── TFT_CS ──────▶ ILI9341 CS             │
-    │   GPIO13 ●──── TFT_DC ──────▶ ILI9341 DC             │
-    │   GPIO14 ●──── TFT_RST ─────▶ ILI9341 RST            │
-    │   GPIO8  ●──── TFT_BL ──────▶ MOSFET Gate            │
-    │                                                      │
-    │   GPIO9  ●──── USB_DETECT ──▶ USB 5V Divider         │
-    │                                                      │
-    │   GPIO18 ●──── USB D- ──────▶ USB-C D-               │
-    │   GPIO19 ●──── USB D+ ──────▶ USB-C D+               │
-    │                                                      │
-    └──────────────────────────────────────────────────────┘
-```
-
----
-
-## Display - TFT 2.4" ILI9341
-
-### Display Connections
+### MAX98357AETE+T Wiring
 
 ```
-            TFT 2.4" ILI9341
-          ┌─────────────────────┐
-          │   ┌─────────────┐   │
-          │   │             │   │
-          │   │   DISPLAY   │   │
-          │   │   320×240   │   │
-          │   │             │   │
-          │   └─────────────┘   │
-          │                     │
-          └──┬──┬──┬──┬──┬──┬──┬┘
-             │  │  │  │  │  │  │
-            VCC GND CLK MOSI CS DC RST BL
-             │  │  │   │   │  │  │   │
-             │  │  │   │   │  │  │   │
-             │  │  │   │   │  │  │   └─── MOSFET
-             │  │  │   │   │  │  └─────── GPIO14
-             │  │  │   │   │  └────────── GPIO13
-             │  │  │   │   └───────────── GPIO12
-             │  │  │   └───────────────── GPIO11
-             │  │  └───────────────────── GPIO10
-             │  └──────────────────────── GND
-             └─────────────────────────── 3.3V
+                              MAX98357AETE+T
+                           ┌─────────────────────┐
+                           │                     │
+   3.3V ──────────────────┤ VDD               1 │
+                           │                     │
+   GND ───────────────────┤ GND               2 │
+                           │                     │
+   GPIO1 (SD/Enable) ─────┤ SD_MODE           3 │  (HIGH = Stereo mix, LOW = Shutdown)
+                           │                     │
+   NC (Internal pull-down) │ GAIN             4 │  (GND = 9dB, VDD = 15dB)
+                           │                     │
+   GPIO3 (I2S BCLK) ──────┤ BCLK              5 │
+                           │                     │
+   GPIO2 (I2S LRCK) ──────┤ LRCLK             6 │
+                           │                     │
+   GPIO4 (I2S DIN) ───────┤ DIN               7 │
+                           │                     │
+                           │ OUTP ─────────────┬─┼──▶ Speaker (+)
+                           │                   │ │
+                           │ OUTN ────────┬────┼─┼──▶ Speaker (-)
+                           │              │    │ │
+                           └──────────────┼────┼─┘
+                                          │    │
+                                        1µF  1µF    (Optional output filtering)
+                                          │    │
+                                         GND  GND
 ```
 
-### Backlight MOSFET Control
+### MAX98357A Decoupling (Critical for Audio Quality)
 
 ```
-GPIO8 ────────┬────────┐
-              │        │
-             10K     ┌─┴─┐
-              │      │ G │
-             GND     │   │  AO3400
-                     │ S │  N-MOSFET
-                     └─┬─┘
-                       │ D
-                       │
-                       └────────────▶ TFT Backlight (-)
-                       
-TFT BL (+) ◀──────────────────────── 3.3V
-```
-
-> **Note:** GPIO8 HIGH = Backlight ON, GPIO8 LOW = Backlight OFF  
-> 10K pull-down ensures backlight is OFF during deep sleep.
-
----
-
-## RTC - DS3231M
-
-### DS3231M Connections
-
-```
-              DS3231M RTC Module
-            ┌─────────────────────┐
-            │    ○ ○ ○            │  ← CR1220 backup battery
-            │   ┌─────┐           │
-            │   │CHIP │ ±2ppm     │
-            │   └─────┘           │
-            │                     │
-            └──┬──┬──┬──┬──┬──┬───┘
-               │  │  │  │  │  │
-              VCC GND SDA SCL 32K SQW
-               │  │  │   │   │   │
-               │  │  │   │   │   └───▶ GPIO21 (Wake Interrupt)
-               │  │  │   │   └───────▶ NC (not used)
-               │  │  │   └───────────▶ GPIO3 (I2C SCL)
-               │  │  └───────────────▶ GPIO2 (I2C SDA)
-               │  └──────────────────▶ GND
-               └─────────────────────▶ 3.3V
-```
-
-### I2C Pull-up Resistors
-
-```
-3.3V ──┬───────────────────────┬──
-       │                       │
-      4.7K                    4.7K
-       │                       │
-       ├───────▶ SDA (GPIO2)   ├───────▶ SCL (GPIO3)
-       │                       │
-       └─── DS3231 SDA         └─── DS3231 SCL
-```
-
-### SQW/INT Pull-up (Wake Interrupt)
-
-```
-3.3V ─── 10K ───┬─── GPIO21
+              VDD Pin
                 │
-                └─── DS3231 SQW/INT (open-drain)
+      ┌─────────┼─────────┐
+      │         │         │
+     ═╧═       ═╧═       ═╧═
+    10µF      100nF      10pF    ← Place as close as possible to VDD pin
+      │         │         │
+      └─────────┴─────────┘
+                │
+               GND
 ```
 
-> **Note:** DS3231 SQW/INT is open-drain, requires external pull-up for proper HIGH level.
+### I2S Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Sample Rate | 44100 Hz |
+| Bits per Sample | 16-bit |
+| Channels | Mono (L+R mixed) |
+| Format | I2S Philips |
+| BCLK Frequency | 44100 × 16 × 2 = 1.41 MHz |
 
 ---
 
-## Audio - MAX98357A
+## Physical Button (Wake/Mute/Settings)
 
-### MAX98357A I2S Amplifier
-
-```
-                MAX98357A
-            ┌───────────────────┐
-            │                   │
-   3.3V ────┤ VIN         OUT+ ├───────┐
-            │                   │      │
-    GND ────┤ GND         OUT- ├───┐   │     ┌──────────────┐
-            │                   │  │   │     │              │
- GPIO7 ────┤ SD          GAIN  ├───┼───┼─────┤   SPEAKER    │
-            │                   │  │   │     │    3W 4Ω     │
- GPIO4 ────┤ BCLK               │  │   └─────┤              │
-            │                   │  └─────────┤              │
- GPIO5 ────┤ LRC                │            └──────────────┘
-            │                   │
- GPIO6 ────┤ DIN                │
-            │                   │
-            └───────────────────┘
-```
-
-| Pin | Connection | Function |
-|-----|------------|----------|
-| VIN | 3.3V | Power supply |
-| GND | GND | Ground |
-| SD | GPIO7 | Shutdown (HIGH = ON) |
-| BCLK | GPIO4 | I2S Bit Clock |
-| LRC | GPIO5 | I2S Left/Right Clock |
-| DIN | GPIO6 | I2S Data In |
-| GAIN | GND | 9dB gain (or VIN for 15dB) |
-| OUT+/- | Speaker | Differential output |
-
----
-
-## Buttons
-
-### Button Circuit (×3)
+### Button Circuit
 
 ```
-        3.3V
+        3.3V (3V3_BUCK)
           │
          10K  (pull-up)
           │
-          ├─────────────────▶ GPIO (0, 1, or 20)
+          ├─────────────────▶ GPIO8
           │
         ┌─┴─┐
         │   │  Tactile
@@ -350,214 +563,396 @@ TFT BL (+) ◀──────────────────────
          GND
 ```
 
-| Button | GPIO | Function |
-|--------|------|----------|
-| BTN1 | GPIO0 | Wake from sleep / Settings (long press) |
-| BTN2 | GPIO1 | Volume + |
-| BTN3 | GPIO20 | Volume - |
+> **Note:** Button is active LOW (pressed = 0, released = 1).  
+> GPIO8 is used as wake source from deep sleep: `esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0)`
 
-> **Note:** Buttons are active LOW (pressed = 0, released = 1)  
-> GPIO0 also used as wake source from deep sleep.
+### Button Behavior Map
 
----
-
-## USB-C Connector
-
-### USB-C Pinout
-
-```
-                   USB-C Connector (16-pin)
-                  ┌───────────────────────┐
-                  │  ○ ○ ○ ○ ○ ○ ○ ○ ○ ○  │
-                  │     ┌───────────┐     │
-                  │     │           │     │
-                  │     └───────────┘     │
-                  │                       │
-                  │  A1  ...  A12         │
-                  │  B1  ...  B12         │
-                  └───────────────────────┘
-```
-
-### USB-C Wiring
-
-| Pin(s) | Signal | Connection |
-|--------|--------|------------|
-| A4, B4, A9, B9 | VBUS | → AP2112K VIN, USB detect divider |
-| A7 | D- | → 22Ω → GPIO18 |
-| A6 | D+ | → 22Ω → GPIO19 |
-| A5 | CC1 | → 5.1K → GND |
-| B5 | CC2 | → 5.1K → GND |
-| A1, B1, A12, B12 | GND | → GND |
-| Shield | Shield | → GND (via 1M + 100pF) |
-
-### USB Data Lines with ESD Protection
-
-```
-USB D- (A7) ────┬──── 22Ω ──────▶ GPIO18
-                │
-               ═╧═  USBLC6-2
-                │   (ESD Diodes)
-USB D+ (A6) ────┬──── 22Ω ──────▶ GPIO19
-                │
-               ═╧═
-                │
-               GND
-```
+| Context | Press | Action |
+|---------|-------|--------|
+| Deep sleep | Any press | Wake device, turn on display |
+| Adhan playing | Short press | Stop/mute adhan |
+| Normal (screen on) | Short press | Toggle mute |
+| Normal (screen on) | Long press (3s) | Open settings / WiFi reconnect |
+| Screen off (light sleep) | Any press | Wake display |
 
 ---
 
-## Pin Assignment Table
+## Power Switch (ON/OFF)
 
-| GPIO | Function | Direction | Notes |
-|------|----------|-----------|-------|
-| 0 | BTN1 | Input | Wake + Settings (long press) |
-| 1 | BTN2 | Input | Volume + |
-| 2 | I2C SDA | I/O | RTC data line |
-| 3 | I2C SCL | Output | RTC clock line |
-| 4 | I2S BCLK | Output | Audio bit clock |
-| 5 | I2S LRC | Output | Audio L/R clock |
-| 6 | I2S DOUT | Output | Audio data |
-| 7 | AMP Enable | Output | HIGH = audio on |
-| 8 | TFT Backlight | Output | PWM for brightness |
-| 9 | USB Detect | Input | HIGH = USB connected |
-| 10 | TFT CLK | Output | SPI clock |
-| 11 | TFT MOSI | Output | SPI data |
-| 12 | TFT CS | Output | Chip select (active LOW) |
-| 13 | TFT DC | Output | Data/Command select |
-| 14 | TFT RST | Output | Reset (active LOW) |
-| 18 | USB D- | I/O | USB data minus |
-| 19 | USB D+ | I/O | USB data plus |
-| 20 | BTN3 | Input | Volume - |
-| 21 | RTC INT | Input | Wake alarm (active LOW) |
+### Switch Circuit
+
+```
+    4×AA BATTERIES          SPST Slide Switch
+         │                  (SS-12D00)
+      BATT+ (Red)        ┌──────────┐
+         │               │   ┌──┐   │
+         └─────────────┤ 1 │  │ 2 ├───▶ MP2359 VIN
+                          │   └──┘   │
+                          └──────────┘
+
+    ON position:  Pin 1 connected to Pin 2 → Power flows
+    OFF position: Pin 1 disconnected      → 0µA drain
+```
+
+> **Placement:** Side of enclosure, easily accessible.  
+> **Rating:** Must handle >200mA at 6V (SS-12D00 rated 0.3A/12V = adequate)
 
 ---
 
-## Power Logic
+## RTC Module (DS3231SN)
+
+### DS3231SN Wiring
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         POWER MODES                                 │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  USB CONNECTED (GPIO9 = HIGH)                               │    │
-│  ├─────────────────────────────────────────────────────────────┤    │
-│  │  • Power: USB 5V → AP2112K → 3.3V                           │    │
-│  │  • Battery: Disconnected (Schottky reverse biased)          │    │
-│  │  • Display: Always ON                                       │    │
-│  │  • WiFi: Always connected                                   │    │
-│  │  • Settings server: Always running                          │    │
-│  │  • Current: ~80mA typical                                   │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  BATTERY ONLY (GPIO9 = LOW)                                 │    │
-│  ├─────────────────────────────────────────────────────────────┤    │
-│  │  • Power: 6V Battery → MP2359 Buck → 3.3V                   │    │
-│  │  • Display: OFF (wake on button/prayer time)                │    │
-│  │  • WiFi: OFF (enable on long press BTN1)                    │    │
-│  │  • Deep sleep between events                                │    │
-│  │  • Current: ~8µA (deep sleep)                               │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  BOTH CONNECTED                                             │    │
-│  ├─────────────────────────────────────────────────────────────┤    │
-│  │  • USB wins (higher voltage through Schottky OR-ing)        │    │
-│  │  • Battery ready as backup                                  │    │
-│  │  • Seamless switching if USB removed                        │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+                           DS3231SN (SO-16W)
+                    ┌──────────────────────────┐
+                    │                          │
+   NC ─────────────┤ 1  32KHz        VCC  16 ├────── 3.3V
+                    │                          │
+   NC ─────────────┤ 2  INT/SQW      VBAT 15 ├────── CR1220 (+)
+                    │                          │        │
+   GPIO16 ─────────┤ 3  RST           N/C  14 ├── NC   └── 100K ── GND (trickle disable)
+   (optional)       │                          │
+                    │ 4  N/C          GND  13 ├────── GND, CR1220 (-)
+                    │                          │
+                    │ 5  N/C          N/C  12 ├── NC
+                    │                          │
+                    │ 6  N/C          N/C  11 ├── NC
+                    │                          │
+                    │ 7  N/C          N/C  10 ├── NC
+                    │                          │
+   GPIO15 ── 4.7K ─┤ 8  SDA          N/C   9 ├── NC
+       │           │                          │
+   GPIO7 ─── 4.7K ─┤               SCL ───────┤
+       │           └──────────────────────────┘
+       │
+   To 3.3V (I2C pull-ups)
 ```
 
-### Battery Life Calculation
+### I2C Configuration
 
-| State | Current | Duration/Day | Energy |
-|-------|---------|--------------|--------|
-| Deep Sleep | 8µA | 23.75 hours | 190µAh |
-| Wake + Display | 35mA | 12 min | 7mAh |
-| Adhan Playback | 150mA | 3 min | 7.5mAh |
-| **Total per day** | | | **~15mAh** |
-
-**4×AA Batteries (2500mAh) ÷ 15mAh/day = ~166 days ≈ 2.8 months**
+| Parameter | Value |
+|-----------|-------|
+| I2C Address | 0x68 |
+| I2C Speed | 400 kHz (Fast Mode) |
+| Pull-up Resistors | 4.7kΩ to 3.3V |
+| SDA | GPIO15 |
+| SCL | GPIO7 |
 
 ---
 
-## PCB Layout
+## Carrier Board Pin Mapping
+
+### Complete Wiring List
+
+| WT32S3 Pin | GPIO | Function | Destination | Notes |
+|------------|------|----------|-------------|-------|
+| Row1-1 | 3V3 | Power | All ICs VCC | 3.3V rail |
+| Row1-2 | GPIO7 | I2C SCL | DS3231 SCL | 4.7K pull-up |
+| Row1-3 | GPIO15 | I2C SDA | DS3231 SDA | 4.7K pull-up |
+| Row1-4 | GPIO16 | RTC INT | DS3231 SQW | Optional wake |
+| Row1-7 | GPIO8 | BTN (Wake/Mute) | Physical Button | 10K pull-up, active LOW |
+| Row1-8 | GPIO3 | I2S BCLK | MAX98357 BCLK | Bit clock |
+| Row1-10 | GND | Ground | All ICs GND | Common ground |
+| Row2-11 | 5V | Power In | From 3.3V rail | Module power |
+| Row2-12 | GPIO6 | USB_DETECT | USB 5V Divider | HIGH=USB |
+| Row2-14 | GPIO4 | I2S DIN | MAX98357 DIN | Audio data |
+| Row2-15 | GPIO2 | I2S LRCK | MAX98357 LRCK | Word select |
+| Row2-16 | GPIO1 | AMP_EN | MAX98357 SD | Shutdown ctrl |
+| Row2-20 | GND | Ground | All ICs GND | Common ground |
+
+### Schematic Net List (for EasyEDA/KiCad Import)
+
+```
+NET LIST - Carrier Base Board for WT32S3-28S PLUS (4×AA Version with USB Isolation)
+====================================================================================
+
+Power Nets:
+-----------
+NET: VBAT (4.5V-6.4V from batteries)
+  - 4×AA Battery holder RED wire (+) → BATT+ pad
+  - SPST slide switch (power ON/OFF)
+  - 22µF input capacitor (+)
+  - MP2359 VIN pin
+
+NET: 3V3_BUCK (MP2359 output + USB reverse feed)
+  - MP2359 output (via inductor)
+  - 22µF output cap (+)
+  - SS14 D1 anode (battery → module isolation)
+  - SS14 D2 cathode (module → peripherals feed)
+  - DS3231 VCC
+  - MAX98357 VDD
+  - I2C Pull-ups (2× 4.7K)
+  - Button pull-up (10K)
+
+NET: 3V3_MODULE (module's 3V3 pin)
+  - SS14 D1 cathode (receives battery power)
+  - SS14 D2 anode (outputs USB power to peripherals)
+  - WT32S3-28S 3V3 pin (Row1-1)
+
+NET: GND
+  - 4×AA Battery holder BLACK wire (-) → BATT- pad
+  - MP2359 GND pin
+  - All capacitors (-)
+  - WT32S3-28S GND (Row1-10, Row2-20)
+  - DS3231 GND
+  - MAX98357 GND
+  - SS14 not connected to GND (diode in series, not to ground)
+
+Signal Nets:
+------------
+NET: I2C_SDA
+  - WT32S3 GPIO15 (Row1-3)
+  - DS3231 SDA (pin 8)
+  - 4.7K pull-up to 3V3
+
+NET: I2C_SCL
+  - WT32S3 GPIO7 (Row1-2)
+  - DS3231 SCL
+  - 4.7K pull-up to 3V3
+
+NET: I2S_BCLK
+  - WT32S3 GPIO3 (Row1-8)
+  - MAX98357 BCLK (pin 5)
+
+NET: I2S_LRCK
+  - WT32S3 GPIO2 (Row2-15)
+  - MAX98357 LRCLK (pin 6)
+
+NET: I2S_DIN
+  - WT32S3 GPIO4 (Row2-14)
+  - MAX98357 DIN (pin 7)
+
+NET: AMP_ENABLE
+  - WT32S3 GPIO1 (Row2-16)
+  - MAX98357 SD_MODE (pin 3)
+
+NET: RTC_INT (optional)
+  - WT32S3 GPIO16 (Row1-4)
+  - DS3231 INT/SQW (pin 2)
+  - 10K pull-up to 3V3
+
+NET: BTN_WAKE
+  - WT32S3 GPIO8 (Row1-7)
+  - 10K pull-up to 3V3_BUCK
+  - Tactile switch to GND
+  - Active LOW (pressed = 0)
+  - Deep sleep wake source
+
+NET: SPKR_P
+  - MAX98357 OUTP
+  - Speaker (+)
+
+NET: SPKR_N
+  - MAX98357 OUTN
+  - Speaker (-)
+
+Internal Buck Converter Nets:
+-----------------------------
+NET: SW (switching node)
+  - MP2359 SW pin
+  - 10µH inductor (one end)
+  
+NET: FB (feedback)
+  - MP2359 FB pin
+  - 16K resistor to 3V3
+  - 5.6K resistor to GND
+```
+
+---
+
+## PCB Layout Guidelines (JLCPCB)
+
+### Trace Width Recommendations
+
+| Net | Current | Trace Width | Layer |
+|-----|---------|-------------|-------|
+| VBAT (6V) | 200mA peak | 0.5mm (20mil) | Top |
+| 3V3 Rail | 500mA | 0.4mm (16mil) | Top |
+| I2S Signals | <10mA | 0.25mm (10mil) | Top |
+| I2C Signals | <1mA | 0.2mm (8mil) | Top |
+| GND | Return | Polygon fill | Both |
+
+### Critical Layout Rules
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       EMI/EMC GUIDELINES                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. GROUND PLANE                                                        │
+│     ├─ Bottom layer: Solid GND plane (no splits under audio)           │
+│     ├─ Top layer: GND pour around components                           │
+│     └─ Via stitching: Every 5mm around board edge                      │
+│                                                                         │
+│  2. POWER SECTION (MP2359 Buck Converter)                              │
+│     ├─ Place near battery connector input                              │
+│     ├─ Short, wide traces for SW node (high di/dt)                     │
+│     ├─ Input/output caps within 3mm of IC pins                         │
+│     ├─ Keep feedback resistors close to FB pin                         │
+│     ├─ Inductor placement minimizes SW loop area                       │
+│     └─ Ground plane under buck for heat dissipation                    │
+│                                                                         │
+│  3. USB POWER PATH (SS14 Diodes)                                       │
+│     ├─ Place SS14 diodes near module USB-C output                      │
+│     ├─ Short traces from diode cathodes to 3.3V rail                   │
+│     ├─ D1: Battery path isolation (after buck converter)               │
+│     └─ D2: USB path isolation (from module VBUS)                       │
+│                                                                         │
+│  4. AUDIO SECTION (MAX98357A)                                          │
+│     ├─ Place away from switching regulators                            │
+│     ├─ Decoupling caps within 2mm of VDD pin                           │
+│     ├─ Keep I2S traces parallel, equal length (±2mm)                   │
+│     ├─ Avoid routing I2S over gaps in ground plane                     │
+│     └─ Speaker traces can be wider (0.5mm) to reduce resistance        │
+│                                                                         │
+│  5. I2C SECTION (DS3231)                                               │
+│     ├─ Keep SDA/SCL traces short (<30mm)                               │
+│     ├─ Pull-ups close to RTC IC                                        │
+│     └─ Place backup battery holder on bottom if space tight            │
+│                                                                         │
+│  6. MODULE CONNECTION                                                   │
+│     ├─ Use 2×10 pin header (2.54mm pitch)                              │
+│     ├─ Match header footprint to WT32S3 exactly                        │
+│     └─ Consider castellated holes for direct soldering                 │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Component Placement (Top View)
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                              80mm                                  │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                                                              │  │
-│  │                      DISPLAY AREA                            │  │
-│  │                   TFT 2.4" ILI9341                           │  │
-│  │                      320×240                                 │  │
-│  │                                                              │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│  ┌────────────┐  ┌────────┐  ┌──────────┐  ┌────────────────┐      │
-│  │            │  │        │  │          │  │                │      │
-│  │  ESP32-C3  │  │ DS3231 │  │ MAX98357 │  │   MP2359 Buck  │      │
-│  │  WROOM-02  │  │  RTC   │  │   Amp    │  │   + AP2112K    │      │
-│  │            │  │        │  │          │  │                │      │
-│  └────────────┘  └────────┘  └──────────┘  └────────────────┘      │
-│                                                                    │
-│  [BTN1]  [BTN2]  [BTN3]          [Speaker]           [USB-C]       │
-│   Wake    Vol+    Vol-                                             │
-│                                                                    │
-│  ○ LED (Status - optional)                                         │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                           70mm                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                                                                 │   │
+│  │             WT32S3-28S PLUS MODULE                              │   │
+│  │               (Mounted on headers)                              │   │
+│  │           77 × 47mm with 2.8" display                           │   │
+│  │                                                                 │   │
+│  └───────────────────────────┬─────────────────────────────────────┘   │
+│                              │                                         │
+│  ┌────────┐  ┌────────────┐  │  ┌─────────────┐  ┌──────────────┐     │
+│  │        │  │   MP2359   │  │  │             │  │              │     │
+│  │ USB-C  │  │   Buck     │  │  │  DS3231SN   │  │  MAX98357A   │     │
+│  │        │  │   + Diodes │  │  │  + CR1220   │  │              │     │
+│  │        │  └────────────┘  │  │             │  │              │     │
+│  └────────┘  ┌────────────┐  │  └─────────────┘  └──────────────┘     │
+│              │ SPST Switch│  │                                        │
+│              │  (ON/OFF)  │  │                     ┌────────────────┐ │
+│              └────────────┘  │  ┌─────────┐        │    SPEAKER     │ │
+│                              │  │  BTN1   │        │    CONNECTOR   │ │
+│                              │  │  (6×6)  │        └────────────────┘ │
+│                              ▼  └─────────┘                           │
+│                         4×AA Battery                                  │
+│                          Connector                                    │
+│                                                                       │
+└───────────────────────────────────────────────────────────────────────┘
+◄──────────────────────── 55mm ──────────────────────────────────────────►
 
-◄─────────────── 4×AA Battery Holder (Below PCB) ────────────────────►
+BOTTOM SIDE: 
+  - 4×AA Battery Holder (underneath module)
+  - CR1220 holder (if space needed)
 ```
-
-### Recommended PCB Specifications
-
-| Parameter | Value |
-|-----------|-------|
-| Layers | 2 (minimum) |
-| Size | 80mm × 60mm |
-| Thickness | 1.6mm |
-| Copper | 1oz |
-| Finish | HASL or ENIG |
-| Solder Mask | Black or Blue |
 
 ---
 
-## Design Notes
+## Manufacturing Files
 
-### Power Considerations
-- Keep high-current traces (buck converter) short and wide
-- Place decoupling caps close to IC power pins
-- Separate analog (audio) and digital grounds, join at one point
+### JLCPCB BOM Format
 
-### ESP32-C3 EN Pin (Recommended)
+```csv
+Comment,Designator,Footprint,LCSC Part #
+"Buck Converter",U1,SOT-23-6,C14259
+"I2S Audio Amplifier",U2,QFN-16,C910544
+"Precision RTC",U3,SO-16W,C9866
+"Schottky Diode",D1 D2,SOD-123,C2480
+"10K Resistor",R1,0402,C25744
+"22uF Cap",C1 C2,0805,C45783
+"10uF Cap",C3,0402,C15525
+"100nF Cap",C4 C5,0402,C1525
+"10uH Inductor",L1,0805,C1046
+"CR1220 Holder",BT1,THT,C14488
+"SPST Slide Switch",SW1,THT,C431540
+"Tactile Switch",SW2,THT,C318884
+```
 
-Add RC delay circuit on EN pin for reliable startup:
+### CPL (Centroid) File Format
+
+```csv
+Designator,Mid X,Mid Y,Layer,Rotation
+U1,15,12,T,0
+U2,50,15,T,0
+U3,50,28,T,0
+D1,20,8,T,0
+D2,28,8,T,0
+L1,18,16,T,0
+SW1,5,25,T,0
+SW2,60,8,T,0
+...
+```
+
+---
+
+## Battery Life Calculation
+
+**Usage Scenario:** 6 min/day adhan (screen OFF) + 7×15sec touch interactions
+
+#### Component Current Draw (from datasheets)
+
+| Component | Active | Sleep/Shutdown | Source |
+|-----------|--------|----------------|--------|
+| ESP32-S3R8 | 40-50mA | 40µA (PSRAM) | Espressif Datasheet |
+| WT32S3 Display | 70mA (backlight) | 0 (IO45 LOW) | ST7789V Datasheet |
+| MAX98357A @ 60% vol | 85mA @ 3.3V | 0.6µA (SD=LOW) | MAX98357A Datasheet |
+| DS3231 RTC | 0.2mA | 0.2mA | DS3231 Datasheet |
+
+> **Note:** MAX98357A @ 3.3V max output = V²/(2×R) = 3.3²/(2×8) = **0.68W**. At 60% volume: 0.25W output.
+
+#### Daily Energy Consumption
+
+| State | Current (3.3V) | Duration | Energy |
+|-------|----------------|----------|--------|
+| Adhan (ESP32 + audio, screen OFF) | 135mA | 6 min (0.1h) | 13.5 mAh |
+| Display ON (touch wake) | 120mA | 1.75 min (0.029h) | 3.5 mAh |
+| Deep Sleep (ESP32 + RTC) | 40µA | 23.87 h | 1.0 mAh |
+| **Subtotal** | | | **18 mAh** |
+| Buck converter loss (90% eff.) | ×1.11 | | +2 mAh |
+| **Total per day** | | | **~20 mAh** |
+
+#### Battery Life Estimate
 
 ```
-3.3V ─── 10K ───┬─── EN pin
-                │
-               10µF
-                │
-               GND
+4×AA Batteries (2400 mAh) ÷ 20 mAh/day = 120 days ≈ 4 months
 ```
 
-> This provides ~100ms delay, ensuring stable power before chip enables.
+| Usage Pattern | Battery Life |
+|---------------|--------------|
+| Optimized (6 min ezan, 2 min screen) | **~4 months** |
+| Moderate (+ 10 min screen/day) | ~2.5 months |
+| Heavy (+ 30 min screen/day) | ~1 month |
 
-### RF Considerations
-- Keep antenna area of ESP32-C3 clear of copper
-- No ground plane under antenna
-- USB traces should be 90Ω differential impedance
+#### Power Optimization Requirements
 
-### Thermal Considerations
-- MP2359 may need thermal via to bottom copper
-- MAX98357A generates heat during playback
+For maximum battery life, firmware MUST implement:
+
+1. **ESP32-S3 Deep Sleep**: Use `esp_deep_sleep_start()` between prayer times
+2. **MAX98357A Shutdown**: Set SD/EN pin LOW when not playing audio
+3. **Backlight Control**: Set IO45 LOW when screen not needed
+4. **RTC Wake**: Use DS3231 alarm to wake for prayer times
+5. **Button Wake**: Use `esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0)` for physical button
+
+```cpp
+// Example power optimization
+void enterDeepSleep() {
+    digitalWrite(AMP_EN_PIN, LOW);      // Shutdown amplifier (~0.6µA)
+    digitalWrite(BACKLIGHT_PIN, LOW);   // Turn off display backlight
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_8, 0);  // Wake on button press (active LOW)
+    // Configure RTC alarm for next prayer
+    esp_deep_sleep_start();             // ESP32-S3 enters deep sleep
+}
+```
 
 ---
 
@@ -565,9 +960,10 @@ Add RC delay circuit on EN pin for reliable startup:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2026-01-14 | Initial design |
-| 1.1 | 2026-01-14 | Fixed buck FB resistors (16K/5.6K), added RTC INT pull-up, added EN RC circuit |
-
----
-
-*Generated for Spiritual Assistant Project*
+| 1.0 | 2026-01-14 | Initial design (WT32S3-28S PLUS module-based) |
+| 1.1 | 2026-02-07 | Changed from Li-ion to 4×AA batteries |
+| 1.2 | 2026-02-07 | Added detailed battery life calculation with datasheet values (~4 months) |
+| 1.3 | 2026-02-07 | Simplified - removed carrier USB-C (uses module's USB-C for programming) |
+| 1.4 | 2026-02-07 | Added SS14 USB isolation - prevents reverse current when USB+battery connected |
+| 1.5 | 2026-02-09 | Added SPST power switch (ON/OFF) and physical button (GPIO8) for wake/mute/settings |
+| 1.6 | 2026-02-09 | Added 2nd SS14 diode (D2) so USB-C can fully power device (RTC + Audio) without batteries |

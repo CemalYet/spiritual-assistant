@@ -151,31 +151,54 @@ namespace WiFiPortal
     }
 
     // Serve settings.html with DEVICE_MODE injected
-    // Stream settings.html directly from flash - no RAM needed
-    bool serveSettingsPage()
+    // Serve gzipped file if available, otherwise serve original
+    bool serveGzippedFile(const char *path, const char *contentType)
     {
         if (!server)
             return false;
 
-        const char *path = "/settings.html";
+        String gzPath = String(path) + ".gz";
 
-        if (!LittleFS.exists(path))
+        // Check if browser accepts gzip
+        bool acceptsGzip = server->hasHeader("Accept-Encoding") &&
+                           server->header("Accept-Encoding").indexOf("gzip") >= 0;
+
+        // Try gzipped version first
+        if (acceptsGzip && LittleFS.exists(gzPath.c_str()))
         {
-            Serial.printf("[Portal] File not found: %s\n", path);
-            return false;
+            File file = LittleFS.open(gzPath.c_str(), "r");
+            if (file)
+            {
+                Serial.printf("[Portal] Streaming %s (%u bytes, gzip)\n", gzPath.c_str(), file.size());
+                server->sendHeader("Content-Encoding", "gzip");
+                server->sendHeader("Cache-Control", "max-age=86400");
+                server->streamFile(file, contentType);
+                file.close();
+                return true;
+            }
         }
 
-        File file = LittleFS.open(path, "r");
-        if (!file)
+        // Fall back to original file
+        if (LittleFS.exists(path))
         {
-            Serial.printf("[Portal] Failed to open file\n");
-            return false;
+            File file = LittleFS.open(path, "r");
+            if (file)
+            {
+                Serial.printf("[Portal] Streaming %s (%u bytes)\n", path, file.size());
+                server->sendHeader("Cache-Control", "max-age=86400");
+                server->streamFile(file, contentType);
+                file.close();
+                return true;
+            }
         }
 
-        // Stream file directly - zero RAM usage
-        server->streamFile(file, "text/html");
-        file.close();
-        return true;
+        return false;
+    }
+
+    // Stream settings.html directly from flash - no RAM needed
+    bool serveSettingsPage()
+    {
+        return serveGzippedFile("/settings.html", "text/html");
     }
 
     // API endpoint to return current mode
@@ -358,9 +381,7 @@ namespace WiFiPortal
         {
             const char *mode = doc["connectionMode"].as<const char *>();
             SettingsManager::setConnectionMode(mode);
-
-            // If offline mode selected, set flag so main loop can handle transition
-            if (etl::string_view(mode) == "offline")
+            if (strcmp(mode, "offline") == 0)
             {
                 offlineModeRequested = true;
             }
@@ -655,7 +676,35 @@ namespace WiFiPortal
         if (server)
         {
             server->sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
+            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
             server->send(HTTP_FOUND, "text/plain", "");
+        }
+    }
+
+    // Android-specific: expects non-204 to trigger captive portal
+    void handleGenerate204()
+    {
+        if (server)
+        {
+            // Return 302 redirect - Android sees "not 204" = captive portal
+            server->sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
+            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            server->send(HTTP_FOUND, "text/html",
+                         "<html><head><meta http-equiv='refresh' content='0;url=http://192.168.4.1/'></head></html>");
+        }
+    }
+
+    // iOS-specific: /hotspot-detect.html must return specific content
+    void handleAppleHotspot()
+    {
+        if (server)
+        {
+            // iOS checks if this returns "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"
+            // If NOT, it opens captive portal. So we return something else:
+            server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            server->send(HTTP_OK, "text/html",
+                         "<HTML><HEAD><TITLE>Sign In</TITLE></HEAD><BODY>"
+                         "<script>window.location='http://192.168.4.1/';</script></BODY></HTML>");
         }
     }
 
@@ -797,9 +846,9 @@ namespace WiFiPortal
             server = std::make_unique<WebServer>(80);
         }
 
-        // MANDATORY for 2026: Tell the server to look at the "Host" header
-        const char *headerkeys[] = {"Host", "User-Agent"};
-        server->collectHeaders(headerkeys, 2);
+        // MANDATORY for 2026: Tell the server to look at these headers
+        const char *headerkeys[] = {"Host", "User-Agent", "Accept-Encoding"};
+        server->collectHeaders(headerkeys, 3);
 
         server->on("/", HTTP_GET, handleRoot);
         server->on("/save", HTTP_POST, handleSave);
@@ -826,12 +875,22 @@ namespace WiFiPortal
         server->on("/ncsi.txt", HTTP_ANY, handleNcsi);
         server->on("/redirect", HTTP_GET, handleRoot);
 
-        // Mobile connectivity checks (Android/iOS/Firefox)
-        server->on("/generate_204", HTTP_ANY, handleMobileRedirect);
-        server->on("/gen_204", HTTP_ANY, handleMobileRedirect);
-        server->on("/hotspot-detect.html", HTTP_ANY, handleMobileRedirect);
+        // Android captive portal checks (multiple Google/Android URLs)
+        server->on("/generate_204", HTTP_ANY, handleGenerate204);
+        server->on("/gen_204", HTTP_ANY, handleGenerate204);
+        server->on("/mobile/status.php", HTTP_ANY, handleGenerate204); // Some Android versions
+        server->on("/check_network_status.txt", HTTP_ANY, handleGenerate204);
+        server->on("/connectivity-check.html", HTTP_ANY, handleGenerate204);
+
+        // iOS/Apple captive portal checks
+        server->on("/hotspot-detect.html", HTTP_ANY, handleAppleHotspot);
+        server->on("/library/test/success.html", HTTP_ANY, handleAppleHotspot);
+
+        // Firefox/Mozilla, Samsung, other
         server->on("/canonical.html", HTTP_ANY, handleMobileRedirect);
         server->on("/success.txt", HTTP_ANY, handleMobileRedirect);
+        server->on("/kindle-wifi/wifistub.html", HTTP_ANY, handleMobileRedirect); // Kindle
+        server->on("/chat", HTTP_ANY, handleMobileRedirect);                      // Some Samsung devices
 
         // Catch-all for unknown paths
         server->onNotFound(handleNotFound);
@@ -919,6 +978,12 @@ namespace WiFiPortal
         connectedIP = WiFi.localIP().toString().c_str();
 
         Serial.printf("[Portal] ✓ Connection successful! IP: %s\n", connectedIP.c_str());
+
+        // Credentials are saved by Network::handlePortal() when it sees SUCCESS
+        // Switch to wifi mode so device uses WiFi on next boot
+        SettingsManager::setConnectionMode("wifi");
+        Serial.println("[Portal] Connection mode set to 'wifi'");
+
         connectState = ConnectState::SUCCESS;
         connectRetryCount = 0;
         WiFi.disconnect(false); // Keep AP for status polling

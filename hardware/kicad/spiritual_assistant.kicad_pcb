@@ -1,0 +1,268 @@
+(kicad_pcb
+  (version 20231014)
+  (generator "spiritual_assistant")
+  (generator_version "8.0")
+  (general
+    (thickness 1.6)
+    (legacy_teardrops no)
+  )
+  (paper "A4")
+  (title_block
+    (title "Spiritual Assistant Carrier Board")
+    (date "2026-02-09")
+    (rev "1.6")
+    (comment 1 "65mm × 50mm 2-Layer PCB")
+  )
+
+  (layers
+    (0 "F.Cu" signal)
+    (31 "B.Cu" signal)
+    (32 "B.Adhes" user "B.Adhesive")
+    (33 "F.Adhes" user "F.Adhesive")
+    (34 "B.Paste" user)
+    (35 "F.Paste" user)
+    (36 "B.SilkS" user "B.Silkscreen")
+    (37 "F.SilkS" user "F.Silkscreen")
+    (38 "B.Mask" user "B.Mask")
+    (39 "F.Mask" user "F.Mask")
+    (40 "Dwgs.User" user "User.Drawings")
+    (41 "Cmts.User" user "User.Comments")
+    (42 "Eco1.User" user "User.Eco1")
+    (43 "Eco2.User" user "User.Eco2")
+    (44 "Edge.Cuts" user)
+    (45 "Margin" user)
+    (46 "B.CrtYd" user "B.Courtyard")
+    (47 "F.CrtYd" user "F.Courtyard")
+    (48 "B.Fab" user "B.Fab")
+    (49 "F.Fab" user "F.Fab")
+  )
+
+  (setup
+    (pad_to_mask_clearance 0.05)
+    (allow_soldermask_bridges_in_footprints no)
+    (pcbplotparams
+      (layerselection 0x00010fc_ffffffff)
+      (plot_on_all_layers_selection 0x0000000_00000000)
+      (disableapertmacros no)
+      (usegerberextensions no)
+      (usegerberattributes yes)
+      (usegerberadvancedattributes yes)
+      (creategerberjobfile yes)
+      (dashed_line_dash_ratio 12.000000)
+      (dashed_line_gap_ratio 3.000000)
+      (svgprecision 4)
+      (plotframeref no)
+      (viasonmask no)
+      (mode 1)
+      (useauxorigin no)
+      (hpglpennumber 1)
+      (hpglpenspeed 20)
+      (hpglpendiameter 15.000000)
+      (pdf_front_fp_property_popups yes)
+      (pdf_back_fp_property_popups yes)
+      (dxfpolygonmode yes)
+      (dxfimperialunits yes)
+      (dxfusepcbnewfont yes)
+      (psnegative no)
+      (psa4output no)
+      (plotreference yes)
+      (plotvalue yes)
+      (plotfptext yes)
+      (plotinvisibletext no)
+      (sketchpadsonfab no)
+      (subtractmaskfromsilk no)
+      (outputformat 1)
+      (mirror no)
+      (drillshape 1)
+      (scaleselection 1)
+      (outputdirectory "gerber/")
+    )
+  )
+
+  (net 0 "")
+  (net 1 "GND")
+  (net 2 "VBAT")
+  (net 3 "3V3_BUCK")
+  (net 4 "3V3_MODULE")
+  (net 5 "I2C_SDA")
+  (net 6 "I2C_SCL")
+  (net 7 "I2S_BCLK")
+  (net 8 "I2S_LRCK")
+  (net 9 "I2S_DIN")
+  (net 10 "AMP_ENABLE")
+  (net 11 "RTC_INT")
+  (net 12 "BTN_WAKE")
+  (net 13 "SW")
+  (net 14 "FB")
+  (net 15 "SPKR_P")
+  (net 16 "SPKR_N")
+  (net 17 "+3V3")
+  (net 18 "5V")
+
+  ;; ========================================
+  ;; BOARD OUTLINE (65mm × 50mm)
+  ;; ========================================
+  (gr_line (start 0 0) (end 65 0) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "edge-top"))
+  (gr_line (start 65 0) (end 65 50) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "edge-right"))
+  (gr_line (start 65 50) (end 0 50) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "edge-bottom"))
+  (gr_line (start 0 50) (end 0 0) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "edge-left"))
+
+  ;; ========================================
+  ;; MOUNTING HOLES (M2.5, corners)
+  ;; ========================================
+  (footprint "MountingHole:MountingHole_2.7mm_M2.5"
+    (layer "F.Cu")
+    (uuid "mh-1")
+    (at 3.5 3.5)
+    (property "Reference" "MH1" (at 0 -3 0) (layer "F.SilkS") (uuid "mh1-ref") (effects (font (size 1 1) (thickness 0.15))))
+    (property "Value" "MountingHole" (at 0 3 0) (layer "F.Fab") (uuid "mh1-val") (effects (font (size 1 1) (thickness 0.15))))
+    (pad "" thru_hole circle (at 0 0) (size 2.7 2.7) (drill 2.7) (layers "*.Cu" "*.Mask"))
+  )
+
+  (footprint "MountingHole:MountingHole_2.7mm_M2.5"
+    (layer "F.Cu")
+    (uuid "mh-2")
+    (at 61.5 3.5)
+    (property "Reference" "MH2" (at 0 -3 0) (layer "F.SilkS") (uuid "mh2-ref") (effects (font (size 1 1) (thickness 0.15))))
+    (property "Value" "MountingHole" (at 0 3 0) (layer "F.Fab") (uuid "mh2-val") (effects (font (size 1 1) (thickness 0.15))))
+    (pad "" thru_hole circle (at 0 0) (size 2.7 2.7) (drill 2.7) (layers "*.Cu" "*.Mask"))
+  )
+
+  (footprint "MountingHole:MountingHole_2.7mm_M2.5"
+    (layer "F.Cu")
+    (uuid "mh-3")
+    (at 3.5 46.5)
+    (property "Reference" "MH3" (at 0 -3 0) (layer "F.SilkS") (uuid "mh3-ref") (effects (font (size 1 1) (thickness 0.15))))
+    (property "Value" "MountingHole" (at 0 3 0) (layer "F.Fab") (uuid "mh3-val") (effects (font (size 1 1) (thickness 0.15))))
+    (pad "" thru_hole circle (at 0 0) (size 2.7 2.7) (drill 2.7) (layers "*.Cu" "*.Mask"))
+  )
+
+  (footprint "MountingHole:MountingHole_2.7mm_M2.5"
+    (layer "F.Cu")
+    (uuid "mh-4")
+    (at 61.5 46.5)
+    (property "Reference" "MH4" (at 0 -3 0) (layer "F.SilkS") (uuid "mh4-ref") (effects (font (size 1 1) (thickness 0.15))))
+    (property "Value" "MountingHole" (at 0 3 0) (layer "F.Fab") (uuid "mh4-val") (effects (font (size 1 1) (thickness 0.15))))
+    (pad "" thru_hole circle (at 0 0) (size 2.7 2.7) (drill 2.7) (layers "*.Cu" "*.Mask"))
+  )
+
+  ;; ========================================
+  ;; COMPONENT PLACEMENT ZONES
+  ;; ========================================
+
+  ;; Silkscreen annotations for placement guidance
+  (gr_text "Module Header\n2×10 Pin (2.54mm)"
+    (at 32.5 25)
+    (layer "F.SilkS")
+    (uuid "txt-module-zone")
+    (effects (font (size 1.2 1.2) (thickness 0.15)) (justify center))
+  )
+
+  (gr_text "U1 MP2359\nBuck Converter"
+    (at 12 12)
+    (layer "F.SilkS")
+    (uuid "txt-buck-zone")
+    (effects (font (size 1 1) (thickness 0.12)) (justify center))
+  )
+
+  (gr_text "U2 MAX98357A\nI2S Audio Amp"
+    (at 53 12)
+    (layer "F.SilkS")
+    (uuid "txt-amp-zone")
+    (effects (font (size 1 1) (thickness 0.12)) (justify center))
+  )
+
+  (gr_text "U3 DS3231SN\nRTC"
+    (at 12 38)
+    (layer "F.SilkS")
+    (uuid "txt-rtc-zone")
+    (effects (font (size 1 1) (thickness 0.12)) (justify center))
+  )
+
+  (gr_text "BT2\nCR1220"
+    (at 53 38)
+    (layer "F.SilkS")
+    (uuid "txt-cr1220-zone")
+    (effects (font (size 1 1) (thickness 0.12)) (justify center))
+  )
+
+  (gr_text "SW1 Power\nSW2 Button"
+    (at 32.5 44)
+    (layer "F.SilkS")
+    (uuid "txt-switches-zone")
+    (effects (font (size 1 1) (thickness 0.12)) (justify center))
+  )
+
+  ;; ========================================
+  ;; MODULE HEADER FOOTPRINT (2×10 Pin, 2.54mm pitch)
+  ;; Placed at board center
+  ;; ========================================
+  (footprint "Connector_PinHeader_2.54mm:PinHeader_2x10_P2.54mm_Vertical"
+    (layer "F.Cu")
+    (uuid "fp-module")
+    (at 32.5 25)
+    (property "Reference" "U4" (at 0 -15 0) (layer "F.SilkS") (uuid "fp-mod-ref") (effects (font (size 1 1) (thickness 0.15))))
+    (property "Value" "WT32S3-28S_PLUS" (at 0 15 0) (layer "F.Fab") (uuid "fp-mod-val") (effects (font (size 1 1) (thickness 0.15))))
+
+    ;; Row 1 (left column) - pins 1-10
+    (pad "1" thru_hole rect (at 0 0) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 4 "3V3_MODULE"))
+    (pad "2" thru_hole oval (at 0 2.54) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 6 "I2C_SCL"))
+    (pad "3" thru_hole oval (at 0 5.08) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 5 "I2C_SDA"))
+    (pad "4" thru_hole oval (at 0 7.62) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 11 "RTC_INT"))
+    (pad "5" thru_hole oval (at 0 10.16) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "6" thru_hole oval (at 0 12.7) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "7" thru_hole oval (at 0 15.24) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 12 "BTN_WAKE"))
+    (pad "8" thru_hole oval (at 0 17.78) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 7 "I2S_BCLK"))
+    (pad "9" thru_hole oval (at 0 20.32) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "10" thru_hole oval (at 0 22.86) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 1 "GND"))
+
+    ;; Row 2 (right column) - pins 11-20
+    (pad "11" thru_hole oval (at 2.54 0) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 18 "5V"))
+    (pad "12" thru_hole oval (at 2.54 2.54) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "13" thru_hole oval (at 2.54 5.08) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "14" thru_hole oval (at 2.54 7.62) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 9 "I2S_DIN"))
+    (pad "15" thru_hole oval (at 2.54 10.16) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 8 "I2S_LRCK"))
+    (pad "16" thru_hole oval (at 2.54 12.7) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 10 "AMP_ENABLE"))
+    (pad "17" thru_hole oval (at 2.54 15.24) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "18" thru_hole oval (at 2.54 17.78) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "19" thru_hole oval (at 2.54 20.32) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask"))
+    (pad "20" thru_hole oval (at 2.54 22.86) (size 1.7 1.7) (drill 1.0) (layers "*.Cu" "*.Mask") (net 1 "GND"))
+  )
+
+  ;; ========================================
+  ;; GROUND ZONE (Bottom copper pour)
+  ;; ========================================
+  (zone
+    (net 1)
+    (net_name "GND")
+    (layer "B.Cu")
+    (uuid "zone-gnd-bottom")
+    (hatch edge 0.5)
+    (connect_pads (clearance 0.3))
+    (min_thickness 0.25)
+    (filled_areas_thickness no)
+    (fill yes (thermal_gap 0.5) (thermal_bridge_width 0.5))
+    (polygon
+      (pts
+        (xy 0.5 0.5) (xy 64.5 0.5) (xy 64.5 49.5) (xy 0.5 49.5)
+      )
+    )
+  )
+
+  ;; ========================================
+  ;; DESIGN NOTES
+  ;; ========================================
+  (gr_text "Spiritual Assistant v1.6\nCarrier Board for WT32S3-28S PLUS\n65×50mm 2-Layer\nBottom GND Pour"
+    (at 32.5 -5)
+    (layer "Cmts.User")
+    (uuid "txt-design-notes")
+    (effects (font (size 1.5 1.5) (thickness 0.15)) (justify center))
+  )
+
+  (gr_text "LAYOUT GUIDELINES:\n- MP2359 components close together (top-left)\n- MAX98357A near module header (top-right)\n- DS3231 + CR1220 bottom-left\n- Switches accessible at board edge\n- Battery/Speaker connectors at edges\n- 0.5mm power traces, 0.25mm signal traces"
+    (at 32.5 -15)
+    (layer "Cmts.User")
+    (uuid "txt-layout-guide")
+    (effects (font (size 1 1) (thickness 0.1)) (justify center))
+  )
+)

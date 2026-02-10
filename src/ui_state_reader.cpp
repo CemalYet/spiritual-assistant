@@ -65,10 +65,13 @@ namespace UiStateReader
                                         g_state.statusLine1.c_str());
                 break;
             case StatusScreenType::NONE:
-                // Return to home screen
-                UiPageHome::create();
-                // Mark all dirty to refresh home screen
-                g_state.markDirty(DirtyFlag::ALL & ~DirtyFlag::STATUS_SCREEN);
+                // Return to home screen (only if pages are created)
+                if (UiPageHome::getScreen() != nullptr)
+                {
+                    lv_scr_load(UiPageHome::getScreen());
+                    // Mark all dirty to refresh home screen
+                    g_state.markDirty(DirtyFlag::ALL & ~DirtyFlag::STATUS_SCREEN);
+                }
                 break;
             }
             g_state.clearDirty(DirtyFlag::STATUS_SCREEN);
@@ -148,26 +151,7 @@ namespace UiStateReader
         // ═══════════════════════════════════════════════════
         if (g_state.isDirty(DirtyFlag::WIFI_STATUS))
         {
-            UiPageSettings::WiFiButtonState btnState;
-            switch (g_state.wifiState)
-            {
-            case WifiState::CONNECTING:
-                btnState = UiPageSettings::WiFiButtonState::CONNECTING;
-                break;
-            case WifiState::CONNECTED:
-                btnState = UiPageSettings::WiFiButtonState::CONNECTED;
-                break;
-            case WifiState::FAILED:
-                btnState = UiPageSettings::WiFiButtonState::FAILED;
-                break;
-            case WifiState::PORTAL:
-                btnState = UiPageSettings::WiFiButtonState::PORTAL;
-                break;
-            default:
-                btnState = UiPageSettings::WiFiButtonState::DISCONNECTED;
-                break;
-            }
-            UiPageSettings::setWiFiButtonState(btnState, g_state.wifiIP.c_str());
+            UiPageSettings::setWiFiButtonState(g_state.wifiState, g_state.wifiIP.c_str());
             g_state.clearDirty(DirtyFlag::WIFI_STATUS);
         }
 
