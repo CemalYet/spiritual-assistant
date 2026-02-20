@@ -3,6 +3,7 @@
 #include "config.h"
 #include "daily_prayers.h"
 #include "prayer_types.h"
+#include "audio_player.h"
 #include <Arduino.h>
 #include <time.h>
 
@@ -172,5 +173,45 @@ namespace TestMode
         {
             delay(1000);
         }
+    }
+
+    void testAllAdhan()
+    {
+        Serial.println("\n=== ADHAN AUDIO TEST ===");
+        Serial.println("Playing 5 seconds of each adhan file...\n");
+
+        for (uint8_t i = 0; i < static_cast<uint8_t>(PrayerType::COUNT); i++)
+        {
+            const auto prayer = static_cast<PrayerType>(i);
+            const auto file = getAdhanFile(prayer);
+
+            if (file.empty())
+            {
+                Serial.printf("[%s] No adhan file — skipping\n",
+                              getPrayerName(prayer).data());
+                continue;
+            }
+
+            Serial.printf("[%s] Playing %s ...\n",
+                          getPrayerName(prayer).data(), file.data());
+
+            if (!playAudioFile(file.data()))
+            {
+                Serial.printf("[%s] FAILED to open %s\n",
+                              getPrayerName(prayer).data(), file.data());
+                continue;
+            }
+
+            // Play for 5 seconds
+            unsigned long start = millis();
+            while (!isAudioFinished() && (millis() - start < 5000))
+                delay(10);
+
+            stopAudio();
+            Serial.printf("[%s] OK\n\n", getPrayerName(prayer).data());
+            delay(500); // Brief pause between files
+        }
+
+        Serial.println("=== ADHAN TEST COMPLETE ===\n");
     }
 }

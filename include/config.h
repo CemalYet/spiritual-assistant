@@ -7,6 +7,10 @@
 // Uses PRAYER_METHOD setting below for calculations
 #define TEST_MODE false
 
+// --- TEST ADHAN AUDIO ---
+// Set to true to play 5s of each adhan file on boot (then normal operation)
+#define TEST_ADHAN_AUDIO false
+
 // ---  AP PORTAL ---
 // Set to true to clear WiFi credentials on boot and force AP portal
 // Useful for testing offline mode

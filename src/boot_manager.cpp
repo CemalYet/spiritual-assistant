@@ -162,7 +162,7 @@ namespace BootManager
         }
 
         // Step 4: No clock + no WiFi → portal for time sync
-        if (!hasClock() && !wifiConnected && !offlineMode)
+        if (!hasClock() && !wifiConnected)
         {
             Serial.println("[Boot] No clock, no WiFi — starting portal");
             showStatus("Saat Alinamadi", "Saat icin WiFi baglantisi gerekli");

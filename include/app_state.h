@@ -66,7 +66,7 @@ struct AppState
     // ═══════════════════════════════════════════════════
     int8_t hour = 0;
     int8_t minute = 0;
-    etl::string<32> date;
+    etl::string<48> date;
     etl::string<48> location; // "Istanbul • Diyanet"
 
     // ═══════════════════════════════════════════════════

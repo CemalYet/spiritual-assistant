@@ -23,6 +23,7 @@
 #include "ui_page_settings.h"
 #include "ui_components.h"
 #include "network.h"
+#include "hijri_date.h"
 
 // ═══════════════════════════════════════════════════════════════
 // LOVANGFX DISPLAY CONFIGURATION
@@ -160,11 +161,17 @@ static void formatTurkishDate(char *buffer, size_t size)
     struct tm timeinfo;
     if (getLocalTime(&timeinfo))
     {
-        snprintf(buffer, size, "%s, %d %s %d",
-                 TURKISH_DAYS[timeinfo.tm_wday],
+        HijriDate hijri = gregorianToHijri(
+            1900 + timeinfo.tm_year,
+            timeinfo.tm_mon + 1,
+            timeinfo.tm_mday);
+
+        snprintf(buffer, size, "%d %s - %d %s %d",
                  timeinfo.tm_mday,
                  TURKISH_MONTHS[timeinfo.tm_mon],
-                 1900 + timeinfo.tm_year);
+                 hijri.day,
+                 getHijriMonth(hijri.month),
+                 hijri.year);
     }
     else
     {
@@ -326,10 +333,6 @@ namespace LvglDisplay
         struct tm timeinfo;
         bool ntpSynced = getLocalTime(&timeinfo, 0);
         AppStateHelper::setNtpSynced(ntpSynced);
-
-        // Adhan file status
-        bool adhanExists = LittleFS.exists("/azan.mp3") || LittleFS.exists("/azan.wav");
-        AppStateHelper::setAdhanAvailable(adhanExists);
     }
 
     const char *formatPrayerDate(int dayOffset)
