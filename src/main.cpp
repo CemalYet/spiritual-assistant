@@ -10,6 +10,7 @@
 #include "lvgl_display.h"
 #include "app_state.h"
 #include "ui_page_settings.h"
+#include "prayer_types.h"
 
 #include "boot_manager.h"
 #include "prayer_engine.h"
@@ -17,7 +18,7 @@
 #include "portal_handler.h"
 #include "display_ticker.h"
 
-#if TEST_MODE
+#if TEST_MODE || TEST_ADHAN_AUDIO
 #include "test_mode.h"
 #endif
 
@@ -43,8 +44,21 @@ static void initHardware()
 
     audioPlayerInit();
 
-    Serial.printf("[Audio] azan.mp3: %s\n",
-                  LittleFS.exists("/azan.mp3") ? "found" : "NOT FOUND");
+    // Verify per-prayer adhan files exist
+    bool adhanFound = false;
+    for (uint8_t i = 0; i < static_cast<uint8_t>(PrayerType::COUNT); i++)
+    {
+        const auto file = getAdhanFile(static_cast<PrayerType>(i));
+        if (!file.empty())
+        {
+            bool exists = LittleFS.exists(file.data());
+            Serial.printf("[Audio] %s: %s\n", file.data(),
+                          exists ? "found" : "NOT FOUND");
+            if (exists)
+                adhanFound = true;
+        }
+    }
+    AppStateHelper::setAdhanAvailable(adhanFound);
 }
 
 // ── Settings Button ───────────────────────────────────
@@ -84,8 +98,9 @@ void setup()
     initHardware();
 
 #if FORCE_AP_PORTAL
-    Serial.println("[DEBUG] FORCE_AP_PORTAL: Clearing credentials");
+    Serial.println("[DEBUG] FORCE_AP_PORTAL: Full reset for testing");
     WiFiCredentials::clear();
+    SettingsManager::setConnectionMode("wifi");
     Network::init(true);
 #else
     Network::init(false);
@@ -105,6 +120,10 @@ void setup()
     BootManager::run();
     TestMode::runPrayerTimeTests();
     return;
+#endif
+
+#if TEST_ADHAN_AUDIO
+    TestMode::testAllAdhan();
 #endif
 
     // ── Boot (blocking) ──

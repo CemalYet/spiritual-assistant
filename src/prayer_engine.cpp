@@ -174,6 +174,9 @@ namespace PrayerEngine
         Serial.printf("\n\n🕌 === PRAYER TIME: %s === 🕌\n\n",
                       getPrayerName(currentPrayer).data());
 
+        const auto adhanFile = getAdhanFile(currentPrayer);
+        if (adhanFile.empty())
+            return;
         bool shouldPlay = SettingsManager::getAdhanEnabled(currentPrayer) && !g_state.muted;
 
         if (shouldPlay)
@@ -181,8 +184,8 @@ namespace PrayerEngine
             s_currentVolume = SettingsManager::getVolume();
             setVolume(SettingsManager::getHardwareVolume());
 
-            Serial.println("[Adhan] Playing...");
-            playAudioFileBlocking("/azan.mp3", onAdhanLoop);
+            Serial.printf("[Adhan] Playing %s\n", adhanFile.data());
+            playAudioFileBlocking(adhanFile.data(), onAdhanLoop);
             Serial.println("[Adhan] Finished");
         }
         else
@@ -259,14 +262,10 @@ namespace PrayerEngine
             s_lastDay = timeinfo.tm_mday;
         }
 
-        // Cache refresh
+        // Cache refresh — also push to UI so display stays current
         if (s_nextPrayerSeconds == -1)
         {
-            s_nextPrayer = s_prayers.findNext(now._minutes);
-            if (s_nextPrayer)
-            {
-                s_nextPrayerSeconds = s_prayers[*s_nextPrayer].toSeconds();
-            }
+            displayNextPrayer();
         }
 
         // Adhan check

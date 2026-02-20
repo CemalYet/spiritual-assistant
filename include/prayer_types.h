@@ -37,5 +37,19 @@ constexpr std::string_view getJsonKey(PrayerType type)
     return PRAYER_NAMES_EN[idx(type)];
 }
 
+constexpr std::array<std::string_view, 6> ADHAN_FILES = {
+    "/sabah.mp3",  // Fajr
+    "",            // Sunrise (no adhan)
+    "/ogle.mp3",   // Dhuhr
+    "/ikindi.mp3", // Asr
+    "/aksam.mp3",  // Maghrib
+    "/yatsi.mp3"   // Isha
+};
+
+constexpr std::string_view getAdhanFile(PrayerType type)
+{
+    return ADHAN_FILES[idx(type)];
+}
+
 // Prayer calculation methods
 constexpr int PRAYER_METHOD_DIYANET = 13;

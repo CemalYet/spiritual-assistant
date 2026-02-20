@@ -45,16 +45,21 @@
 | WT32S3-28S PLUS | - | ESP32-S3 + 2.8" IPS Touch Module | Module | €12.00 |
 | MAX98357AETE+T | C910544 | I2S 3W Audio Amplifier | Extended | €0.80 |
 | DS3231SN | C9866 | Precision RTC ±2ppm | Extended | €2.50 |
-| CR1220 Holder | C14488 | RTC Backup Battery Holder | Basic | €0.05 |
-| MP2359DJ | C14259 | Buck Converter IC (SOT-23-6) | Basic | €0.30 |
-| 10µH Inductor | C1046 | Power inductor for buck | Basic | €0.10 |
-| SS14 Schottky ×2 | C2480 | 1A 40V diode (power path isolation) | Basic | €0.10 |
-| SPST Slide Switch | C431540 | SS-12D00 ON/OFF power switch | Basic | €0.10 |
-| Tactile Switch ×1 | C318884 | 6×6mm push button (wake/mute) | Basic | €0.05 |
+| CR1220 Holder | C5365932 | KH-BS1220-2-SMT RTC Backup Battery | Extended | €0.08 |
+| MP2359DJ-LF-Z-TP | C52205265 | Buck Converter IC (SOT-23-6) | Extended | €0.16 |
+| 10µH 2.2A Inductor | XRTC322512S100MBCA⚠️ | Power inductor for buck (molded, 210mΩ, 1210) | Extended | €0.10 |
+| 22µF Cap ×2 | C45783 | Input/output caps for buck | Basic | €0.05 |
+| 10µF Cap ×1 | C15525 | MAX98357A decoupling | Basic | €0.02 |
+| 100nF Cap ×2 | C1525 | Decoupling caps | Basic | €0.01 |
+| SS14 Schottky ×3 | C2480 | 1A 40V diode (power isolation + buck catch) | Basic | €0.15 |
+| SPDT Slide Switch | C50377150 | SS12D00G6 ON/OFF power switch | Extended | €0.02 |
+| Tactile Switch ×1 | C2939240 | TS-1187F-015E HOOYA SMD push button (wake/mute) | Extended | €0.03 |
 | 10K Resistor ×1 | C25744 | Pull-up for button | Basic | €0.01 |
+| 4.7K Resistor ×2 | C25900 | I2C pull-ups (SDA/SCL) | Basic | €0.01 |
+| 49.9K Resistor 1% ×1 | C25905⚠️ | MP2359 feedback (high side) | Extended | €0.01 |
+| 16.2K Resistor 1% ×1 | C25764⚠️ | MP2359 feedback (low side) | Extended | €0.01 |
 | Speaker 3W 4Ω | - | 28mm Mini Speaker | - | €0.60 |
-| 4×AA Holder | C720557 | 4×AA Battery Holder with leads | - | €0.40 |
-| Passives | Various | Caps, Resistors | Basic | €0.40 |
+| 4×AA Holder | - | 4×AA Battery Holder (buy separately) | - | €0.40 |
 | PCB 2-layer | - | 65×50mm Carrier Board | - | €2.00 |
 | **TOTAL** | | | | **~€16.41** |
 
@@ -62,8 +67,8 @@
 
 | Category | Parts | Notes |
 |----------|-------|-------|
-| **Basic** | MP2359, SS14, Slide Switch, Tactile Switch, Passives | No extra fee |
-| **Extended** | MAX98357A, DS3231SN | +€3 per unique part |
+| **Basic** | MP2359, SS14, Tactile Switch, Passives | No extra fee |
+| **Extended** | MAX98357A, DS3231SN, Slide Switch (SS-12D00G4-4MM) | +€3 per unique part |
 
 ---
 
@@ -85,8 +90,8 @@
                       BATT+ (Red)  BATT- (Black)
                           │           │
                        ┌──┴──┐        │
-                       │ ON  │  SPST Slide Switch
-                       │ OFF │  (Power ON/OFF)
+                       │ ON  │  SPDT Slide Switch
+                       │ OFF │  (SS-12D00G4-4MM)
                        └──┬──┘        │
                           │           │
                           ▼           ▼
@@ -244,8 +249,8 @@ The system runs from 4×AA batteries or USB-C. Two SS14 Schottky diodes provide 
     4×AA BATTERIES (6V)                    MODULE USB-C (5V)
            │                                     │
         ┌──┴──┐                                  │
-        │ ON  │  SPST Slide Switch               │
-        │ OFF │  (Power ON/OFF)                  │
+        │ ON  │  SPDT Slide Switch               │
+        │ OFF │  (SS-12D00G4-4MM)                │
         └──┬──┘                                  │
            ▼                                     ▼
     ┌─────────────┐                      ┌──────────────────┐
@@ -254,7 +259,7 @@ The system runs from 4×AA batteries or USB-C. Two SS14 Schottky diodes provide 
     │  6V → 3.3V  │                      │  5V → 3.3V       │
     └──────┬──────┘                      └────────┬─────────┘
            │                                      │
-           │ 3.31V                                │ 3.3V
+           │ 3.3V                                 │ 3.3V
            │                                      │
            │  SS14 (Schottky)                     │
            ├───▶├──────────┐                      │
@@ -290,9 +295,9 @@ The system runs from 4×AA batteries or USB-C. Two SS14 Schottky diodes provide 
 
 | Scenario | Battery | USB-C | Switch | What Happens |
 |----------|---------|-------|--------------|
-| **Normal Operation** | ✅ Inserted | ❌ Disconnected | ON | MP2359 powers everything directly |
-| **USB Powered** | ❌ Removed | ✅ Connected | - | Module LDO powers everything via D2 |
-| **Both Connected** | ✅ Inserted | ✅ Connected | ON | Battery powers peripherals, module uses USB (D1+D2 isolate) |
+| **Normal Operation** | ✅ Inserted | ❌ Disconnected | ON | MP2359 → 3V3_BUCK powers RTC+Audio directly. D1 conducts → module gets ~3.0V |
+| **USB Powered** | ❌ Removed | ✅ Connected | - | Module LDO → 3.3V. D2 conducts → 3V3_BUCK gets ~3.0V → powers RTC+Audio |
+| **Both Connected** | ✅ Inserted | ✅ Connected | ON | Both rails at 3.3V → D1 OFF, D2 OFF. Battery feeds peripherals directly, USB feeds module directly. No cross-feeding. |
 | **Sleep Mode** | ✅ Inserted | ❌ Disconnected | ON | MP2359 in PFM mode, ~40µA total |
 | **Power OFF** | ✅ Inserted | ❌ Disconnected | OFF | 0µA draw — battery lasts years in storage |
 
@@ -301,7 +306,7 @@ The system runs from 4×AA batteries or USB-C. Two SS14 Schottky diodes provide 
 ```
 D1: Battery → Module (prevents regulator conflict)
 
-  MP2359 ──┬── 3.31V          ▶├ (SS14 D1, 0.3V drop)
+  MP2359 ──┬── 3.3V           ▶├ (SS14 D1, 0.3V drop)
          │                    │
          │               3.0V │ → Module 3V3 pin
          │                    │
@@ -314,7 +319,7 @@ D2: Module → Peripherals (USB powers RTC + Audio)
                                 │
                            3.0V │ → RTC + Audio
                                 │
-  When battery ON: MP2359 3.31V > 3.0V, so battery dominates
+  When battery ON: MP2359 3.3V > 3.0V, so battery dominates
   When USB only:   D2 feeds 3.0V to peripherals ✔️
 ```
 
@@ -352,7 +357,7 @@ D2: Module → Peripherals (USB powers RTC + Audio)
               │   BATT- ──────────────────┤     GND     │              │
               │  (BLACK)      │           └──────┬──────┘              │
               │               │                  │                    │
-              │              GND             3.31V OUT                 │
+              │              GND             3.3V OUT                  │
               │                                  │                    │
               │                    ┌─────────────┼─────────────┐       │
               │                    │             │             │       │
@@ -391,7 +396,7 @@ BATTERY 6V ────┬──────────────────
                 │    │                        │
                 │    │   Feedback Network     │
                 │    │   ┌───────────────┐    │
-                │    └───┤ 16K    5.6K   │    │
+                │    └───┤ 49.9K  16.2K  │    │
                 │        │   │      │    │    │
                 │        │   └──┬───┘    │    │
                 │        └──────┼────────┘    │
@@ -405,7 +410,7 @@ BATTERY 6V ────┬──────────────────
                                 └──────────────▶ 3.3V OUT
 ```
 
-> **Note:** Vout = 0.6V × (1 + 16K/5.6K) = **3.31V**
+> **Note:** Vout = 0.81V × (1 + 49.9K/16.2K) = **3.30V**
 
 ### 4×AA Battery Holder Connection (CRITICAL)
 
@@ -458,8 +463,8 @@ BATTERY 6V ────┬──────────────────
     │   └──┬──┘                      └──┬──┘      │
     │      │                            │         │
     │      │   ┌────────────────────┐   │         │
-    │      │   │  SPST Slide Switch │   │         │
-    │      └──▶│  (ON/OFF Power)    │   │         │
+    │      │   │  SPDT Slide Switch │   │         │
+    │      └──▶│  (SS-12D00G4-4MM)  │   │         │
     │          └─────────┬──────────┘   │         │
     │                    │              │         │
     │          ┌─────────▼──────────┐   │         │
@@ -583,8 +588,8 @@ BATTERY 6V ────┬──────────────────
 ### Switch Circuit
 
 ```
-    4×AA BATTERIES          SPST Slide Switch
-         │                  (SS-12D00)
+    4×AA BATTERIES          SPDT Slide Switch
+         │                  (SS-12D00G4-4MM)
       BATT+ (Red)        ┌──────────┐
          │               │   ┌──┐   │
          └─────────────┤ 1 │  │ 2 ├───▶ MP2359 VIN
@@ -596,7 +601,7 @@ BATTERY 6V ────┬──────────────────
 ```
 
 > **Placement:** Side of enclosure, easily accessible.  
-> **Rating:** Must handle >200mA at 6V (SS-12D00 rated 0.3A/12V = adequate)
+> **Rating:** Must handle >200mA at 6V (SS-12D00 rated 0.3A @ 6V DC = adequate)
 
 ---
 
@@ -672,7 +677,7 @@ Power Nets:
 -----------
 NET: VBAT (4.5V-6.4V from batteries)
   - 4×AA Battery holder RED wire (+) → BATT+ pad
-  - SPST slide switch (power ON/OFF)
+  - SPDT slide switch SS-12D00G4-4MM (power ON/OFF)
   - 22µF input capacitor (+)
   - MP2359 VIN pin
 
@@ -753,11 +758,17 @@ Internal Buck Converter Nets:
 NET: SW (switching node)
   - MP2359 SW pin
   - 10µH inductor (one end)
+  - D3 Cathode (SS14 freewheeling/catch diode)
+  - Bootstrap cap C5 (one end)
+
+NET: BS (bootstrap)
+  - MP2359 BST pin
+  - Bootstrap cap C5 (other end)
   
 NET: FB (feedback)
   - MP2359 FB pin
-  - 16K resistor to 3V3
-  - 5.6K resistor to GND
+  - 49.9K resistor to 3V3_BUCK
+  - 16.2K resistor to GND
 ```
 
 ---
@@ -786,13 +797,16 @@ NET: FB (feedback)
 │     ├─ Top layer: GND pour around components                           │
 │     └─ Via stitching: Every 5mm around board edge                      │
 │                                                                         │
-│  2. POWER SECTION (MP2359 Buck Converter)                              │
+│  2. POWER SECTION (MP2359 Buck Converter) — per datasheet Fig.2        │
 │     ├─ Place near battery connector input                              │
-│     ├─ Short, wide traces for SW node (high di/dt)                     │
-│     ├─ Input/output caps within 3mm of IC pins                         │
-│     ├─ Keep feedback resistors close to FB pin                         │
+│     ├─ Minimize loop area: C1(+) → U1.IN → U1.SW → D3 → GND → C1(-)  │
+│     ├─ D3 (Schottky): SW-to-GND path as short and wide as possible     │
+│     ├─ Short, wide traces for SW node (high di/dt switching)           │
+│     ├─ Route SW AWAY from FB — noisy SW corrupts feedback sensing      │
+│     ├─ Input cap C1 within 3mm of IN pin, output cap C2 near L1       │
+│     ├─ Keep feedback resistors R4/R5 close to FB pin (Pin 3)           │
 │     ├─ Inductor placement minimizes SW loop area                       │
-│     └─ Ground plane under buck for heat dissipation                    │
+│     └─ Connect IN, SW, GND pads to large copper areas for cooling      │
 │                                                                         │
 │  3. USB POWER PATH (SS14 Diodes)                                       │
 │     ├─ Place SS14 diodes near module USB-C output                      │
@@ -864,18 +878,21 @@ BOTTOM SIDE:
 
 ```csv
 Comment,Designator,Footprint,LCSC Part #
-"Buck Converter",U1,SOT-23-6,C14259
+"Buck Converter",U1,SOT-23-6,C52205265
 "I2S Audio Amplifier",U2,QFN-16,C910544
 "Precision RTC",U3,SO-16W,C9866
-"Schottky Diode",D1 D2,SOD-123,C2480
+"Schottky Diode",D1 D2 D3,SMA,C2480
 "10K Resistor",R1,0402,C25744
+"4.7K Resistor",R2 R3,0402,C25900
+"49.9K Resistor 1%",R4,0402,C25905⚠️
+"16.2K Resistor 1%",R5,0402,C25764⚠️
 "22uF Cap",C1 C2,0805,C45783
 "10uF Cap",C3,0402,C15525
 "100nF Cap",C4 C5,0402,C1525
-"10uH Inductor",L1,0805,C1046
-"CR1220 Holder",BT1,THT,C14488
-"SPST Slide Switch",SW1,THT,C431540
-"Tactile Switch",SW2,THT,C318884
+"10uH 2.2A Inductor",L1,1210,XRTC322512S100MBCA⚠️
+"CR1220 Holder",BT1,SMD,C5365932
+"SPDT Slide Switch",SW1,SMD-3P,C50377150
+"Tactile Switch",SW2,SMD-4P,C2939240
 ```
 
 ### CPL (Centroid) File Format
@@ -967,3 +984,5 @@ void enterDeepSleep() {
 | 1.4 | 2026-02-07 | Added SS14 USB isolation - prevents reverse current when USB+battery connected |
 | 1.5 | 2026-02-09 | Added SPST power switch (ON/OFF) and physical button (GPIO8) for wake/mute/settings |
 | 1.6 | 2026-02-09 | Added 2nd SS14 diode (D2) so USB-C can fully power device (RTC + Audio) without batteries |
+| 1.7 | 2026-02-14 | Fixed MP2359 feedback resistors (R4: 18K→49.9K 1%, R5: 3.9K→16.2K 1%), corrected Vref from 0.6V to 0.81V per datasheet |
+| 1.8 | 2026-02-14 | Upgraded L1 inductor from 0805/C1046 (~0.4A) to 1210/XRTC322512S100MBCA (2.2A Isat) for max volume support |

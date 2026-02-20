@@ -130,6 +130,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install platformio
+
+      - name: 📚 Setup Adhan C library
+        run: |
+          ADHAN_DIR=".pio/libdeps/${{ env.BOARD_ENV }}/Adhan"
+          mkdir -p "$ADHAN_DIR"
+          git clone --depth 1 --quiet ${{ env.ADHAN_REPO }} /tmp/Adhan
+          cp -r /tmp/Adhan/C/adhan/* "$ADHAN_DIR/"
+          cat > "$ADHAN_DIR/library.json" << 'EOF'
+          {
+            "name": "Adhan",
+            "version": "1.0.0",
+            "build": {
+              "srcDir": "src",
+              "includeDir": "src/include",
+              "srcFilter": ["+<*.c>", "-<example.c>"]
+            }
+          }
+          EOF
       
       - name: 🧪 Run native tests
         run: |

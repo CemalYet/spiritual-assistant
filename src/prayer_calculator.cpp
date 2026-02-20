@@ -16,6 +16,7 @@ extern "C"
 #include "coordinates.h"
 #include "madhab.h"
 #include "high_latitude_rule.h"
+#include "solar_time.h"
 }
 
 namespace
@@ -141,24 +142,17 @@ namespace
         params.adjustments.maghrib = net.maghrib - internalMaghribOffsetMinutes(spec.calcMethod);
     }
 
-    // Diyanet high-latitude rules (applies for latitude >= 45°)
-    // Based on official Diyanet KARAR (ruling) for prayer times at high latitudes
+    // Diyanet high-latitude rules — KARAR 2006 + 2009 revision
     //
-    // The KARAR solves the problem of "perpetual twilight" in SUMMER when
-    // astronomical calculations fail or produce extreme times.
-    // In WINTER, astronomical calculations work fine and should be used.
+    // 2009 KARAR rules:
+    // a) For lat >= 45°: Isha = min(astronomical, Maghrib + şer'î_gece/3)
+    //    Şer'î gece = Maghrib → Fajr (astronomical)
+    // b) If şer'î_gece/3 > 80 dk → cap at 80 dk
+    // c) Mar-Sep: Fajr = Sunrise - (isha_offset + 10 dk)
+    // d) lat >= 62° → clamp to 62° (handled separately by clampLatitudeForDiyanet)
     //
-    // Official rules from Diyanet document:
-    // a) For lat >= 45°: Isha = Maghrib + 1/3 of Islamic night (= 1/6 of full night)
-    // b) For lat >= 52°: Cap Isha offset at 80 minutes (1 hour 20 min)
-    // c) For March-September: Fajr = Sunrise - (Isha offset + 10 min)
-    // d) For lat >= 62°: Use 62° latitude for calculations
-    //
-    // Implementation: Use whichever gives EARLIER Isha time:
-    // - Winter: Astronomical is earlier → use it (karar not needed)
-    // - Summer: Night/6 is earlier or astro fails → apply karar
+    // Logic: use astronomical isha unless it exceeds the KARAR limit.
     static constexpr double DIYANET_HIGH_LAT_THRESHOLD = 45.0;
-    static constexpr double DIYANET_ISHA_CAP_THRESHOLD = 52.0; // Cap only applies above this
     static constexpr double DIYANET_MAX_LAT_CLAMP = 62.0;
     static constexpr int DIYANET_ISHA_CAP_MINUTES = 80; // 1 hour 20 minutes
     static constexpr int DIYANET_FAJR_EXTRA_MINUTES = 10;
@@ -167,73 +161,58 @@ namespace
     {
         if (latitude < DIYANET_HIGH_LAT_THRESHOLD)
         {
-            return; // No adjustments needed for lower latitudes
+            return; // No adjustments needed below 45°
         }
 
-        // Get time components
         const time_t maghrib = times.maghrib;
         const time_t sunrise = times.sunrise;
         const time_t fajr_astro = times.fajr;
         const time_t isha_astro = times.isha;
 
-        struct tm maghribTm, sunriseTm;
-        localtime_r(&maghrib, &maghribTm);
-        localtime_r(&sunrise, &sunriseTm);
-
-        // Maghrib includes +7 min adjustment, so sunset is maghrib - 7 min
-        int sunsetSeconds = maghribTm.tm_hour * 3600 + maghribTm.tm_min * 60 + maghribTm.tm_sec - (7 * 60);
-        int sunriseSeconds = sunriseTm.tm_hour * 3600 + sunriseTm.tm_min * 60 + sunriseTm.tm_sec;
-
-        // Full night = (24:00 - sunset) + sunrise
-        int nightDuration = (24 * 3600 - sunsetSeconds) + sunriseSeconds;
-
-        // Diyanet KARAR: 1/6 of full night (= 1/3 of Islamic half-night)
-        int ishaOffsetSeconds = nightDuration / 6;
-
-        // Rule b) Cap Isha at 80 minutes for latitudes >= 52°
-        if (latitude >= DIYANET_ISHA_CAP_THRESHOLD)
+        // Şer'î gece = Maghrib → Fajr (astronomical)
+        // fajr_astro is next morning, so difference is positive
+        int seriGeceSeconds = (int)difftime(fajr_astro, maghrib);
+        if (seriGeceSeconds <= 0)
         {
+            seriGeceSeconds += 24 * 3600; // safety wrap
+        }
+
+        // KARAR: 1/3 of şer'î gece (uncapped, for comparison)
+        int nightThirdSeconds = seriGeceSeconds / 3;
+
+        // Astronomical Isha offset from Maghrib
+        int astroIshaOffset = (int)difftime(isha_astro, maghrib);
+        if (astroIshaOffset <= 0)
+        {
+            astroIshaOffset += 24 * 3600;
+        }
+
+        // Compare astronomical with UNCAPPED 1/3 night:
+        // - Winter: astro < nightThird → keep astronomical
+        // - Summer: astro > nightThird (or astro invalid) → apply KARAR with 80dk cap
+        if (astroIshaOffset <= nightThirdSeconds && astroIshaOffset > 0 && astroIshaOffset < 12 * 3600)
+        {
+            // Astronomical Isha is earlier than 1/3 of night — keep it (winter)
+        }
+        else
+        {
+            // Astronomical exceeds 1/3 night or is invalid — apply KARAR
+            // Now apply the 80 dk cap (2009 KARAR rule b)
+            int ishaOffsetSeconds = nightThirdSeconds;
             const int maxIshaOffset = DIYANET_ISHA_CAP_MINUTES * 60;
             if (ishaOffsetSeconds > maxIshaOffset)
             {
                 ishaOffsetSeconds = maxIshaOffset;
             }
-        }
 
-        // Calculate astronomical Isha offset from sunset
-        struct tm ishaTm;
-        localtime_r(&isha_astro, &ishaTm);
-        int ishaAstroSeconds = ishaTm.tm_hour * 3600 + ishaTm.tm_min * 60 + ishaTm.tm_sec;
-        int astroIshaOffset = ishaAstroSeconds - sunsetSeconds;
-
-        // Handle case where Isha crosses midnight
-        if (astroIshaOffset < 0)
-        {
-            astroIshaOffset += 24 * 3600;
-        }
-
-        // The KARAR applies when astronomical twilight fails or produces extreme times (summer)
-        // In winter, when astronomical offset is smaller, use it instead
-        // Logic: Use whichever gives the EARLIER Isha time
-
-        if (astroIshaOffset <= ishaOffsetSeconds && astroIshaOffset > 0 && astroIshaOffset < 12 * 3600)
-        {
-            // Astronomical Isha is earlier (winter) - KARAR not needed
-            // Keep the astronomical times from the library
-            // (times.isha and times.fajr already set)
-        }
-        else
-        {
-            // Night/6 is earlier OR astronomical failed (summer) - apply KARAR
             times.isha = maghrib + ishaOffsetSeconds;
 
-            // Rule c) Fajr = Sunrise - (Isha offset + 10 minutes) for March-September
+            // Rule c) Fajr = Sunrise - (isha_offset + 10 dk) for Mar-Sep
             if (month >= 3 && month <= 9)
             {
                 int fajrOffsetSeconds = ishaOffsetSeconds + (DIYANET_FAJR_EXTRA_MINUTES * 60);
                 times.fajr = sunrise - fajrOffsetSeconds;
             }
-            // Outside March-September, keep astronomical Fajr (already set by library)
         }
     }
 
@@ -333,13 +312,6 @@ bool PrayerCalculator::calculateTimes(DailyPrayers &prayers, int method, double 
 
     auto params = buildParameters(*spec);
     applyDartNetAdjustments(params, *spec);
-    if (spec->warnTehranMaghribAngle)
-    {
-        if (verbose)
-        {
-            Serial.println("[Calc] Tehran: this Adhan C version doesn't support maghribAngle=4.5°, using standard Maghrib (sunset)");
-        }
-    }
 
     const time_t dateEpoch = resolve_time(&date);
 
@@ -362,10 +334,34 @@ bool PrayerCalculator::calculateTimes(DailyPrayers &prayers, int method, double 
         times.isha += offset_seconds;
     }
 
-    // Apply Diyanet high-latitude rules (for method 13 at latitudes >= 45°)
+    // Diyanet high-latitude KARAR rules (must run AFTER adjustments are baked in)
     if (isDiyanetMethod)
     {
         applyDiyanetHighLatitudeRules(times, latitude, date.month);
+    }
+
+    // Tehran method: compute Maghrib as sun at -4.5° below horizon
+    // The Adhan C library has no maghribAngle field, so we manually compute
+    // using hourAngle() from the solar_time module.
+    if (spec->warnTehranMaghribAngle)
+    {
+        solar_time_t solarTime = new_solar_time(dateEpoch, &coordinates);
+        time_components_t tc = from_double(hourAngle(&solarTime, -4.5, true));
+        if (is_valid_time(tc))
+        {
+            time_t tehranMaghrib = get_date_components(dateEpoch, &tc);
+            tehranMaghrib += offset_seconds;             // Apply timezone
+            tehranMaghrib += spec->dartNet.maghrib * 60; // Net adjustment (0 for Tehran)
+            times.maghrib = tehranMaghrib;
+            if (verbose)
+            {
+                Serial.println("[Calc] Tehran: computed Maghrib using maghribAngle=4.5°");
+            }
+        }
+        else if (verbose)
+        {
+            Serial.println("[Calc] Tehran: hourAngle(-4.5°) invalid, keeping sunset-based Maghrib");
+        }
     }
 
     // Format using local time (this is what you want to display on the device).

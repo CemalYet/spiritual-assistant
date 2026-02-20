@@ -10,4 +10,7 @@ namespace TestMode
 
     // Print today's prayer times in multiple methods
     void compareAllMethods(double lat, double lon);
+
+    // Play 5 seconds of each adhan file for quick audio verification
+    void testAllAdhan();
 }

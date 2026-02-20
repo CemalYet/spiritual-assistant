@@ -12,5 +12,12 @@
         "*.hpp": "cpp"
     },
     "tts.deactivateTtsTestExplorer": true,
-    "tts.runner": ""
+    "tts.runner": "",
+    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    "terminal.integrated.profiles.windows": {
+        "Git Bash": {
+            "path": "C:\\Users\\cyetismis\\AppData\\Local\\Programs\\Git\\bin\\bash.exe",
+            "icon": "terminal-bash"
+        }
+    }
 }
