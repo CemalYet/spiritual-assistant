@@ -9,7 +9,6 @@
 
 # Build artifacts
 data/*.gz
-src/fonts/*.c
 
 # Font source files (used by scripts/generate_fonts.sh, not needed in repo)
 scripts/ttf/
