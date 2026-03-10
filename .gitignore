@@ -3,3 +3,13 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# AI context (local/personal)
+.ai-context.md
+
+# Build artifacts
+data/*.gz
+src/fonts/*.c
+
+# Font source files (used by scripts/generate_fonts.sh, not needed in repo)
+scripts/ttf/

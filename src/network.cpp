@@ -1,13 +1,25 @@
 #include "network.h"
 #include "config.h"
+#include "settings_manager.h"
 #include "wifi_portal.h"
 #include "wifi_credentials.h"
 #include "settings_server.h"
+#include "rtc_manager.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <LittleFS.h>
 #include <stdlib.h>
 #include <time.h>
+#include <esp_sntp.h>
+
+static void sntpSyncCallback(struct timeval *tv)
+{
+    struct tm t;
+    gmtime_r(&tv->tv_sec, &t);
+    Serial.printf("[SNTP] Clock set! UTC=%02d:%02d:%02d (epoch=%ld)\n",
+                  t.tm_hour, t.tm_min, t.tm_sec, (long)tv->tv_sec);
+    RtcManager::writeSystemClockToRTC();
+}
 
 // WiFi event handler - only log important events
 void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
@@ -30,7 +42,6 @@ namespace Network
     constexpr int WIFI_CONNECT_TIMEOUT_MS = 15000;
     constexpr int WIFI_MAX_RETRIES = 3;
     constexpr int WIFI_RESET_DELAY_MS = 500;
-    constexpr int NTP_SYNC_TIMEOUT_ATTEMPTS = 60; // 60 * 500ms = 30 seconds
 
     static bool portalMode = false;
     static char currentSSID[33] = "";        // Max SSID: 32 + null
@@ -88,8 +99,7 @@ namespace Network
         WiFi.mode(WIFI_STA);
         WiFi.persistent(false);
         WiFi.setAutoReconnect(true);
-        WiFi.setSleep(false);
-        WiFi.setTxPower(WIFI_POWER_17dBm);
+        WiFi.setTxPower(WIFI_POWER_8_5dBm);
 
         for (int retry = 0; retry < WIFI_MAX_RETRIES; retry++)
         {
@@ -99,7 +109,6 @@ namespace Network
                 WiFi.disconnect(true);
                 delay(WIFI_RESET_DELAY_MS);
                 WiFi.mode(WIFI_STA);
-                WiFi.setSleep(false);
             }
 
             WiFi.begin(currentSSID, currentPassword);
@@ -112,8 +121,7 @@ namespace Network
                 {
                     Serial.printf("\n[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
 
-                    // Disable WiFi power saving for stable transfers
-                    esp_wifi_set_ps(WIFI_PS_NONE);
+                    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
 
                     if (!WiFiCredentials::hasCredentials())
                         WiFiCredentials::save(currentSSID, currentPassword);
@@ -259,31 +267,31 @@ namespace Network
     {
         Serial.println("[NTP] Syncing time...");
 
-        // Wait for network stack to stabilize after connection
-        delay(1000);
-
-        // Ensure C library timezone is set immediately (Adhan C library relies on localtime/mktime).
-        setenv("TZ", Config::TIMEZONE, 1);
+        const char *tz = SettingsManager::getTimezone();
+        setenv("TZ", tz, 1);
         tzset();
 
-        // Configure SNTP with multiple servers for redundancy
-        configTzTime(Config::TIMEZONE, Config::NTP_SERVER1, Config::NTP_SERVER2, Config::NTP_SERVER3);
+        configTzTime(tz, Config::NTP_SERVER1, Config::NTP_SERVER2, Config::NTP_SERVER3);
+        sntp_set_time_sync_notification_cb(sntpSyncCallback);
 
-        // Wait up to 30 seconds for NTP sync
+        // Wait up to 15 seconds for NTP sync (30 × 500ms)
         constexpr int ntpPollIntervalMs = 500;
+        constexpr int ntpMaxAttempts = 30;
         struct tm timeinfo;
-        for (int i = 0; i < NTP_SYNC_TIMEOUT_ATTEMPTS; ++i)
+        for (int i = 0; i < ntpMaxAttempts; ++i)
         {
             if (getLocalTime(&timeinfo, ntpPollIntervalMs))
             {
                 Serial.printf("[NTP] Time synced: %02d:%02d:%02d\n",
                               timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                RtcManager::resetSyncTimer();
                 return;
             }
-            delay(ntpPollIntervalMs);
         }
 
-        Serial.println("[NTP] Failed to sync time");
+        // Retry in 1 hour instead of immediately
+        Serial.println("[NTP] Failed to sync time — retry in 1h");
+        RtcManager::postponeSync(60UL * 60 * 1000);
     }
 
     bool didPortalConnectWiFi()

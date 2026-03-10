@@ -23,6 +23,12 @@ namespace UiStateReader
      */
     void update();
 
+    /** @brief Pause the LVGL timer (screen off — no UI to update) */
+    void pause();
+
+    /** @brief Resume the LVGL timer (screen woken) */
+    void resume();
+
 } // namespace UiStateReader
 
 #endif // UI_STATE_READER_H

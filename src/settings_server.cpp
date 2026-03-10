@@ -4,10 +4,12 @@
 #include "http_helpers.h"
 #include "prayer_api.h"
 #include "audio_player.h"
+#include "app_state.h"
 #include "time_utils.h"
 #include "wifi_credentials.h"
 #include <WiFi.h>
 #include <WebServer.h>
+#include <esp_wifi.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
@@ -31,7 +33,6 @@ namespace SettingsServer
     static void handlePostSettings();
     static void handleGetStatus();
     static void handleRefresh();
-    static void handleTestAdhan();
     static void handleTestAudio();
     static void handleStopAdhan();
     static void handleSetTime();
@@ -81,7 +82,6 @@ namespace SettingsServer
         server->on("/api/settings", HTTP_POST, handlePostSettings);
         server->on("/api/status", HTTP_GET, handleGetStatus);
         server->on("/api/refresh", HTTP_POST, handleRefresh);
-        server->on("/api/test-adhan", HTTP_POST, handleTestAdhan);
         server->on("/api/test-audio", HTTP_GET, handleTestAudio);
         server->on("/api/stop-adhan", HTTP_POST, handleStopAdhan);
         server->on("/api/time", HTTP_POST, handleSetTime);
@@ -94,6 +94,7 @@ namespace SettingsServer
 
         server->begin();
         active = true;
+        esp_wifi_set_ps(WIFI_PS_NONE);
         Serial.printf("[Settings] Server started at http://%s\n", WiFi.localIP().toString().c_str());
     }
 
@@ -103,8 +104,9 @@ namespace SettingsServer
             return;
 
         server->stop();
-        server.reset(); // Automatically deletes and sets to nullptr
+        server.reset();
         active = false;
+        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
         Serial.println("[Settings] Server stopped");
     }
 
@@ -134,10 +136,26 @@ namespace SettingsServer
             File file = LittleFS.open(gzPath.c_str(), "r");
             if (file)
             {
-                Serial.printf("[Server] Streaming %s (%u bytes, gzip)\n", gzPath.c_str(), file.size());
+                size_t fileSize = file.size();
+                Serial.printf("[Server] Streaming %s (%u bytes, gzip)\n", gzPath.c_str(), fileSize);
+                server->setContentLength(fileSize);
                 server->sendHeader("Content-Encoding", "gzip");
                 server->sendHeader("Cache-Control", "max-age=86400"); // Cache 1 day
-                server->streamFile(file, contentType);
+                server->send(200, contentType, "");
+
+                uint8_t buf[1460];
+                size_t sent = 0;
+                while (sent < fileSize)
+                {
+                    size_t toRead = std::min((size_t)sizeof(buf), fileSize - sent);
+                    size_t bytesRead = file.read(buf, toRead);
+                    if (bytesRead == 0)
+                        break;
+                    server->client().write(buf, bytesRead);
+                    sent += bytesRead;
+                }
+
+                Serial.printf("[Server] Sent %u/%u bytes\n", sent, fileSize);
                 file.close();
                 return;
             }
@@ -230,7 +248,11 @@ namespace SettingsServer
         {
             int vol = doc["volume"].as<int>();
             if (vol >= 0 && vol <= 100)
+            {
                 changed |= SettingsManager::setVolume(static_cast<uint8_t>(vol));
+                setVolume(static_cast<uint8_t>(vol)); // Apply to codec immediately
+                AppStateHelper::setVolume(static_cast<uint8_t>(vol));
+            }
         }
 
         // Adhan toggles
@@ -274,6 +296,15 @@ namespace SettingsServer
             changed |= SettingsManager::setDiyanetId(doc["diyanetId"].as<int32_t>());
         else if (doc["diyanetId"].isNull())
             changed |= SettingsManager::setDiyanetId(0); // Clear diyanetId for manual coords
+
+        // Timezone (POSIX string with DST rules from browser)
+        if (doc["posixTz"].is<const char *>())
+        {
+            const char *tz = doc["posixTz"].as<const char *>();
+            setenv("TZ", tz, 1);
+            tzset();
+            changed |= SettingsManager::setTimezone(tz);
+        }
 
         if (!changed)
             return sendJsonError(HttpHelpers::HTTP_BAD_REQUEST, "No valid settings");
@@ -444,12 +475,9 @@ namespace SettingsServer
 
     static unsigned long testAudioStopTime = 0;
     static constexpr unsigned long TEST_AUDIO_DURATION_MS = 5000;
-    static constexpr int MAX_VOLUME_HW = 21;   // Hardware max volume level
-    static constexpr int MAX_VOLUME_PCT = 100; // Percentage scale
-
     static bool startTestAudio()
     {
-        if (!playAudioFile("/azan.mp3"))
+        if (!playAudioFile("/ogle.mp3"))
             return false;
 
         testAudioStopTime = millis() + TEST_AUDIO_DURATION_MS;
@@ -462,10 +490,12 @@ namespace SettingsServer
             return;
 
         int vol = server->arg("volume").toInt();
-        if (vol < 0 || vol > MAX_VOLUME_PCT)
+        if (vol < 0 || vol > AudioConfig::MAX_VOLUME_PCT)
             return;
 
-        setVolume(vol * MAX_VOLUME_HW / MAX_VOLUME_PCT);
+        setVolume(static_cast<uint8_t>(vol));
+        SettingsManager::setVolume(static_cast<uint8_t>(vol));
+        AppStateHelper::setVolume(static_cast<uint8_t>(vol));
     }
 
     static void sendTestAudioResponse()
@@ -474,11 +504,6 @@ namespace SettingsServer
             sendJson(HttpHelpers::HTTP_OK, "{\"success\":true,\"message\":\"Playing 5 sec preview\"}");
         else
             sendJsonError(HttpHelpers::HTTP_INTERNAL_ERROR, "Failed to play audio");
-    }
-
-    static void handleTestAdhan()
-    {
-        sendTestAudioResponse();
     }
 
     static void handleTestAudio()

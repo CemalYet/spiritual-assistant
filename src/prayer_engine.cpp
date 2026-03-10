@@ -10,6 +10,7 @@
 #include "settings_server.h"
 #include "audio_player.h"
 #include "lvgl_display.h"
+#include "power_manager.h"
 #include "app_state.h"
 #include <Arduino.h>
 #include <cmath>
@@ -20,6 +21,7 @@ namespace PrayerEngine
     static DailyPrayers s_prayers;
     static std::optional<PrayerType> s_nextPrayer;
     static int s_nextPrayerSeconds = -1;
+    static int s_slotStartSeconds = -1; // start of current prayer slot (seconds from midnight)
     static bool s_prayersFetched = false;
     static bool s_showingTomorrow = false;
     static int s_lastDay = -1;
@@ -133,6 +135,18 @@ namespace PrayerEngine
             s_prayers[PrayerType::Maghrib].value.data(),
             s_prayers[PrayerType::Isha].value.data(),
             s_showingTomorrow ? -1 : static_cast<int>(prayer));
+
+        // Track start of current slot for progress calculation
+        if (s_showingTomorrow)
+        {
+            s_slotStartSeconds = -1;
+            return;
+        }
+
+        const int nextIdx = static_cast<int>(prayer);
+        s_slotStartSeconds = (nextIdx > 0)
+                                 ? s_prayers[static_cast<PrayerType>(nextIdx - 1)].toSeconds()
+                                 : 0; // before Fajr — slot started at midnight
     }
 
     static void onAdhanLoop()
@@ -144,7 +158,10 @@ namespace PrayerEngine
         if (now._minutes != s_lastAdhanMinute)
         {
             s_lastAdhanMinute = now._minutes;
-            LvglDisplay::updateTime();
+            // Keep time state current while adhan is playing (main loop is blocked)
+            struct tm timeinfo;
+            if (getLocalTime(&timeinfo))
+                AppStateHelper::setTime(timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         }
 
         if (g_state.muted)
@@ -161,7 +178,7 @@ namespace PrayerEngine
         if (newVolume != s_currentVolume)
         {
             s_currentVolume = newVolume;
-            setVolume(SettingsManager::getHardwareVolume());
+            setVolume(SettingsManager::getVolume());
         }
     }
 
@@ -177,22 +194,25 @@ namespace PrayerEngine
         const auto adhanFile = getAdhanFile(currentPrayer);
         if (adhanFile.empty())
             return;
-        bool shouldPlay = SettingsManager::getAdhanEnabled(currentPrayer) && !g_state.muted;
+        bool shouldPlay = SettingsManager::getAdhanEnabled(currentPrayer);
 
         if (shouldPlay)
         {
-            s_currentVolume = SettingsManager::getVolume();
-            setVolume(SettingsManager::getHardwareVolume());
+            ScopedWakeLock lock("adhan");
+            PowerManager::wakeScreen();
 
-            Serial.printf("[Adhan] Playing %s\n", adhanFile.data());
-            playAudioFileBlocking(adhanFile.data(), onAdhanLoop);
-            Serial.println("[Adhan] Finished");
+            s_currentVolume = g_state.muted ? 0 : SettingsManager::getVolume();
+            Serial.printf("[Adhan] Volume: %d%%%s, File: %s\n",
+                          s_currentVolume, g_state.muted ? " (muted)" : "", adhanFile.data());
+            setVolume(s_currentVolume);
+
+            bool ok = playAudioFileBlocking(adhanFile.data(), onAdhanLoop);
+            Serial.printf("[Adhan] %s\n", ok ? "Finished OK" : "PLAYBACK FAILED");
         }
         else
         {
-            Serial.printf("[Adhan] Skipped for %s (%s)\n",
-                          getPrayerName(currentPrayer).data(),
-                          g_state.muted ? "muted" : "disabled");
+            Serial.printf("[Adhan] Skipped for %s (disabled)\n",
+                          getPrayerName(currentPrayer).data());
         }
 
         // Load tomorrow if last prayer passed
@@ -275,12 +295,33 @@ namespace PrayerEngine
                 return;
 
             const int secondsUntil = s_nextPrayerSeconds - now._seconds;
+
             if (secondsUntil <= 0)
             {
+                // Push zero countdown so UI doesn't stay stuck at old value
+                AppStateHelper::setCountdown(0);
                 checkAndPlayAdhan();
                 s_nextPrayer = std::nullopt;
                 s_nextPrayerSeconds = -1;
+                s_slotStartSeconds = -1;
+                return;
             }
+
+            AppStateHelper::setCountdown(static_cast<uint32_t>(secondsUntil));
+
+            if (s_slotStartSeconds < 0)
+                return;
+
+            const int slotDuration = s_nextPrayerSeconds - s_slotStartSeconds;
+            if (slotDuration <= 0)
+                return;
+
+            int pct = ((now._seconds - s_slotStartSeconds) * 100) / slotDuration;
+            if (pct < 0)
+                pct = 0;
+            if (pct > 100)
+                pct = 100;
+            AppStateHelper::setProgress(static_cast<uint8_t>(pct));
         }
     }
 
@@ -301,6 +342,16 @@ namespace PrayerEngine
     bool isReady()
     {
         return s_prayersFetched;
+    }
+
+    int getNextPrayerSeconds()
+    {
+        return s_nextPrayerSeconds;
+    }
+
+    bool isShowingTomorrow()
+    {
+        return s_showingTomorrow;
     }
 
 } // namespace PrayerEngine

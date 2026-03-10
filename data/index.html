@@ -594,11 +594,15 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span>Ayarlanıyor...';
 
+            // Capture seconds at send time for accuracy
+            const sendTime = new Date();
+            const second = sendTime.getSeconds();
+
             // First set time
             fetch('/api/time', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ day, month, year, hour, minute, timezone })
+                body: JSON.stringify({ day, month, year, hour, minute, second, timezone })
             })
                 .then(r => r.json())
                 .then(data => {

@@ -3,6 +3,7 @@
 #include "settings_manager.h"
 #include "prayer_types.h"
 #include "time_utils.h"
+#include "rtc_manager.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -169,11 +170,25 @@ namespace WiFiPortal
             File file = LittleFS.open(gzPath.c_str(), "r");
             if (file)
             {
-                Serial.printf("[Portal] Streaming %s (%u bytes, gzip)\n", gzPath.c_str(), file.size());
+                size_t fileSize = file.size();
+                Serial.printf("[Portal] Streaming %s (%u bytes, gzip)\n", gzPath.c_str(), fileSize);
+                server->setContentLength(fileSize);
                 server->sendHeader("Content-Encoding", "gzip");
                 server->sendHeader("Cache-Control", "max-age=86400");
-                server->streamFile(file, contentType);
+                server->send(HTTP_OK, contentType, "");
+                uint8_t buf[1460];
+                size_t sent = 0;
+                while (sent < fileSize)
+                {
+                    size_t toRead = std::min((size_t)sizeof(buf), fileSize - sent);
+                    size_t bytesRead = file.read(buf, toRead);
+                    if (bytesRead == 0)
+                        break;
+                    server->client().write(buf, bytesRead);
+                    sent += bytesRead;
+                }
                 file.close();
+                Serial.printf("[Portal] Sent %u/%u bytes\n", sent, fileSize);
                 return true;
             }
         }
@@ -281,6 +296,17 @@ namespace WiFiPortal
             return;
         }
 
+        RtcManager::writeSystemClockToRTC();
+
+        // Override with full POSIX TZ string (includes DST rules) if provided
+        if (doc["posixTz"].is<const char *>())
+        {
+            const char *tz = doc["posixTz"].as<const char *>();
+            setenv("TZ", tz, 1);
+            tzset();
+            SettingsManager::setTimezone(tz);
+        }
+
         server->send(HTTP_OK, "application/json", "{\"success\":true}");
     }
 
@@ -376,6 +402,25 @@ namespace WiFiPortal
             SettingsManager::setDiyanetId(doc["diyanetId"].as<int32_t>());
         else if (doc["diyanetId"].isNull())
             SettingsManager::setDiyanetId(0); // Clear diyanetId for manual coords
+
+        if (doc["posixTz"].is<const char *>())
+        {
+            const char *tz = doc["posixTz"].as<const char *>();
+            setenv("TZ", tz, 1);
+            tzset();
+            SettingsManager::setTimezone(tz);
+        }
+        else if (doc["timezone"].is<float>() || doc["timezone"].is<int>())
+        {
+            float offset = doc["timezone"].as<float>();
+            int tzHours = static_cast<int>(offset);
+            int tzMins = abs(static_cast<int>((offset - tzHours) * 60));
+            char tzBuf[24];
+            snprintf(tzBuf, sizeof(tzBuf), "UTC%+d:%02d", -tzHours, tzMins);
+            setenv("TZ", tzBuf, 1);
+            tzset();
+            SettingsManager::setTimezone(tzBuf);
+        }
 
         if (doc["connectionMode"].is<const char *>())
         {

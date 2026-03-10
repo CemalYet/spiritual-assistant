@@ -1,6 +1,13 @@
 #pragma once
 
 #include "prayer_types.h"
+#include <cstdint>
+
+enum class PowerMode : uint8_t
+{
+    ALWAYS_ON = 0,
+    SCREEN_OFF = 1
+};
 
 namespace SettingsManager
 {
@@ -36,8 +43,9 @@ namespace SettingsManager
     uint8_t getVolume();
     bool setVolume(uint8_t volume);
 
-    // Get volume mapped to hardware range (0-21)
-    uint8_t getHardwareVolume();
+    // Mute state (persisted)
+    bool getMuted();
+    bool setMuted(bool muted);
 
     // --- Connection Mode ---
     // "wifi" = online mode, "offline" = manual time
@@ -58,7 +66,14 @@ namespace SettingsManager
     bool setDiyanetId(int32_t id);
 
     // --- Action Flags ---
-    // Check if prayer times need recalculation (method or location changed)
     bool needsRecalculation();
     void clearRecalculationFlag();
+
+    // --- Power Mode ---
+    PowerMode getPowerMode();
+    bool setPowerMode(PowerMode mode);
+
+    // --- Timezone ---
+    const char *getTimezone();
+    bool setTimezone(const char *posixTz);
 }

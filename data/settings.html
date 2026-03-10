@@ -2329,6 +2329,91 @@
         // ===== DATETIME FUNCTIONS =====
         let timeSynced = false;
 
+        // Dynamically compute POSIX TZ string by probing the browser's timezone.
+        // The phone OS keeps its IANA timezone database updated, so getTimezoneOffset()
+        // at any date already reflects the latest DST rules. We reverse-engineer
+        // the POSIX string from those offsets — no hardcoded table needed.
+        function getPosixTz() {
+            const y = new Date().getFullYear();
+            const janOff = new Date(y, 0, 1).getTimezoneOffset();
+            const julOff = new Date(y, 6, 1).getTimezoneOffset();
+
+            // Format display name like <+03> or <-05:30>
+            function pn(min) {
+                const u = -min / 60;
+                const h = Math.abs(Math.trunc(u));
+                const m = Math.abs(Math.round((u - Math.trunc(u)) * 60));
+                return '<' + (u >= 0 ? '+' : '-') + String(h).padStart(2, '0')
+                    + (m ? ':' + String(m).padStart(2, '0') : '') + '>';
+            }
+
+            // Format POSIX offset (positive=west, negative=east)
+            function po(min) {
+                const h = Math.trunc(min / 60);
+                const m = Math.abs(min % 60);
+                return h + (m ? ':' + String(m).padStart(2, '0') : '');
+            }
+
+            // No DST — return simple fixed offset
+            if (janOff === julOff) return pn(janOff) + po(janOff);
+
+            // Standard offset is the larger getTimezoneOffset value
+            const stdOff = Math.max(janOff, julOff);
+            const dstOff = Math.min(janOff, julOff);
+
+            // Binary search for exact transition moment (1-min precision)
+            function findTransition(a, b) {
+                let lo = a.getTime(), hi = b.getTime();
+                while (hi - lo > 60000) {
+                    const mid = Math.floor((lo + hi) / 2);
+                    if (new Date(mid).getTimezoneOffset() === a.getTimezoneOffset()) lo = mid;
+                    else hi = mid;
+                }
+                return new Date(hi);
+            }
+
+            // Find both DST transitions in the year
+            let toDst = null, toStd = null;
+            for (let m = 0; m < 12; m++) {
+                const a = new Date(y, m, 1), b = new Date(y, m + 1, 1);
+                if (a.getTimezoneOffset() !== b.getTimezoneOffset()) {
+                    const t = findTransition(a, b);
+                    if (t.getTimezoneOffset() === dstOff) toDst = t;
+                    else toStd = t;
+                }
+            }
+
+            // Fallback if transitions not detected
+            if (!toDst || !toStd) return pn(janOff) + po(janOff);
+
+            // Convert transition date to POSIX M<month>.<week>.<dow>[/h[:mm]] rule
+            function makeRule(d, prevOff) {
+                // Wall clock time in the "before" timezone at the transition moment
+                const w = new Date(d.getTime() - prevOff * 60000);
+                const month = w.getUTCMonth() + 1;
+                const dow = w.getUTCDay();
+                const dom = w.getUTCDate();
+                const daysInMonth = new Date(Date.UTC(y, w.getUTCMonth() + 1, 0)).getUTCDate();
+                const week = (dom + 7 > daysInMonth) ? 5 : Math.ceil(dom / 7);
+                const h = w.getUTCHours();
+                const min = w.getUTCMinutes();
+                let r = 'M' + month + '.' + week + '.' + dow;
+                if (h !== 2 || min !== 0) {
+                    r += '/' + h;
+                    if (min !== 0) r += ':' + String(min).padStart(2, '0');
+                }
+                return r;
+            }
+
+            // Build POSIX TZ string
+            let posix = pn(stdOff) + po(stdOff) + pn(dstOff);
+            // Omit DST offset if it's exactly 1 hour ahead (POSIX default)
+            if (stdOff - dstOff !== 60) posix += po(dstOff);
+            // toDst: transition uses standard wall clock; toStd: uses DST wall clock
+            posix += ',' + makeRule(toDst, stdOff) + ',' + makeRule(toStd, dstOff);
+            return posix;
+        }
+
         function getTimezoneLabel(offset) {
             const sign = offset >= 0 ? '+' : '';
             const hrs = Math.floor(Math.abs(offset));
@@ -2356,7 +2441,7 @@
                 const res = await fetch('/api/time', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ day, month, year, hour, minute, second, timezone })
+                    body: JSON.stringify({ day, month, year, hour, minute, second, timezone, posixTz: getPosixTz() })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -2905,7 +2990,8 @@
                     cityName: locationData.cityName,
                     diyanetId: locationData.diyanetId,
                     volume: parseInt(volumeSlider.value),
-                    adhanEnabled: adhan
+                    adhanEnabled: adhan,
+                    posixTz: getPosixTz()
                 };
 
                 const res = await fetch('/api/settings', {

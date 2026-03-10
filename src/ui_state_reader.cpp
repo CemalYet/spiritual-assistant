@@ -9,10 +9,13 @@
 #include "ui_state_reader.h"
 #include "app_state.h"
 #include "ui_page_home.h"
-#include "ui_page_prayer.h"
+#include "ui_page_clock.h"
 #include "ui_page_settings.h"
 #include "ui_page_status.h"
 #include <lvgl.h>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
 
 namespace UiStateReader
 {
@@ -31,6 +34,18 @@ namespace UiStateReader
         {
             updateTimer = lv_timer_create(timerCallback, 50, nullptr);
         }
+    }
+
+    void pause()
+    {
+        if (updateTimer)
+            lv_timer_pause(updateTimer);
+    }
+
+    void resume()
+    {
+        if (updateTimer)
+            lv_timer_resume(updateTimer);
     }
 
     void update()
@@ -85,66 +100,104 @@ namespace UiStateReader
         }
 
         // ═══════════════════════════════════════════════════
-        // HOME PAGE UPDATES
+        // CLOCK SCREEN UPDATES
         // ═══════════════════════════════════════════════════
         if (g_state.isDirty(DirtyFlag::TIME))
         {
-            UiPageHome::setTime(g_state.hour, g_state.minute);
+            UiPageClock::setTime(g_state.hour, g_state.minute, g_state.second);
             g_state.clearDirty(DirtyFlag::TIME);
         }
 
         if (g_state.isDirty(DirtyFlag::DATE))
         {
-            UiPageHome::setDate(g_state.date.c_str());
+            UiPageClock::setGregorianDate(g_state.gregorianFull.c_str());
+            UiPageHome::setStatusBarCity(g_state.location.c_str(), g_state.date.c_str());
+            UiPageClock::setStatusBarCity(g_state.location.c_str(), g_state.date.c_str());
+            // Settings header: no date, just "Ayarlar" (set once in create)
             g_state.clearDirty(DirtyFlag::DATE);
         }
 
+        if (g_state.isDirty(DirtyFlag::HIJRI))
+        {
+            UiPageClock::setHijriDate(g_state.hijriDate.c_str());
+
+            // Derive greeting for home screen from hijri + time of day
+            const char *greetL = "";
+            if (g_state.hour >= 5 && g_state.hour < 12)
+                greetL = "Hay\xc4\xb1rl\xc4\xb1 Sabahlar \xe2\x80\x94";
+            else if (g_state.hour >= 12 && g_state.hour < 17)
+                greetL = "Hay\xc4\xb1rl\xc4\xb1 G\xc3\xbcnler \xe2\x80\x94";
+            else if (g_state.hour >= 17 && g_state.hour < 21)
+                greetL = "Hay\xc4\xb1rl\xc4\xb1 Ak\xc5\x9f"
+                         "amlar \xe2\x80\x94";
+            else
+                greetL = "Hay\xc4\xb1rl\xc4\xb1 Geceler \xe2\x80\x94";
+
+            // If Ramazan, show "Ramazan X. Gün" as right side
+            const char *hijri = g_state.hijriDate.c_str();
+            static char greetR[32];
+            greetR[0] = '\0';
+            const char *ramPos = strstr(hijri, "Ramazan");
+            // Auto-detect Ramadan mode from Hijri month
+            g_state.ramadanMode = (ramPos != nullptr);
+            if (ramPos && hijri[0] >= '0' && hijri[0] <= '9')
+            {
+                // hijri = "17 Ramazan 1447" -> extract day
+                int day = atoi(hijri);
+                snprintf(greetR, sizeof(greetR), "Ramazan %d. G\xc3\xbcn", day);
+            }
+            UiPageHome::setGreeting(greetL, greetR);
+            g_state.clearDirty(DirtyFlag::HIJRI);
+        }
+
+        // ═══════════════════════════════════════════════════
+        // HOME PAGE UPDATES
+        // ═══════════════════════════════════════════════════
         if (g_state.isDirty(DirtyFlag::LOCATION))
         {
-            UiPageHome::setLocation(g_state.location.c_str());
+            UiPageHome::setStatusBarCity(g_state.location.c_str(), g_state.date.c_str());
+            UiPageClock::setStatusBarCity(g_state.location.c_str(), g_state.date.c_str());
+            // Settings header: no date/location update needed
             g_state.clearDirty(DirtyFlag::LOCATION);
         }
 
         if (g_state.isDirty(DirtyFlag::NEXT_PRAYER))
         {
-            UiPageHome::setNextPrayer(g_state.nextPrayerName.c_str(), g_state.nextPrayerTime.c_str());
+            UiPageHome::setNextPrayerName(g_state.nextPrayerName.c_str());
             g_state.clearDirty(DirtyFlag::NEXT_PRAYER);
         }
 
-        if (g_state.isDirty(DirtyFlag::NTP_SYNCED))
+        if (g_state.isDirty(DirtyFlag::COUNTDOWN))
         {
-            UiPageHome::setNtpSynced(g_state.ntpSynced);
-            g_state.clearDirty(DirtyFlag::NTP_SYNCED);
+            UiPageHome::setCountdown(g_state.secondsToNext);
+
+            // Forward Ramadan countdown to home page iftar pill
+            if (g_state.ramadanMode && !g_state.ramadanCountdownText.empty())
+                UiPageHome::setIftarDelta(true, g_state.ramadanCountdownText.c_str());
+            else
+                UiPageHome::setIftarDelta(false, nullptr);
+
+            g_state.clearDirty(DirtyFlag::COUNTDOWN);
         }
 
-        if (g_state.isDirty(DirtyFlag::ADHAN_AVAILABLE))
-        {
-            UiPageHome::setAdhanAvailable(g_state.adhanAvailable);
-            g_state.clearDirty(DirtyFlag::ADHAN_AVAILABLE);
-        }
-
-        if (g_state.isDirty(DirtyFlag::MUTED))
-        {
-            UiPageHome::setMuted(g_state.muted);
-            g_state.clearDirty(DirtyFlag::MUTED);
-        }
-
-        // ═══════════════════════════════════════════════════
-        // PRAYER PAGE UPDATES
-        // ═══════════════════════════════════════════════════
         if (g_state.isDirty(DirtyFlag::PRAYER_TIMES))
         {
-            UiPagePrayer::PrayerTimesData data = {
-                g_state.fajr.c_str(),
-                g_state.sunrise.c_str(),
-                g_state.dhuhr.c_str(),
-                g_state.asr.c_str(),
-                g_state.maghrib.c_str(),
-                g_state.isha.c_str(),
-                g_state.activePrayerIndex};
-            UiPagePrayer::setPrayerTimes(data);
+            UiPageHome::setPrayerTimes(
+                g_state.fajr.c_str(), g_state.sunrise.c_str(),
+                g_state.dhuhr.c_str(), g_state.asr.c_str(),
+                g_state.maghrib.c_str(), g_state.isha.c_str());
+            UiPageHome::setActivePrayerIndex(g_state.activePrayerIndex);
             g_state.clearDirty(DirtyFlag::PRAYER_TIMES);
         }
+
+        if (g_state.isDirty(DirtyFlag::PROGRESS))
+        {
+            UiPageHome::setActivePrayerProgress(g_state.activePrayerProgress);
+            g_state.clearDirty(DirtyFlag::PROGRESS);
+        }
+
+        // NTP_SYNCED, ADHAN_AVAILABLE, MUTED — not in current home screen API; clear to prevent stale dirty loops
+        g_state.clearDirty(DirtyFlag::NTP_SYNCED | DirtyFlag::ADHAN_AVAILABLE | DirtyFlag::MUTED);
 
         // ═══════════════════════════════════════════════════
         // SETTINGS PAGE UPDATES
@@ -159,6 +212,25 @@ namespace UiStateReader
         {
             UiPageSettings::setVolumeLevel(g_state.volume);
             g_state.clearDirty(DirtyFlag::VOLUME);
+        }
+
+        // ═══════════════════════════════════════════════════
+        // SIGNAL & BATTERY (all pages)
+        // ═══════════════════════════════════════════════════
+        if (g_state.isDirty(DirtyFlag::SIGNAL_BATTERY))
+        {
+            uint8_t bars = g_state.wifiStrength;
+            uint8_t pct = g_state.batteryPct;
+            bool chg = g_state.charging;
+
+            UiPageHome::setWifi(bars);
+            UiPageHome::setBattery(pct, chg);
+            UiPageClock::setWifi(bars);
+            UiPageClock::setBattery(pct, chg);
+            UiPageSettings::setWifi(bars);
+            UiPageSettings::setBattery(pct, chg);
+
+            g_state.clearDirty(DirtyFlag::SIGNAL_BATTERY);
         }
     }
 
