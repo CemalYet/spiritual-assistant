@@ -1,15 +1,18 @@
 #include "audio_player.h"
 #include "Audio.h"
+#include "pmu_manager.h"
 #include <LittleFS.h>
+#include "es8311.h"
 
 static constexpr int AUDIO_BUFFER_SIZE = 8000;
 static constexpr int AUDIO_BUFFER_SIZE_PSRAM = 80000;
-static constexpr int AMP_STABILIZE_MS = 10;
+static constexpr int CODEC_STABILIZE_MS = 10;
 
 static Audio audio;
 static volatile bool audioFinished = false;
 static TaskHandle_t audioTaskHandle = NULL;
 static SemaphoreHandle_t audioMutex = NULL;
+static es8311_handle_t codecHandle = NULL;
 
 // Thread-safe audio access
 static inline void audioLock()
@@ -24,15 +27,55 @@ static inline void audioUnlock()
         xSemaphoreGive(audioMutex);
 }
 
-// Audio task runs on Core 0 to not block WiFi/HTTP on Core 1
+// ── ES8311 codec init ────────────────────────────────────
+static bool initCodec()
+{
+    codecHandle = es8311_create(I2C_NUM_0, ES8311_ADDRESS_0);
+    if (!codecHandle)
+    {
+        Serial.println("[Audio] ES8311 create failed");
+        return false;
+    }
+
+    const es8311_clock_config_t clk = {
+        .mclk_inverted = false,
+        .sclk_inverted = false,
+        .mclk_from_mclk_pin = true,
+        .mclk_frequency = AudioConfig::MCLK_FREQ,
+        .sample_frequency = AudioConfig::SAMPLE_RATE};
+
+    esp_err_t err = es8311_init(codecHandle, &clk,
+                                ES8311_RESOLUTION_16, ES8311_RESOLUTION_16);
+    if (err != ESP_OK)
+    {
+        Serial.printf("[Audio] ES8311 init failed: %d\n", err);
+        es8311_delete(codecHandle);
+        codecHandle = NULL;
+        return false;
+    }
+
+    es8311_voice_volume_set(codecHandle, AudioConfig::DEFAULT_VOLUME, NULL); // Start at default; user volume applied later
+    es8311_microphone_config(codecHandle, false);
+    es8311_voice_mute(codecHandle, true); // Start muted
+
+    Serial.println("[Audio] ES8311 codec initialized");
+    return true;
+}
+
+// Audio task runs on Core 0 — blocks when idle, woken by xTaskNotifyGive
 void audioTask(void *parameter)
 {
     while (true)
     {
-        audioLock();
-        audio.loop();
-        audioUnlock();
-        vTaskDelay(1); // Yield to other tasks
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        while (audio.isRunning())
+        {
+            audioLock();
+            audio.loop();
+            audioUnlock();
+            vTaskDelay(1);
+        }
     }
 }
 
@@ -41,29 +84,28 @@ bool audioPlayerInit()
     if (audioTaskHandle != NULL)
         return true; // Already initialized
 
-    // Create mutex for thread-safe audio access
     audioMutex = xSemaphoreCreateMutex();
 
-    pinMode(AudioConfig::SD_PIN, OUTPUT);
-    disableAmp();
+    // Wire.begin() already called by initHardware() in main.cpp
+    initCodec();
 
-    audio.setPinout(AudioConfig::BCLK, AudioConfig::LRC, AudioConfig::DOUT);
+    // Init I2S output — 4-pin: BCLK, LRC, DOUT, MCLK
+    audio.setPinout(AudioConfig::BCLK, AudioConfig::LRC,
+                    AudioConfig::DOUT, AudioConfig::MCLK);
     audio.setBufsize(AUDIO_BUFFER_SIZE, AUDIO_BUFFER_SIZE_PSRAM);
-    audio.setVolume(AudioConfig::DEFAULT_VOLUME);
-    audio.forceMono(true);
+    audio.setVolume(AudioConfig::MAX_VOLUME); // I2S at max; user volume controlled via ES8311 codec
 
-    // Create audio task on Core 0
+    // Audio task on Core 0 — needs enough stack and priority to avoid underruns
     xTaskCreatePinnedToCore(
-        audioTask,        // Task function
-        "AudioTask",      // Name
-        4096,             // Stack size
-        NULL,             // Parameters
-        1,                // Priority
-        &audioTaskHandle, // Task handle
-        0                 // Core 0
-    );
+        audioTask,
+        "AudioTask",
+        8192,
+        NULL,
+        5, // Higher priority prevents buffer underruns (crackling)
+        &audioTaskHandle,
+        0);
 
-    Serial.println("Audio player initialized");
+    Serial.println("[Audio] Player initialized (ES8311 + I2S)");
     return true;
 }
 
@@ -71,16 +113,22 @@ bool playAudioFile(const char *filename)
 {
     if (!LittleFS.exists(filename))
     {
-        Serial.printf("File not found: %s\n", filename);
+        Serial.printf("[Audio] File not found: %s\n", filename);
         return false;
     }
+    Serial.printf("[Audio] Codec=%s, Amp ON, unmute...\n",
+                  codecHandle ? "OK" : "NULL!");
     enableAmp();
-    delay(AMP_STABILIZE_MS);
+    delay(CODEC_STABILIZE_MS);
     audioFinished = false;
     audioLock();
     audio.connecttoFS(LittleFS, filename);
     audioUnlock();
-    Serial.printf("Playing: %s\n", filename);
+    if (audioTaskHandle)
+        xTaskNotifyGive(audioTaskHandle);
+    else
+        Serial.println("[Audio] WARNING: audioTask not running!");
+    Serial.printf("[Audio] Playing: %s\n", filename);
     return true;
 }
 
@@ -105,29 +153,55 @@ void stopAudio()
 
 void setVolume(uint8_t vol)
 {
-    audioLock();
-    audio.setVolume(vol);
-    audioUnlock();
+    // vol is 0-100 percentage, passed directly to ES8311 codec
+    uint8_t clamped = (vol > AudioConfig::MAX_VOLUME_PCT) ? AudioConfig::MAX_VOLUME_PCT : vol;
+    if (codecHandle)
+        es8311_voice_volume_set(codecHandle, clamped, NULL);
 }
 
 void enableAmp()
 {
-    digitalWrite(AudioConfig::SD_PIN, HIGH);
+    PmuManager::setSpeakerAmpEnabled(true);
+    if (codecHandle)
+        es8311_voice_mute(codecHandle, false);
 }
 
 void disableAmp()
 {
-    digitalWrite(AudioConfig::SD_PIN, LOW);
+    if (codecHandle)
+        es8311_voice_mute(codecHandle, true);
+    PmuManager::setSpeakerAmpEnabled(false);
+}
+
+void audioPlayerSuspend()
+{
+    disableAmp();
+    if (codecHandle)
+    {
+        es8311_delete(codecHandle);
+        codecHandle = NULL;
+    }
+    PmuManager::setCodecPowerEnabled(false);
+}
+
+void audioPlayerResume()
+{
+    PmuManager::setCodecPowerEnabled(true);
+    delay(10); // ALDO1 settling time
+    initCodec();
 }
 
 bool playAudioURL(const char *url)
 {
+
     enableAmp();
-    delay(AMP_STABILIZE_MS);
+    delay(CODEC_STABILIZE_MS);
     audioFinished = false;
     audioLock();
     audio.connecttohost(url);
     audioUnlock();
+    if (audioTaskHandle)
+        xTaskNotifyGive(audioTaskHandle);
     Serial.printf("Streaming: %s\n", url);
     return true;
 }

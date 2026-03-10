@@ -1,6 +1,7 @@
 /**
- * LVGL v8.3 Configuration for ESP32-S3 with ILI9341
- * Touch: XPT2046 (prepared but disabled)
+ * LVGL v8.3 Configuration for ESP32-S3 with AXS15231B
+ * Display: 320x480 QSPI (Waveshare ESP32-S3-Touch-LCD-3.5B)
+ * Touch:   AXS15231B capacitive (I2C)
  */
 
 #ifndef LV_CONF_H
@@ -11,7 +12,7 @@
 /*====================
    DISPLAY SETTINGS
  *====================*/
-#define LV_HOR_RES_MAX 240
+#define LV_HOR_RES_MAX 480
 #define LV_VER_RES_MAX 320
 #define LV_DPI_DEF 130
 
@@ -19,7 +20,7 @@
    COLOR SETTINGS
  *====================*/
 #define LV_COLOR_DEPTH 16
-#define LV_COLOR_16_SWAP 1
+#define LV_COLOR_16_SWAP 1 /* Pre-swap for fast writeBytes path via draw16bitBeRGBBitmap */
 
 /*====================
    MEMORY SETTINGS - Use PSRAM
@@ -40,7 +41,7 @@
 #define LV_TICK_CUSTOM_SYS_TIME_EXPR (millis())
 
 #define LV_DISP_DEF_REFR_PERIOD 16
-#define LV_INDEV_DEF_READ_PERIOD 30
+#define LV_INDEV_DEF_READ_PERIOD 20
 
 /*====================
    FEATURE CONFIGURATION
@@ -58,16 +59,35 @@
 /*====================
    FONT USAGE
  *====================*/
-#define LV_FONT_MONTSERRAT_12 1
-#define LV_FONT_MONTSERRAT_14 1
-#define LV_FONT_MONTSERRAT_16 1
-#define LV_FONT_MONTSERRAT_20 1
-#define LV_FONT_MONTSERRAT_24 1
-#define LV_FONT_MONTSERRAT_28 1
-#define LV_FONT_MONTSERRAT_32 1
-#define LV_FONT_MONTSERRAT_48 1
+/* All built-in Montserrat fonts DISABLED.
+ * UI uses Cinzel + DM Mono (src/fonts/), --lcd subpixel rendered.
+ * LV_FONT_DEFAULT → Cinzel Regular 14 with Turkish glyphs + FA symbols. */
+#define LV_FONT_MONTSERRAT_8 0
+#define LV_FONT_MONTSERRAT_10 0
+#define LV_FONT_MONTSERRAT_12 0
+#define LV_FONT_MONTSERRAT_14 0
+#define LV_FONT_MONTSERRAT_16 0
+#define LV_FONT_MONTSERRAT_18 0
+#define LV_FONT_MONTSERRAT_20 0
+#define LV_FONT_MONTSERRAT_24 0
+#define LV_FONT_MONTSERRAT_28 0
+#define LV_FONT_MONTSERRAT_48 0
 
-#define LV_FONT_DEFAULT &lv_font_montserrat_16
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+  extern const struct _lv_font_t font_cinzel_14;
+#ifdef __cplusplus
+}
+#endif
+#define LV_FONT_DEFAULT (&font_cinzel_14)
+
+/* Subpixel font rendering (horizontal RGB) — needs fonts built with --lcd */
+#define LV_USE_FONT_SUBPX 1
+#if LV_USE_FONT_SUBPX
+#define LV_FONT_SUBPX_BGR 0 /* 0: RGB; 1: BGR order */
+#endif
 
 #define LV_TXT_ENC LV_TXT_ENC_UTF8
 

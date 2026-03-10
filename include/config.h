@@ -14,7 +14,7 @@
 // ---  AP PORTAL ---
 // Set to true to clear WiFi credentials on boot and force AP portal
 // Useful for testing offline mode
-#define FORCE_AP_PORTAL true
+#define FORCE_AP_PORTAL false
 
 // --- DEBUG MODE ---
 // Set to true to see detailed cache logs
@@ -48,16 +48,8 @@ namespace Config
     constexpr int HIGH_LATITUDE_RULE = -1; // -1 = use method default (recommended)
 
     // Timezone with automatic DST handling (POSIX format)
-    // Uncomment the one you need or add your own:
-
-    constexpr const char *TIMEZONE = "CET-1CEST,M3.5.0,M10.5.0/3"; // Europe (Belgium/Germany/France) - Default
-    // constexpr const char *TIMEZONE = "TRT-3";                      // Turkey (GMT+3, NO DST since 2016)
-    // constexpr const char *TIMEZONE = "EET-2EEST,M3.5.0,M10.5.0/3"; // Eastern Europe (Greece/Romania) with DST
-    // constexpr const char *TIMEZONE = "GMT0BST,M3.5.0/1,M10.5.0";   // UK (London)
-    // constexpr const char *TIMEZONE = "EST5EDT,M3.2.0,M11.1.0";     // USA East Coast
-    // constexpr const char *TIMEZONE = "PST8PDT,M3.2.0,M11.1.0";     // USA West Coast
-    // constexpr const char *TIMEZONE = "AST-3";                      // Saudi Arabia (GMT+3, no DST)
-    // constexpr const char *TIMEZONE = "GST-4";                      // UAE/Dubai (GMT+4, no DST)
+    // Default timezone now stored in SettingsManager (NVS-persisted).
+    // Phone portal or NTP path saves the POSIX TZ string to NVS.
 
     // Manual Timezone Offset (in seconds)
     // Use this if automatic DST fails.

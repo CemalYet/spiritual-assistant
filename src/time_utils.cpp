@@ -1,4 +1,6 @@
 #include "time_utils.h"
+#include "settings_manager.h"
+#include "rtc_manager.h"
 #include <Arduino.h>
 #include <sys/time.h>
 #include <cmath>
@@ -65,6 +67,7 @@ namespace TimeUtils
 
         setenv("TZ", tzStr.c_str(), 1);
         tzset();
+        SettingsManager::setTimezone(tzStr.c_str());
     }
 
     bool applySystemTime(const TimeRequest &req)
@@ -81,6 +84,9 @@ namespace TimeUtils
         timeinfo.tm_sec = req.second;
         timeinfo.tm_isdst = 0;
 
+        setenv("TZ", "UTC0", 1);
+        tzset();
+
         time_t localTime = mktime(&timeinfo);
         long tzOffset = static_cast<long>(req.timezoneOffset * SECONDS_PER_HOUR);
 
@@ -91,6 +97,8 @@ namespace TimeUtils
 
         Serial.printf("[Time] Set: %04d-%02d-%02d %02d:%02d:%02d (UTC%+.1f)\n",
                       req.year, req.month, req.day, req.hour, req.minute, req.second, req.timezoneOffset);
+
+        RtcManager::writeSystemClockToRTC();
 
         return true;
     }

@@ -2,9 +2,9 @@
  * @file lvgl_display.cpp
  * @brief LVGL Display Driver Implementation
  *
- * Main display system - replaces TftDisplay completely.
- * Uses LovyanGFX for hardware, LVGL for UI, UiHome for screens.
- * Prayer logic handled by main.cpp
+ * Main display system for Waveshare ESP32-S3-Touch-LCD-3.5B.
+ * Uses Arduino_GFX (QSPI AXS15231B) + LVGL for UI.
+ * Touch via I2C capacitive AXS15231B driver.
  */
 
 #include "lvgl_display.h"
@@ -13,170 +13,189 @@
 #include <time.h>
 #include <LittleFS.h>
 #include <WiFi.h>
+#include <Wire.h>
 
-#define LGFX_USE_V1
-#include <LovyanGFX.hpp>
+#include <databus/Arduino_ESP32QSPI.h>
+#include <display/Arduino_AXS15231B.h>
+#include "esp_lcd_touch_axs15231b.h"
+
+#include "tft_config.h"
+#include "tca_expander.h"
+#include "power_manager.h"
 #include "app_state.h"
 #include "ui_state_reader.h"
 #include "ui_page_home.h"
-#include "ui_page_prayer.h"
+#include "ui_page_clock.h"
 #include "ui_page_settings.h"
 #include "ui_components.h"
 #include "network.h"
-#include "hijri_date.h"
+#include "locale_tr.h"
 
 // ═══════════════════════════════════════════════════════════════
-// LOVANGFX DISPLAY CONFIGURATION
+// DISPLAY HARDWARE  (Waveshare AXS15231B QSPI — native 320×480 portrait)
 // ═══════════════════════════════════════════════════════════════
-class LGFX_Display : public lgfx::LGFX_Device
-{
-    lgfx::Panel_ILI9341 _panel_instance;
-    lgfx::Bus_SPI _bus_instance;
-    lgfx::Touch_XPT2046 _touch_instance;
 
-public:
-    LGFX_Display(void)
-    {
-        {
-            auto cfg = _bus_instance.config();
-            cfg.spi_host = SPI2_HOST;
-            cfg.spi_mode = 0;
-            cfg.freq_write = 40000000;
-            cfg.freq_read = 16000000;
-            cfg.spi_3wire = false;
-            cfg.use_lock = true;
-            cfg.dma_channel = SPI_DMA_CH_AUTO;
-            cfg.pin_sclk = 14;
-            cfg.pin_mosi = 13;
-            cfg.pin_miso = 15;
-            cfg.pin_dc = 12;
-            _bus_instance.config(cfg);
-            _panel_instance.setBus(&_bus_instance);
-        }
-        {
-            auto cfg = _panel_instance.config();
-            cfg.pin_cs = 10;
-            cfg.pin_rst = 11;
-            cfg.pin_busy = -1;
-            cfg.memory_width = 240;
-            cfg.memory_height = 320;
-            cfg.panel_width = 240;
-            cfg.panel_height = 320;
-            cfg.offset_x = 0;
-            cfg.offset_y = 0;
-            cfg.offset_rotation = 0;
-            cfg.dummy_read_pixel = 8;
-            cfg.dummy_read_bits = 1;
-            cfg.readable = false;
-            cfg.invert = false;
-            cfg.rgb_order = false;
-            cfg.dlen_16bit = false;
-            cfg.bus_shared = false;
-            _panel_instance.config(cfg);
-        }
-        {
-            // Touch configuration (XPT2046 resistive touch)
-            auto cfg = _touch_instance.config();
-            cfg.spi_host = SPI2_HOST; // Same SPI bus as display
-            cfg.freq = 1000000;       // 1MHz - slower = more reliable
-            cfg.pin_sclk = 14;        // Shared with display
-            cfg.pin_mosi = 13;        // Shared with display
-            cfg.pin_miso = 15;        // Shared with display
-            cfg.pin_cs = 9;           // Touch CS pin
-            cfg.pin_int = -1;         // No interrupt pin
-            cfg.x_min = 100;          // Wider calibration range
-            cfg.x_max = 4000;
-            cfg.y_min = 100;
-            cfg.y_max = 4000;
-            cfg.bus_shared = true; // SPI shared with display
-            _touch_instance.config(cfg);
-            _panel_instance.setTouch(&_touch_instance);
-        }
-        setPanel(&_panel_instance);
-    }
-};
+// Native resolution (hardware is portrait)
+static const uint16_t GFX_W = 320;
+static const uint16_t GFX_H = 480;
+
+// Logical resolution for LVGL (landscape)
+static const uint16_t SCR_W = 480;
+static const uint16_t SCR_H = 320;
+
+static Arduino_DataBus *bus = new Arduino_ESP32QSPI(
+    QSPI_CS, QSPI_CLK, QSPI_D0, QSPI_D1, QSPI_D2, QSPI_D3);
+
+// Hardware stays in native portrait — software rotation in flush_cb
+static Arduino_GFX *gfx = new Arduino_AXS15231B(
+    bus, -1 /* RST */, 0 /* Native Portrait */, false /* IPS */,
+    GFX_W, GFX_H);
 
 // ═══════════════════════════════════════════════════════════════
 // STATIC OBJECTS
 // ═══════════════════════════════════════════════════════════════
-static LGFX_Display gfx;
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t *buf1 = nullptr;
+static lv_color_t *buf1 = nullptr; // LVGL render buffer (persistent, full-screen landscape)
 static lv_disp_drv_t disp_drv;
-static lv_indev_drv_t indev_drv; // Touch input device driver
+static lv_indev_drv_t indev_drv;
 static bool initialized = false;
-
-// Turkish localization
-static const char *TURKISH_DAYS[] = {"Pazar", "Pazartesi", "Sali", "Carsamba", "Persembe", "Cuma", "Cumartesi"};
-static const char *TURKISH_MONTHS[] = {"Ocak", "Subat", "Mart", "Nisan", "Mayis", "Haziran",
-                                       "Temmuz", "Agustos", "Eylul", "Ekim", "Kasim", "Aralik"};
 
 // ═══════════════════════════════════════════════════════════════
 // LVGL CALLBACKS
 // ═══════════════════════════════════════════════════════════════
+
 static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p)
 {
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
-
-    gfx.startWrite();
-    gfx.setAddrWindow(area->x1, area->y1, w, h);
-    gfx.writePixels((uint16_t *)color_p, w * h);
-    gfx.endWrite();
-
+    // direct_mode: buf1 is persistent full-screen landscape buffer.
+    // LVGL only re-renders dirty widgets into buf1.
+    // On last flush, send entire buf1 to display via draw16bitBeRGBBitmapR1
+    // which does 90° CW rotation DURING the QSPI DMA transfer — no rot_buf needed.
+    if (lv_disp_flush_is_last(drv))
+    {
+        gfx->draw16bitBeRGBBitmapR1(0, 0, (uint16_t *)buf1, SCR_W, SCR_H);
+    }
     lv_disp_flush_ready(drv);
 }
 
-// Touch input callback for LVGL
-static void lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
+// Touch input callback for LVGL (I2C capacitive — AXS15231B)
+static lv_point_t touchStart = {0, 0};
+static bool touchActive = false;
+static bool gestureActive = false; // suppress clicks during swipe
+static bool swipeFired = false;    // prevent double-fire per touch
+
+static const int SWIPE_MIN_PX = 60; // minimum horizontal distance for swipe
+static int currentPage = 0;
+static bool suppressSwipe = false; // set when touch interacts with a widget — blocks swipe for entire session
+static int touchFrames = 0;        // frames since touch began — delays swipe so LVGL can acquire widget
+static void goToPage(int page);    // forward declaration
+
+// Dynamic page count: 3 normally, 4 when portal screen is active
+static int getNumPages()
 {
-    uint16_t x, y;
+    return UiPageSettings::getPortalScreen() ? 4 : 3;
+}
 
-    // Single read - let LVGL handle debouncing
-    bool touched = gfx.getTouch(&x, &y);
-
-    if (touched)
+static void lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
+{ // Ignore touch reads when screen is off — touch IC generates phantom events in SLPIN
+    if (!PowerManager::isScreenOn())
     {
-        // Touch panel is 90° rotated with different scaling
-        // Swap and scale X/Y to match display
-        uint16_t raw_x = x, raw_y = y;
-        x = 240 - (raw_y * 240 / 320);
-        y = 320 - (raw_x * 320 / 240);
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
 
+    touch_data_t touch_data;
+    bsp_touch_read();
+
+    if (bsp_touch_get_coordinates(&touch_data))
+    {
+        // Touch library rotation=1 already maps portrait→landscape coords
         data->state = LV_INDEV_STATE_PRESSED;
-        data->point.x = x;
-        data->point.y = y;
+        data->point.x = touch_data.coords[0].x;
+        data->point.y = touch_data.coords[0].y;
+        if (!touchActive)
+        {
+            touchStart.x = data->point.x;
+            touchStart.y = data->point.y;
+            touchActive = true;
+            gestureActive = false;
+            swipeFired = false;
+            suppressSwipe = false;
+            touchFrames = 0;
+
+            // On settings page, suppress swipe if touch starts on a slider track
+            if (currentPage == 2 && UiPageSettings::isSliderHit(touchStart.x, touchStart.y))
+                suppressSwipe = true;
+        }
+        ++touchFrames;
+        // Once LVGL acquires a widget (slider, toggle, button), lock out swipe
+        if (!suppressSwipe)
+        {
+            lv_obj_t *pressed = lv_indev_get_obj_act();
+            if (pressed && pressed != lv_scr_act())
+                suppressSwipe = true;
+        }
+        // Detect swipe — delay a few frames so LVGL can acquire widgets first
+        if (!swipeFired && !suppressSwipe && touchFrames > 2)
+        {
+            int dx = data->point.x - touchStart.x;
+            int dy = data->point.y - touchStart.y;
+            int adx = dx < 0 ? -dx : dx;
+            int ady = dy < 0 ? -dy : dy;
+            if (adx >= SWIPE_MIN_PX && adx > ady)
+            {
+                swipeFired = true;
+                gestureActive = true;
+                if (dx < 0)
+                    goToPage(currentPage + 1);
+                else
+                    goToPage(currentPage - 1);
+            }
+        }
+        PowerManager::reportActivity();
     }
     else
     {
+        touchActive = false;
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HELPER FUNCTIONS
+// SWIPE GESTURE — horizontal swipe to switch screens
 // ═══════════════════════════════════════════════════════════════
-static void formatTurkishDate(char *buffer, size_t size)
-{
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo))
-    {
-        HijriDate hijri = gregorianToHijri(
-            1900 + timeinfo.tm_year,
-            timeinfo.tm_mon + 1,
-            timeinfo.tm_mday);
 
-        snprintf(buffer, size, "%d %s - %d %s %d",
-                 timeinfo.tm_mday,
-                 TURKISH_MONTHS[timeinfo.tm_mon],
-                 hijri.day,
-                 getHijriMonth(hijri.month),
-                 hijri.year);
-    }
-    else
+static lv_obj_t *getScreenForPage(int page)
+{
+    switch (page)
     {
-        snprintf(buffer, size, "Tarih Yok");
+    case 0:
+        return UiPageHome::getScreen();
+    case 1:
+        return UiPageClock::getScreen();
+    case 2:
+        return UiPageSettings::getScreen();
+    case 3:
+        return UiPageSettings::getPortalScreen();
+    default:
+        return UiPageHome::getScreen();
     }
+}
+
+static void goToPage(int page)
+{
+    int numPages = getNumPages();
+    if (page < 0)
+        page = 0;
+    if (page >= numPages)
+        page = numPages - 1;
+    if (page == currentPage)
+        return;
+    // Partial updates + software rotation: page switch is fast enough.
+    // lv_scr_load marks full screen dirty = one full flush, then back to partials.
+    currentPage = page;
+    lv_obj_t *scr = getScreenForPage(page);
+    lv_scr_load(scr);
+    lv_refr_now(NULL);
 }
 
 // Static buffer for prayer date (used by formatPrayerDate)
@@ -191,32 +210,59 @@ namespace LvglDisplay
 
         Serial.println("[Display] Initializing LVGL...");
 
-        // Init display hardware
-        gfx.init();
-        gfx.setRotation(0);
-        gfx.fillScreen(TFT_BLACK);
+        // Reset display via TCA9554 EXIO1 (LCD_RST)
+        TcaExpander::setPinMode(EXIO_LCD_RST, OUTPUT);
+        TcaExpander::writePin(EXIO_LCD_RST, HIGH);
+        delay(10);
+        TcaExpander::writePin(EXIO_LCD_RST, LOW);
+        delay(10);
+        TcaExpander::writePin(EXIO_LCD_RST, HIGH);
+        delay(200);
+
+        // Init display hardware (QSPI AXS15231B)
+        if (!gfx->begin())
+        {
+            Serial.println("[Display] ERROR: gfx->begin() failed!");
+            return false;
+        }
+
+        // No setRotation() — AXS15231B MADCTL rotation broken over QSPI.
+        // Software rotation in flush_cb handles landscape→portrait transform.
+        gfx->fillScreen(RGB565_BLACK);
+
+        // Backlight on
+        pinMode(TFT_BL, OUTPUT);
+        digitalWrite(TFT_BL, HIGH);
 
         // Init LVGL
         lv_init();
 
-        // Allocate draw buffer in PSRAM
-        size_t buf_size = 240 * 40; // 40 lines
-        buf1 = (lv_color_t *)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+        // Init capacitive touch (I2C, rotation=1 for landscape coord mapping)
+        bsp_touch_init(&Wire, TOUCH_RST, 1, SCR_W, SCR_H);
+
+        // Buffer in PSRAM for LVGL rendering (no rotation buffer needed)
+        size_t buf_size = SCR_W * SCR_H;
+        buf1 = (lv_color_t *)heap_caps_aligned_alloc(32, buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
         if (!buf1)
         {
             Serial.println("[Display] ERROR: Buffer allocation failed!");
             return false;
         }
+        memset(buf1, 0, buf_size * sizeof(lv_color_t));
+        Serial.printf("[Display] Buffer allocated: %uB in PSRAM (no rot_buf needed)\n",
+                      buf_size * sizeof(lv_color_t));
 
-        lv_disp_draw_buf_init(&draw_buf, buf1, NULL, buf_size);
+        lv_disp_draw_buf_init(&draw_buf, buf1, NULL, buf_size); // Single buffer
 
-        // Register display driver
+        // Register display driver — logical 480×320 landscape
+        // Manual rotation in flush_cb handles portrait hardware output
         lv_disp_drv_init(&disp_drv);
-        disp_drv.hor_res = 240;
-        disp_drv.ver_res = 320;
+        disp_drv.hor_res = SCR_W; // 480 (logical landscape)
+        disp_drv.ver_res = SCR_H; // 320 (logical landscape)
         disp_drv.flush_cb = lvgl_flush_cb;
         disp_drv.draw_buf = &draw_buf;
-        lv_disp_drv_register(&disp_drv);
+        disp_drv.direct_mode = 1; // Persistent buffer — LVGL only re-renders dirty widgets
+        lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
 
         // Register touch input driver
         lv_indev_drv_init(&indev_drv);
@@ -227,7 +273,7 @@ namespace LvglDisplay
         initialized = true;
         Serial.println("[Display] LVGL initialized with touch");
 
-        // Initialize state reader early so state-driven UI works from the start
+        // Initialize state reader early so boot status screens work
         UiStateReader::init();
 
         return true;
@@ -236,9 +282,7 @@ namespace LvglDisplay
     void loop()
     {
         if (initialized)
-        {
             lv_timer_handler();
-        }
     }
 
     void showPrayerScreen()
@@ -247,92 +291,28 @@ namespace LvglDisplay
         g_state.statusScreen = StatusScreenType::NONE;
         g_state.clearDirty(DirtyFlag::STATUS_SCREEN);
 
-        // Initialize state reader (creates LVGL timer for state polling)
-        UiStateReader::init();
+        // Create shared assets (motif tile) before screens
+        UiComponents::createSharedAssets();
 
         // Create all pages once (they stay in memory)
         UiPageHome::create();
-        UiPagePrayer::create();
+        UiPageClock::create();
         UiPageSettings::create();
 
-        // Load home screen (pages created above, this just displays home)
+        // Load home screen
+        currentPage = 0;
         lv_scr_load(UiPageHome::getScreen());
+        lv_refr_now(NULL);
 
-        // Set time via shared state
-        struct tm timeinfo;
-        if (getLocalTime(&timeinfo))
-        {
-            AppStateHelper::setTime(timeinfo.tm_hour, timeinfo.tm_min);
-        }
-        else
-        {
-            AppStateHelper::setTime(0, 0);
-        }
-
-        // Set Turkish date via shared state
-        char dateBuffer[64];
-        formatTurkishDate(dateBuffer, sizeof(dateBuffer));
-        AppStateHelper::setDate(dateBuffer);
-
-        // Initial loading state
-        AppStateHelper::setNextPrayer("YUKLENIYOR", "--:--");
-
-        // Update status icons via shared state
-        updateStatus();
+        // Fresh pages need current state — mark all dirty so UiStateReader pushes everything
+        g_state.markDirty(DirtyFlag::ALL & ~DirtyFlag::STATUS_SCREEN);
 
         // Navigation callback - just switch screens, no recreation
         UiComponents::setNavClickCallback([](int page)
                                           {
-            switch (page)
-            {
-            case 0:
-                lv_scr_load(UiPageHome::getScreen());
-                break;
-            case 1:
-                lv_scr_load(UiPagePrayer::getScreen());
-                break;
-            case 2:
-                lv_scr_load(UiPageSettings::getScreen());
-                break;
-            } });
-    }
-
-    void updateTime()
-    {
-        struct tm timeinfo;
-        if (getLocalTime(&timeinfo))
-        {
-            AppStateHelper::setTime(timeinfo.tm_hour, timeinfo.tm_min);
-
-            // Update date at midnight
-            if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0)
-            {
-                char dateBuffer[64];
-                formatTurkishDate(dateBuffer, sizeof(dateBuffer));
-                AppStateHelper::setDate(dateBuffer);
-            }
-        }
-    }
-
-    void updateDate()
-    {
-        struct tm timeinfo;
-        if (!getLocalTime(&timeinfo))
-        {
-            Serial.println("[Display] updateDate: Failed to get time");
-            return;
-        }
-        char dateBuffer[64];
-        formatTurkishDate(dateBuffer, sizeof(dateBuffer));
-        AppStateHelper::setDate(dateBuffer);
-    }
-
-    void updateStatus()
-    {
-        // NTP sync status
-        struct tm timeinfo;
-        bool ntpSynced = getLocalTime(&timeinfo, 0);
-        AppStateHelper::setNtpSynced(ntpSynced);
+            if (page < 0 || page >= getNumPages() || page == currentPage) return;
+            currentPage = page;
+            lv_scr_load(getScreenForPage(page)); });
     }
 
     const char *formatPrayerDate(int dayOffset)
@@ -349,14 +329,44 @@ namespace LvglDisplay
             }
             snprintf(prayerDateBuffer, sizeof(prayerDateBuffer), "%d %s %s",
                      timeinfo.tm_mday,
-                     TURKISH_MONTHS[timeinfo.tm_mon],
-                     TURKISH_DAYS[timeinfo.tm_wday]);
+                     LocaleTR::MONTHS[timeinfo.tm_mon],
+                     LocaleTR::DAYS[timeinfo.tm_wday]);
         }
         else
         {
             prayerDateBuffer[0] = '\0';
         }
         return prayerDateBuffer;
+    }
+
+    void setBacklight(uint8_t brightness)
+    {
+        analogWrite(TFT_BL, brightness);
+    }
+
+    void displayOff()
+    {
+        gfx->displayOff();
+    }
+
+    void displayOn()
+    {
+        gfx->displayOn();
+    }
+
+    bool isGestureActive()
+    {
+        return gestureActive;
+    }
+
+    void goToPortalPage()
+    {
+        lv_obj_t *portalScr = UiPageSettings::getPortalScreen();
+        if (!portalScr)
+            return;
+        currentPage = 3;
+        lv_scr_load(portalScr);
+        lv_refr_now(NULL);
     }
 
 } // namespace LvglDisplay

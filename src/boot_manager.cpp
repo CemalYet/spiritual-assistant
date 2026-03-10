@@ -154,10 +154,11 @@ namespace BootManager
             wifiConnected = tryConnectWiFi();
         }
 
-        // Step 3: NTP
+        // Step 3: NTP — always sync when WiFi available (RTC may have drifted)
         if (wifiConnected)
         {
-            showStatus("Saat Senkronize", "NTP sunucusuna baglaniliyor...");
+            if (!hasClock())
+                showStatus("Saat Senkronize", "NTP sunucusuna baglaniliyor...");
             Network::syncTime();
         }
 

@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <Wire.h>
 #include <LittleFS.h>
 #include "config.h"
+#include "tft_config.h"
 #include "network.h"
 #include "settings_server.h"
 #include "settings_manager.h"
@@ -17,6 +19,11 @@
 #include "wifi_manager.h"
 #include "portal_handler.h"
 #include "display_ticker.h"
+#include "tca_expander.h"
+#include "rtc_manager.h"
+#include "pmu_manager.h"
+#include "power_manager.h"
+#include "imu_manager.h"
 
 #if TEST_MODE || TEST_ADHAN_AUDIO
 #include "test_mode.h"
@@ -26,9 +33,14 @@
 
 static void initHardware()
 {
-    delay(2000);
     Serial.begin(115200);
-    delay(500);
+    // USB CDC: short wait for serial monitor (non-blocking if not connected)
+    unsigned long t0 = millis();
+    while (!Serial && (millis() - t0 < 1000))
+    {
+        delay(10);
+    }
+    delay(200);
 
     Serial.println("\n========================================");
     Serial.println("  ESP32-S3 SPIRITUAL ASSISTANT v3.0");
@@ -42,7 +54,22 @@ static void initHardware()
     if (!LittleFS.begin(true))
         Serial.println("[Error] LittleFS mount failed!");
 
-    audioPlayerInit();
+    Wire.begin(I2C_SDA, I2C_SCL);
+
+    TcaExpander::init();
+    PmuManager::init(); // ALDO1 powers ES8311 codec — must precede audioPlayerInit
+    audioPlayerInit();  // ES8311 codec + I2S + audio task
+    RtcManager::init();
+    ImuManager::init();
+    SettingsManager::init();
+
+    // Apply timezone from NVS before setting system clock
+    const char *tzCold = SettingsManager::getTimezone();
+    setenv("TZ", tzCold, 1);
+    tzset();
+
+    if (RtcManager::hasValidTime())
+        RtcManager::setSystemClockFromRTC();
 
     // Verify per-prayer adhan files exist
     bool adhanFound = false;
@@ -113,8 +140,6 @@ void setup()
     }
     delay(100);
 
-    SettingsManager::init();
-
 #if TEST_MODE
     // Boot manager still needed for WiFi/NTP in test mode
     BootManager::run();
@@ -132,6 +157,9 @@ void setup()
     // ── Init modules ──
     LvglDisplay::showPrayerScreen();
 
+    AppStateHelper::setNextPrayer("YUKLENIYOR", "--:--"); // placeholder until PrayerEngine loads
+    DisplayTicker::forceUpdate();                         // populate initial time / date / hijri / ntp in AppState
+
     if (bootOk)
         PrayerEngine::init();
 
@@ -139,11 +167,15 @@ void setup()
 
     UiPageSettings::setAdvancedCallback(onSettingsPressed);
 
-    // Volume
+    // Volume — all 0-100 everywhere
     uint8_t vol = SettingsManager::getVolume();
-    int level = (vol + 10) / 20;
-    level = constrain(level, 0, 5);
-    AppStateHelper::setVolume(level);
+    AppStateHelper::setVolume(vol);
+    setVolume(vol); // Apply NVS volume to ES8311 codec
+
+    // Mute state — persisted in NVS
+    g_state.muted = SettingsManager::getMuted();
+
+    PowerManager::init();
 
     Serial.println("\n[System] Ready!\n");
 }
@@ -158,12 +190,24 @@ void loop()
     WifiManager::tick();
     PrayerEngine::tick();
     DisplayTicker::tick();
+    PowerManager::tick();
+    RtcManager::correctDriftFromRTC();
 
     if (Network::isConnected())
+    {
         SettingsServer::handle();
+        if (RtcManager::periodicSyncTick())
+            Network::syncTime();
+    }
+    else if (!SettingsManager::isOfflineMode() && RtcManager::periodicSyncTick())
+    {
+        // WiFi is off but NTP sync is due — reconnect, sync, WiFi auto-disconnects later
+        Serial.println("[NTP] Sync due — reconnecting WiFi...");
+        WifiManager::reconnect();
+    }
 
     static unsigned long lastLog = 0;
-    if (millis() - lastLog > 30000)
+    if (millis() - lastLog > 300000)
     {
         lastLog = millis();
         Serial.printf("[Status] Heap: %d | Min: %d | WiFi: %s\n",

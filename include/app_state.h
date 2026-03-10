@@ -11,6 +11,8 @@
 #define APP_STATE_H
 
 #include <cstdint>
+#include <cstring>
+#include <cstdio>
 #include <etl/string.h>
 #include <etl/string_view.h>
 
@@ -29,6 +31,11 @@ namespace DirtyFlag
     constexpr uint16_t ADHAN_AVAILABLE = 0x0100;
     constexpr uint16_t STATUS_SCREEN = 0x0200;
     constexpr uint16_t LOCATION = 0x0400;
+    constexpr uint16_t COUNTDOWN = 0x0800;
+    constexpr uint16_t HIJRI = 0x1000;
+    constexpr uint16_t PROGRESS = 0x2000;
+    constexpr uint16_t QR_INFO = 0x4000;
+    constexpr uint16_t SIGNAL_BATTERY = 0x8000;
     constexpr uint16_t ALL = 0xFFFF;
 }
 
@@ -66,14 +73,50 @@ struct AppState
     // ═══════════════════════════════════════════════════
     int8_t hour = 0;
     int8_t minute = 0;
-    etl::string<48> date;
-    etl::string<48> location; // "Istanbul • Diyanet"
+    int8_t second = 0;
+    etl::string<48> date;          // Status bar: "· 8 Mart · Cuma"
+    etl::string<48> gregorianFull; // Clock page: "8 Mart 2026 · Cuma"
+    etl::string<48> location;      // "Istanbul • Diyanet"
 
     // ═══════════════════════════════════════════════════
     // PRAYER DATA
     // ═══════════════════════════════════════════════════
     etl::string<16> nextPrayerName;
     etl::string<8> nextPrayerTime;
+
+    // Seconds until next prayer (for countdown display)
+    uint32_t secondsToNext = 0;
+
+    // Hijri date string, e.g. "17 Ramazan 1447"
+    etl::string<32> hijriDate;
+
+    // Progress 0-100 through current prayer slot
+    uint8_t activePrayerProgress = 0;
+
+    // Ramadan mode
+    bool ramadanMode = false;
+    int32_t iftarDeltaSeconds = 0;        // >0=before iftar, <0=after iftar
+    etl::string<40> ramadanCountdownText; // e.g. "\xC4\xB0ftara Kald\xC4\xB1 02:31"
+
+    // Qibla
+    uint16_t qiblaDegrees = 0;
+    etl::string<16> qiblaDistance;  // e.g. "3.182 km"
+    etl::string<16> qiblaDirection; // e.g. "Güneydoğu"
+
+    // Device / QR screen
+    etl::string<16> deviceIp;
+    etl::string<32> deviceHostname;
+    etl::string<32> wifiSsid;
+    uint8_t wifiStrength = 0; // 0-3 bars
+
+    // Battery
+    uint8_t batteryPct = 0;
+    bool charging = false;
+
+    // Settings (mirrored for display)
+    uint8_t brightness = 70;
+    bool adhanEnabled = true;
+    bool sleepMode = true;
 
     // All 6 prayer times for prayer page
     etl::string<8> fajr;
@@ -95,7 +138,7 @@ struct AppState
     // ═══════════════════════════════════════════════════
     // AUDIO
     // ═══════════════════════════════════════════════════
-    int8_t volume = 3; // 0-5
+    uint8_t volume = 80; // 0-100 percentage
     bool muted = false;
     bool adhanAvailable = false;
 
@@ -130,13 +173,14 @@ extern AppState g_state;
 // ═══════════════════════════════════════════════════════════════
 namespace AppStateHelper
 {
-    // Set time
-    inline void setTime(int8_t hour, int8_t minute)
+    // Set time (second=0 default for callers that don't have seconds)
+    inline void setTime(int8_t hour, int8_t minute, int8_t second = 0)
     {
-        if (g_state.hour != hour || g_state.minute != minute)
+        if (g_state.hour != hour || g_state.minute != minute || g_state.second != second)
         {
             g_state.hour = hour;
             g_state.minute = minute;
+            g_state.second = second;
             g_state.markDirty(DirtyFlag::TIME);
         }
     }
@@ -210,16 +254,14 @@ namespace AppStateHelper
         }
     }
 
-    // Set volume (0-5)
-    inline void setVolume(int8_t level)
+    // Set volume (0-100 percentage)
+    inline void setVolume(uint8_t vol)
     {
-        if (level < 0)
-            level = 0;
-        if (level > 5)
-            level = 5;
-        if (g_state.volume != level)
+        if (vol > 100)
+            vol = 100;
+        if (g_state.volume != vol)
         {
-            g_state.volume = level;
+            g_state.volume = vol;
             g_state.markDirty(DirtyFlag::VOLUME);
         }
     }
@@ -251,6 +293,27 @@ namespace AppStateHelper
         {
             g_state.adhanAvailable = available;
             g_state.markDirty(DirtyFlag::ADHAN_AVAILABLE);
+        }
+    }
+
+    // Set WiFi signal strength (0-3 bars)
+    inline void setWifiSignal(uint8_t bars)
+    {
+        if (g_state.wifiStrength != bars)
+        {
+            g_state.wifiStrength = bars;
+            g_state.markDirty(DirtyFlag::SIGNAL_BATTERY);
+        }
+    }
+
+    // Set battery status
+    inline void setBatteryStatus(uint8_t pct, bool isCharging)
+    {
+        if (g_state.batteryPct != pct || g_state.charging != isCharging)
+        {
+            g_state.batteryPct = pct;
+            g_state.charging = isCharging;
+            g_state.markDirty(DirtyFlag::SIGNAL_BATTERY);
         }
     }
 
@@ -296,6 +359,96 @@ namespace AppStateHelper
         g_state.statusLine2.clear();
         g_state.statusLine3.clear();
         g_state.markDirty(DirtyFlag::STATUS_SCREEN);
+    }
+
+    // Set countdown (seconds until next prayer)
+    inline void setCountdown(uint32_t seconds)
+    {
+        g_state.secondsToNext = seconds;
+
+        // Compute Ramadan countdown text at data layer
+        // Always count down to Iftar (Maghrib) or Sahur (Fajr), not just next prayer
+        if (g_state.ramadanMode)
+        {
+            // Parse current time
+            int nowSec = g_state.hour * 3600 + g_state.minute * 60 + g_state.second;
+
+            // Parse Maghrib (Iftar) time from "HH:MM" string
+            int maghribSec = -1;
+            if (g_state.maghrib.size() >= 5)
+            {
+                int mh = (g_state.maghrib[0] - '0') * 10 + (g_state.maghrib[1] - '0');
+                int mm = (g_state.maghrib[3] - '0') * 10 + (g_state.maghrib[4] - '0');
+                maghribSec = mh * 3600 + mm * 60;
+            }
+
+            // Parse Fajr (Sahur) time from "HH:MM" string
+            int fajrSec = -1;
+            if (g_state.fajr.size() >= 5)
+            {
+                int fh = (g_state.fajr[0] - '0') * 10 + (g_state.fajr[1] - '0');
+                int fm = (g_state.fajr[3] - '0') * 10 + (g_state.fajr[4] - '0');
+                fajrSec = fh * 3600 + fm * 60;
+            }
+
+            // Determine: before Maghrib → İftara Kaldı, after Maghrib → Sahura Kaldı
+            int targetSec = -1;
+            const char *prefix = nullptr;
+            if (maghribSec >= 0 && nowSec < maghribSec)
+            {
+                // Daytime: count to Iftar (Maghrib)
+                targetSec = maghribSec - nowSec;
+                prefix = "\xc4\xb0"
+                         "ftara";
+            }
+            else if (fajrSec >= 0)
+            {
+                // Nighttime: count to Sahur (Fajr)
+                targetSec = fajrSec - nowSec;
+                if (targetSec <= 0)
+                    targetSec += 86400; // wrap past midnight
+                prefix = "Sahura";
+            }
+
+            if (targetSec > 0 && prefix)
+            {
+                int h = targetSec / 3600;
+                int m = (targetSec % 3600) / 60;
+                char buf[40];
+                snprintf(buf, sizeof(buf), "%s %02d:%02d Kald\xc4\xb1", prefix, h, m);
+                g_state.ramadanCountdownText.assign(buf);
+            }
+            else
+            {
+                g_state.ramadanCountdownText.clear();
+            }
+        }
+        else
+        {
+            g_state.ramadanCountdownText.clear();
+        }
+
+        g_state.markDirty(DirtyFlag::COUNTDOWN);
+    }
+
+    // Set Hijri date string separately from Gregorian
+    inline void setHijriDate(etl::string_view hijri)
+    {
+        if (g_state.hijriDate != hijri)
+        {
+            g_state.hijriDate.assign(hijri.begin(), hijri.end());
+            g_state.markDirty(DirtyFlag::HIJRI);
+        }
+    }
+
+    // Set prayer slot progress 0-100
+    inline void setProgress(uint8_t pct)
+    {
+        if (g_state.activePrayerProgress != pct)
+        {
+            g_state.activePrayerProgress = pct;
+            g_state.markDirty(DirtyFlag::PROGRESS);
+        }
     }
 
     // Clear status screen (return to normal UI)

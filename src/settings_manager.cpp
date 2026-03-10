@@ -1,5 +1,6 @@
 #include "settings_manager.h"
 #include "config.h"
+#include "audio_player.h"
 #include <Preferences.h>
 #include <Arduino.h>
 #include <etl/string.h>
@@ -42,6 +43,12 @@ namespace SettingsManager
     constexpr const char *KEY_CITY_NAME = "cityName";
     constexpr const char *KEY_DIYANET_ID = "diyanetId";
     constexpr const char *KEY_CONNECTION_MODE = "connMode";
+    constexpr const char *KEY_POWER_MODE = "power_mode";
+    constexpr const char *KEY_TIMEZONE = "timezone";
+    constexpr const char *KEY_MUTED = "muted";
+
+    constexpr const char *DEFAULT_TIMEZONE = "UTC0";
+    static constexpr size_t MAX_TZ_LEN = 48;
 
     // Cached values to avoid frequent NVS reads
     static int cachedPrayerMethod = -1;
@@ -61,6 +68,9 @@ namespace SettingsManager
 
     // Action flags
     static volatile bool flagRecalculation = false;
+    static uint8_t cachedPowerMode = static_cast<uint8_t>(PowerMode::ALWAYS_ON);
+    static int8_t cachedMuted = -1; // -1 = not loaded
+    static etl::string<MAX_TZ_LEN> cachedTimezone;
 
     // Available calculation methods
     static const MethodInfo methods[] = {
@@ -87,7 +97,7 @@ namespace SettingsManager
         // Load cached values
         preferences.begin(NAMESPACE, true);
         cachedPrayerMethod = preferences.getInt(KEY_PRAYER_METHOD, Config::PRAYER_METHOD);
-        cachedVolume = preferences.getUChar(KEY_VOLUME, 80); // Default 80%
+        cachedVolume = preferences.getUChar(KEY_VOLUME, AudioConfig::DEFAULT_VOLUME); // Default 80%
 
         // Load adhan enabled states (default: all enabled except Sunrise)
         cachedAdhanEnabled[idx(PrayerType::Fajr)] = preferences.getBool(KEY_ADHAN_FAJR, true) ? 1 : 0;
@@ -101,6 +111,17 @@ namespace SettingsManager
         char modeBuffer[16];
         size_t len = preferences.getString(KEY_CONNECTION_MODE, modeBuffer, sizeof(modeBuffer));
         cachedConnectionMode.assign(len > 0 ? modeBuffer : "wifi");
+
+        cachedPowerMode = preferences.getUChar(KEY_POWER_MODE,
+                                               static_cast<uint8_t>(PowerMode::ALWAYS_ON));
+        if (cachedPowerMode > static_cast<uint8_t>(PowerMode::SCREEN_OFF))
+            cachedPowerMode = static_cast<uint8_t>(PowerMode::ALWAYS_ON);
+
+        cachedMuted = preferences.getBool(KEY_MUTED, false) ? 1 : 0;
+
+        char tzBuffer[MAX_TZ_LEN];
+        size_t tzLen = preferences.getString(KEY_TIMEZONE, tzBuffer, sizeof(tzBuffer));
+        cachedTimezone.assign(tzLen > 0 ? tzBuffer : DEFAULT_TIMEZONE);
 
         preferences.end();
 
@@ -328,21 +349,16 @@ namespace SettingsManager
         if (cachedVolume < 0)
         {
             preferences.begin(NAMESPACE, true);
-            cachedVolume = preferences.getUChar(KEY_VOLUME, 80);
+            cachedVolume = preferences.getUChar(KEY_VOLUME, AudioConfig::DEFAULT_VOLUME);
             preferences.end();
         }
         return static_cast<uint8_t>(cachedVolume);
     }
 
-    uint8_t getHardwareVolume()
-    {
-        return (getVolume() * 21) / 100;
-    }
-
     bool setVolume(uint8_t volume)
     {
-        if (volume > 100)
-            volume = 100;
+        if (volume > AudioConfig::MAX_VOLUME_PCT)
+            volume = AudioConfig::MAX_VOLUME_PCT;
 
         if (!preferences.begin(NAMESPACE, false))
         {
@@ -356,9 +372,35 @@ namespace SettingsManager
         if (success)
         {
             cachedVolume = volume;
-            Serial.printf("[Settings] Volume saved: %d%%\n", volume);
         }
 
+        return success;
+    }
+
+    bool getMuted()
+    {
+        if (cachedMuted < 0)
+        {
+            PreferencesGuard guard(true);
+            cachedMuted = preferences.getBool(KEY_MUTED, false) ? 1 : 0;
+        }
+        return cachedMuted == 1;
+    }
+
+    bool setMuted(bool muted)
+    {
+        if (cachedMuted == (muted ? 1 : 0))
+            return true;
+
+        PreferencesGuard guard(false);
+        if (!guard)
+            return false;
+
+        bool success = preferences.putBool(KEY_MUTED, muted);
+        if (success)
+        {
+            cachedMuted = muted ? 1 : 0;
+        }
         return success;
     }
 
@@ -522,6 +564,68 @@ namespace SettingsManager
         cachedDiyanetId = id;
         flagRecalculation = true;
         Serial.printf("[Settings] Diyanet ID saved: %d\n", id);
+        return true;
+    }
+
+    PowerMode getPowerMode()
+    {
+        return static_cast<PowerMode>(cachedPowerMode);
+    }
+
+    bool setPowerMode(PowerMode mode)
+    {
+        uint8_t val = static_cast<uint8_t>(mode);
+        if (val == cachedPowerMode)
+            return true;
+
+        PreferencesGuard guard(false);
+        if (!guard)
+            return false;
+
+        if (preferences.putUChar(KEY_POWER_MODE, val) == 0)
+            return false;
+
+        cachedPowerMode = val;
+        Serial.printf("[Settings] Power mode: %u\n", val);
+        return true;
+    }
+
+    const char *getTimezone()
+    {
+        if (cachedTimezone.empty())
+        {
+            PreferencesGuard guard(true);
+            if (guard)
+            {
+                char tzBuffer[MAX_TZ_LEN];
+                size_t len = preferences.getString(KEY_TIMEZONE, tzBuffer, sizeof(tzBuffer));
+                cachedTimezone.assign(len > 0 ? tzBuffer : DEFAULT_TIMEZONE);
+            }
+            else
+            {
+                return DEFAULT_TIMEZONE;
+            }
+        }
+        return cachedTimezone.c_str();
+    }
+
+    bool setTimezone(const char *posixTz)
+    {
+        if (!posixTz || posixTz[0] == '\0')
+            return false;
+
+        if (cachedTimezone == posixTz)
+            return true;
+
+        PreferencesGuard guard(false);
+        if (!guard)
+            return false;
+
+        if (preferences.putString(KEY_TIMEZONE, posixTz) == 0)
+            return false;
+
+        cachedTimezone.assign(posixTz);
+        Serial.printf("[Settings] Timezone: %s\n", posixTz);
         return true;
     }
 }

@@ -6,4 +6,6 @@ namespace PrayerEngine
     void tick();
     void recalculate();
     bool isReady();
+    int getNextPrayerSeconds();
+    bool isShowingTomorrow();
 }
