@@ -5,6 +5,8 @@
 #include "audio_player.h"
 #include "ui_state_reader.h"
 
+#include "rtc_manager.h"
+
 #include "prayer_engine.h"
 #include "current_time.h"
 
@@ -98,6 +100,9 @@ namespace PowerManager
         switch (currentState)
         {
         case State::ACTIVE:
+            if (cachedMode == PowerMode::ALWAYS_ON)
+                break;
+
             if (idleMs >= getDimTimeout())
             {
                 LvglDisplay::setBacklight(DIM_BRIGHTNESS);
@@ -108,7 +113,12 @@ namespace PowerManager
 
         case State::DIM:
             if (cachedMode == PowerMode::ALWAYS_ON)
+            {
+                LvglDisplay::setBacklight(ACTIVE_BRIGHTNESS);
+                currentState = State::ACTIVE;
+                Serial.println("[Power] DIM → ACTIVE (mode=ALWAYS_ON)");
                 break;
+            }
 
             if (idleMs >= SCREEN_OFF_TIMEOUT_MS)
             {
@@ -180,6 +190,13 @@ namespace PowerManager
         // Re-init UART — USB-CDC drops during light sleep
         Serial.begin(115200);
         delay(50);
+
+        // Re-anchor system time to external RTC after light sleep.
+        if (!RtcManager::setSystemClockFromRTC())
+        {
+            Serial.println("[Power] RTC read failed after wake — scheduling immediate NTP sync");
+            RtcManager::postponeSync(0);
+        }
 
         audioPlayerResume();
     }

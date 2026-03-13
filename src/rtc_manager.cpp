@@ -14,6 +14,7 @@ namespace
     bool s_validTime = false;
     unsigned long s_lastSyncMs = 0;
     unsigned long s_lastDriftCheckMs = 0;
+    unsigned long s_lastNtpSyncMs = 0;
 
     constexpr uint16_t MIN_VALID_YEAR = 2024;
     constexpr uint8_t NO_ALARM = 0xFF;
@@ -44,6 +45,11 @@ namespace
 
 namespace RtcManager
 {
+    void markNtpSync()
+    {
+        s_lastNtpSyncMs = millis();
+    }
+
     bool init()
     {
         if (s_available)
@@ -116,13 +122,13 @@ namespace RtcManager
         return true;
     }
 
-    void writeSystemClockToRTC()
+    void writeSystemClockToRTC(time_t exactEpoch)
     {
         if (!s_available)
             return;
 
-        // Get current UTC from system clock
-        time_t now = time(nullptr);
+        // Use exact epoch if provided (from SNTP callback), otherwise read system clock
+        time_t now = (exactEpoch > 0) ? exactEpoch : time(nullptr);
         struct tm utc;
         gmtime_r(&now, &utc);
 
@@ -157,10 +163,7 @@ namespace RtcManager
 
     bool periodicSyncTick()
     {
-        if (!s_available)
-            return false;
-
-        unsigned long interval = s_validTime
+        unsigned long interval = (s_available && s_validTime)
                                      ? NTP_SYNC_INTERVAL_RTC
                                      : NTP_SYNC_INTERVAL_NO_RTC;
 
@@ -207,6 +210,7 @@ namespace RtcManager
 
         time_t sysEpoch = time(nullptr);
         long drift = static_cast<long>(sysEpoch - rtcEpoch);
+        bool ntpFresh = (s_lastNtpSyncMs != 0) && ((now - s_lastNtpSyncMs) < NTP_TRUST_WINDOW_MS);
 
         struct tm sysTm;
         gmtime_r(&sysEpoch, &sysTm);
@@ -214,12 +218,34 @@ namespace RtcManager
                       sysTm.tm_hour, sysTm.tm_min, sysTm.tm_sec,
                       dt.getHour(), dt.getMinute(), dt.getSecond(), drift);
 
-        if (drift < -1 || drift > 1)
+        if (drift >= -1 && drift <= 1)
+            return;
+
+        auto setSystemFromRtc = [&]()
         {
             struct timeval tv = {.tv_sec = rtcEpoch, .tv_usec = 0};
             settimeofday(&tv, nullptr);
-            Serial.printf("[RTC] Drift corrected: %+ld sec\n", drift);
+        };
+
+        if (drift < -1)
+        {
+            // RTC ahead of system → system drifted, update system from RTC
+            setSystemFromRtc();
+            Serial.printf("[RTC] System updated from RTC: drift was %+ld sec\n", drift);
+            return;
         }
+
+        if (!ntpFresh)
+        {
+            // Protect external RTC from sleep-induced system drift.
+            setSystemFromRtc();
+            Serial.printf("[RTC] System corrected from RTC (NTP stale): drift was %+ld sec\n", drift);
+            return;
+        }
+
+        // Fresh NTP means system time is trusted for a short window.
+        writeSystemClockToRTC(0);
+        Serial.printf("[RTC] RTC updated from trusted system (fresh NTP): drift was %+ld sec\n", drift);
     }
 
     // Alarm functions

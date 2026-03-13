@@ -3,6 +3,7 @@
 #include "pmu_manager.h"
 #include <LittleFS.h>
 #include "es8311.h"
+#include <cmath>
 
 static constexpr int AUDIO_BUFFER_SIZE = 8000;
 static constexpr int AUDIO_BUFFER_SIZE_PSRAM = 80000;
@@ -93,7 +94,8 @@ bool audioPlayerInit()
     audio.setPinout(AudioConfig::BCLK, AudioConfig::LRC,
                     AudioConfig::DOUT, AudioConfig::MCLK);
     audio.setBufsize(AUDIO_BUFFER_SIZE, AUDIO_BUFFER_SIZE_PSRAM);
-    audio.setVolume(AudioConfig::MAX_VOLUME); // I2S at max; user volume controlled via ES8311 codec
+    // Keep digital headroom at I2S stage; user volume is handled at codec stage.
+    audio.setVolume(AudioConfig::I2S_PLAYBACK_VOLUME);
 
     // Audio task on Core 0 — needs enough stack and priority to avoid underruns
     xTaskCreatePinnedToCore(
@@ -153,10 +155,19 @@ void stopAudio()
 
 void setVolume(uint8_t vol)
 {
-    // vol is 0-100 percentage, passed directly to ES8311 codec
+    // Map UI 0-100 through a perceptual curve so mid values feel less "too quiet"
+    // while upper range ramps more smoothly and avoids sudden loud jumps.
     uint8_t clamped = (vol > AudioConfig::MAX_VOLUME_PCT) ? AudioConfig::MAX_VOLUME_PCT : vol;
+    const float norm = static_cast<float>(clamped) / static_cast<float>(AudioConfig::MAX_VOLUME_PCT);
+    const float shaped = powf(norm, AudioConfig::VOLUME_GAMMA);
+    uint8_t mapped = static_cast<uint8_t>(lroundf(shaped * AudioConfig::CODEC_SOFT_CAP_PCT));
+
+    // Avoid near-zero dead zone when user expects audible output.
+    if (clamped > 0 && mapped < 2)
+        mapped = 2;
+
     if (codecHandle)
-        es8311_voice_volume_set(codecHandle, clamped, NULL);
+        es8311_voice_volume_set(codecHandle, mapped, NULL);
 }
 
 void enableAmp()

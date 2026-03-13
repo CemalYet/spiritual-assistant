@@ -27,8 +27,6 @@ namespace UiPageHome
     // ── Widget handles ────────────────────────────────────────────────
     static lv_obj_t *scr = nullptr;
     static UiComponents::StatusBarHandles sb_handles = {};
-    static lv_obj_t *lbl_greet_l = nullptr;
-    static lv_obj_t *lbl_greet_r = nullptr;
     static lv_obj_t *lbl_next_label = nullptr;
     static lv_obj_t *lbl_prayer_nm = nullptr;
     static lv_obj_t *lbl_countdown = nullptr;
@@ -55,52 +53,25 @@ namespace UiPageHome
 
     // ── Separator ── MOVED TO UiComponents::createSeparator() ──────────
 
-    // ── Greeting row (y≈27) ────────────────────────────────────────
-    static void buildGreeting(lv_obj_t *parent)
-    {
-        lv_obj_t *row = lv_obj_create(parent);
-        lv_obj_remove_style_all(row);
-        noScrollNoBorder(row);
-        lv_obj_set_size(row, 480, 18);
-        lv_obj_set_pos(row, 0, 34);
-        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(row, 3, 0);
-
-        lbl_greet_l = lv_label_create(row);
-        lv_obj_set_style_text_font(lbl_greet_l, FONT_GREETING_13, 0);
-        lv_obj_set_style_text_color(lbl_greet_l, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(lbl_greet_l, 209, 0); // rgba(240,232,208,0.82)
-        lv_obj_set_style_text_letter_space(lbl_greet_l, 1, 0);
-        lv_label_set_text(lbl_greet_l, "");
-
-        lbl_greet_r = lv_label_create(row);
-        lv_obj_set_style_text_font(lbl_greet_r, FONT_GREETING_13, 0);
-        lv_obj_set_style_text_color(lbl_greet_r, COLOR_GOLD_LIGHT, 0);
-        lv_obj_set_style_text_opa(lbl_greet_r, LV_OPA_COVER, 0);
-        lv_obj_set_style_text_letter_space(lbl_greet_r, 1, 0);
-        lv_label_set_text(lbl_greet_r, "");
-    }
-
-    // ── Hero area (y=47 → y=265) ────────────────────────────────────
+    // ── Hero area (clean layout: no greeting row) ────────────────────
     static void buildHero(lv_obj_t *parent)
     {
         lv_obj_t *hero = lv_obj_create(parent);
         lv_obj_remove_style_all(hero);
         noScrollNoBorder(hero);
-        lv_obj_set_size(hero, 480, 140);
-        lv_obj_set_pos(hero, 0, 52);
+        lv_obj_set_size(hero, 480, 144);
+        lv_obj_set_pos(hero, 0, 50);
         lv_obj_set_flex_flow(hero, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(hero, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_row(hero, 4, 0);
+        lv_obj_set_style_pad_row(hero, 10, 0);
         lv_obj_set_style_pad_left(hero, 20, 0);
         lv_obj_set_style_pad_right(hero, 20, 0);
 
         // 1. "{PrayerName} vaktine" label (~24px)
         lbl_next_label = lv_label_create(hero);
         lv_obj_set_style_text_font(lbl_next_label, FONT_PRAYER_24, 0);
-        lv_obj_set_style_text_color(lbl_next_label, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(lbl_next_label, 209, 0);
+        lv_obj_set_style_text_color(lbl_next_label, COLOR_TEXT, 0);
+        lv_obj_set_style_text_opa(lbl_next_label, 245, 0);
         lv_obj_set_style_text_letter_space(lbl_next_label, 1, 0);
         lv_label_set_recolor(lbl_next_label, true);
         lv_label_set_text(lbl_next_label, "--- vaktine");
@@ -114,99 +85,81 @@ namespace UiPageHome
         lv_obj_set_style_text_color(lbl_countdown, COLOR_GOLD_LIGHT, 0);
         lv_obj_set_style_text_letter_space(lbl_countdown, 4, 0);
         lv_obj_set_style_shadow_color(lbl_countdown, COLOR_GOLD, 0);
-        lv_obj_set_style_shadow_spread(lbl_countdown, 15, 0);
-        lv_obj_set_style_shadow_opa(lbl_countdown, 80, 0);
+        lv_obj_set_style_shadow_spread(lbl_countdown, 10, 0);
+        lv_obj_set_style_shadow_opa(lbl_countdown, 58, 0);
         lv_label_set_text(lbl_countdown, "00:00:00");
 
-        // 4. Iftar pill — absolutely positioned below countdown, outside flex flow
-        //    so it never shifts the countdown when shown/hidden
+        // 4. Iftar pill — HTML-like compact card with left accent line
         iftar_pill = lv_obj_create(parent);
         lv_obj_remove_style_all(iftar_pill);
         lv_obj_set_size(iftar_pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_align(iftar_pill, LV_ALIGN_TOP_MID, 0, 175);
-        lv_obj_set_style_radius(iftar_pill, 20, 0);
-        lv_obj_set_style_bg_color(iftar_pill, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(iftar_pill, 26, 0);
-        lv_obj_set_style_border_color(iftar_pill, COLOR_BORDER, 0);
-        lv_obj_set_style_border_opa(iftar_pill, 41, 0);
-        lv_obj_set_style_border_width(iftar_pill, 1, 0);
-        lv_obj_set_style_pad_top(iftar_pill, 5, 0);
-        lv_obj_set_style_pad_bottom(iftar_pill, 5, 0);
-        lv_obj_set_style_pad_left(iftar_pill, 16, 0);
-        lv_obj_set_style_pad_right(iftar_pill, 16, 0);
+        lv_obj_align(iftar_pill, LV_ALIGN_TOP_MID, 0, 178);
+        lv_obj_set_style_radius(iftar_pill, 4, 0);
+        lv_obj_set_style_bg_color(iftar_pill, COLOR_BG2, 0);
+        lv_obj_set_style_bg_opa(iftar_pill, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(iftar_pill, COLOR_DIM, 0);
+        lv_obj_set_style_border_opa(iftar_pill, 130, 0);
+        lv_obj_set_style_border_width(iftar_pill, 3, 0);
+        lv_obj_set_style_border_side(iftar_pill, LV_BORDER_SIDE_LEFT, 0);
+        lv_obj_set_style_pad_top(iftar_pill, 6, 0);
+        lv_obj_set_style_pad_bottom(iftar_pill, 6, 0);
+        lv_obj_set_style_pad_left(iftar_pill, 10, 0);
+        lv_obj_set_style_pad_right(iftar_pill, 14, 0);
         lv_obj_clear_flag(iftar_pill, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_flex_flow(iftar_pill, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(iftar_pill, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(iftar_pill, 6, 0);
+        lv_obj_set_style_pad_column(iftar_pill, 8, 0);
         lv_obj_add_flag(iftar_pill, LV_OBJ_FLAG_HIDDEN);
 
         // dot
         lv_obj_t *idot = lv_obj_create(iftar_pill);
         lv_obj_remove_style_all(idot);
-        lv_obj_set_size(idot, 5, 5);
+        lv_obj_set_size(idot, 7, 7);
         lv_obj_set_style_radius(idot, 3, 0);
-        lv_obj_set_style_bg_color(idot, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(idot, 179, 0);
+        lv_obj_set_style_bg_color(idot, COLOR_DIM, 0);
+        lv_obj_set_style_bg_opa(idot, 166, 0);
         lv_obj_set_style_border_width(idot, 0, 0);
 
         // Full text label: "İftara Kaldı 02:31" or "Sahura Kaldı 05:12"
         lbl_iftar_val = lv_label_create(iftar_pill);
-        lv_obj_set_style_text_font(lbl_iftar_val, FONT_HEADING_10, 0);
-        lv_obj_set_style_text_color(lbl_iftar_val, COLOR_GOLD_LIGHT, 0);
-        lv_obj_set_style_text_letter_space(lbl_iftar_val, 2, 0);
+        lv_obj_set_style_text_font(lbl_iftar_val, FONT_BODY_12, 0);
+        lv_obj_set_style_text_color(lbl_iftar_val, COLOR_TEXT, 0);
+        lv_obj_set_style_text_letter_space(lbl_iftar_val, 1, 0);
         lv_label_set_text(lbl_iftar_val, "");
     }
 
-    // ── Prayer strip (y=265, h=50) ─────────────────────────────────
+    // ── Prayer strip (HTML-like: single top border + 1px vertical dividers) ──
     static void buildPrayerStrip(lv_obj_t *parent)
     {
         lv_obj_t *strip = lv_obj_create(parent);
         lv_obj_remove_style_all(strip);
-        lv_obj_set_size(strip, 480, 60);
-        lv_obj_set_pos(strip, 0, 242);
+        lv_obj_set_size(strip, 480, 64);
+        lv_obj_set_pos(strip, 0, 238);
         lv_obj_set_style_bg_color(strip, COLOR_STRIP_BG, 0);
         lv_obj_set_style_bg_opa(strip, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(strip, 0, 0); // override all
-        lv_obj_set_style_border_side(strip, LV_BORDER_SIDE_TOP, 0);
-        lv_obj_set_style_border_color(strip, COLOR_GOLD, 0);
-        lv_obj_set_style_border_opa(strip, 77, 0); // 0.30×255=77
-        lv_obj_set_style_border_width(strip, 1, 0);
+        lv_obj_set_style_border_width(strip, 0, 0);
         lv_obj_clear_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_pad_all(strip, 0, 0);
 
-        // Gradient hairline inside top (transparent→gold→transparent)
-        lv_obj_t *hl = lv_obj_create(strip);
-        lv_obj_remove_style_all(hl);
-        lv_obj_set_size(hl, 202, 1);
-        lv_obj_set_pos(hl, 38, 0);
-        lv_obj_set_style_bg_grad_dir(hl, LV_GRAD_DIR_HOR, 0);
-        lv_obj_set_style_bg_color(hl, COLOR_STRIP_BG, 0);
-        lv_obj_set_style_bg_grad_color(hl, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(hl, 102, 0);
-        lv_obj_set_style_border_width(hl, 0, 0);
-        lv_obj_clear_flag(hl, LV_OBJ_FLAG_SCROLLABLE);
-
-        lv_obj_t *hr = lv_obj_create(strip);
-        lv_obj_remove_style_all(hr);
-        lv_obj_set_size(hr, 202, 1);
-        lv_obj_set_pos(hr, 240, 0);
-        lv_obj_set_style_bg_grad_dir(hr, LV_GRAD_DIR_HOR, 0);
-        lv_obj_set_style_bg_color(hr, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_grad_color(hr, COLOR_STRIP_BG, 0);
-        lv_obj_set_style_bg_opa(hr, 102, 0);
-        lv_obj_set_style_border_width(hr, 0, 0);
-        lv_obj_clear_flag(hr, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_t *top_line = lv_obj_create(strip);
+        lv_obj_remove_style_all(top_line);
+        lv_obj_set_size(top_line, 480, 1);
+        lv_obj_set_pos(top_line, 0, 0);
+        lv_obj_set_style_bg_color(top_line, COLOR_GOLD, 0);
+        lv_obj_set_style_bg_opa(top_line, 166, 0);
+        lv_obj_set_style_border_width(top_line, 0, 0);
+        lv_obj_clear_flag(top_line, LV_OBJ_FLAG_SCROLLABLE);
 
         // 6 columns (w=80 each)
         for (int i = 0; i < 6; i++)
         {
             lv_obj_t *col = lv_obj_create(strip);
             lv_obj_remove_style_all(col);
-            lv_obj_set_size(col, 80, 60);
-            lv_obj_set_pos(col, i * 80, 0);
+            lv_obj_set_size(col, 80, 63);
+            lv_obj_set_pos(col, i * 80, 1);
             lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
             lv_obj_set_flex_align(col, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-            lv_obj_set_style_pad_row(col, 2, 0);
+            lv_obj_set_style_pad_row(col, 3, 0);
             lv_obj_set_style_pad_all(col, 2, 0);
             lv_obj_set_style_bg_opa(col, LV_OPA_TRANSP, 0);
             lv_obj_set_style_border_width(col, 0, 0);
@@ -218,38 +171,38 @@ namespace UiPageHome
             {
                 lv_obj_t *div = lv_obj_create(strip);
                 lv_obj_remove_style_all(div);
-                lv_obj_set_size(div, 1, 36);
-                lv_obj_set_pos(div, i * 80, 12);
-                lv_obj_set_style_bg_color(div, COLOR_DIM, 0);
-                lv_obj_set_style_bg_opa(div, 26, 0); // rgba(240,232,208,0.10)
+                lv_obj_set_size(div, 1, 63);
+                lv_obj_set_pos(div, i * 80, 1);
+                lv_obj_set_style_bg_color(div, COLOR_BORDER, 0);
+                lv_obj_set_style_bg_opa(div, LV_OPA_COVER, 0);
                 lv_obj_set_style_border_width(div, 0, 0);
                 lv_obj_clear_flag(div, LV_OBJ_FLAG_SCROLLABLE);
             }
 
-            // dot
+            // marker (rectangle for cleaner readability on low DPI)
             lv_obj_t *dot = lv_obj_create(col);
             lv_obj_remove_style_all(dot);
-            lv_obj_set_size(dot, 5, 5);
-            lv_obj_set_style_radius(dot, 3, 0);
+            lv_obj_set_size(dot, 0, 0);
+            lv_obj_set_style_radius(dot, 1, 0);
             lv_obj_set_style_bg_color(dot, COLOR_DIM, 0);
-            lv_obj_set_style_bg_opa(dot, 64, 0); // rgba(.25)
+            lv_obj_set_style_bg_opa(dot, LV_OPA_TRANSP, 0);
             lv_obj_set_style_border_width(dot, 0, 0);
             strip_dot[i] = dot;
 
             // name
             lv_obj_t *nm = lv_label_create(col);
             lv_obj_set_style_text_font(nm, FONT_HEADING_12, 0);
-            lv_obj_set_style_text_color(nm, COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(nm, 242, 0); // rgba(240,232,208,0.95)
+            lv_obj_set_style_text_color(nm, COLOR_TEXT, 0);
+            lv_obj_set_style_text_opa(nm, LV_OPA_COVER, 0);
             lv_obj_set_style_text_letter_space(nm, 0, 0);
             lv_label_set_text(nm, STRIP_NAMES[i]);
             strip_name[i] = nm;
 
             // time
             lv_obj_t *t = lv_label_create(col);
-            lv_obj_set_style_text_font(t, FONT_MONO_10, 0);
-            lv_obj_set_style_text_color(t, COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(t, 179, 0); // rgba(240,232,208,0.70)
+            lv_obj_set_style_text_font(t, FONT_MONO_14, 0);
+            lv_obj_set_style_text_color(t, COLOR_TEXT, 0);
+            lv_obj_set_style_text_opa(t, LV_OPA_COVER, 0);
             lv_obj_set_style_text_letter_space(t, 0, 0);
             lv_label_set_text(t, "--:--");
             strip_time_lbl[i] = t;
@@ -273,11 +226,9 @@ namespace UiPageHome
         lv_obj_set_style_border_width(scr, 0, 0);
         lv_obj_set_style_pad_all(scr, 0, 0);
 
-        UiComponents::applyMotif(scr);
-        UiComponents::createAmbientGlow(scr);
+        // Phase D: keep home background clean (no motif/glow overlays)
         sb_handles = UiComponents::createStatusBar(scr);
         UiComponents::createSeparator(scr);
-        buildGreeting(scr);
         buildHero(scr);
         buildPrayerStrip(scr);
         UiComponents::createNavDots(scr, 0);
@@ -340,11 +291,11 @@ namespace UiPageHome
             lv_obj_set_style_bg_opa(strip_col[old], LV_OPA_TRANSP, 0);
             lv_obj_set_style_bg_grad_dir(strip_col[old], LV_GRAD_DIR_NONE, 0);
             lv_obj_set_style_text_color(strip_name[old], COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(strip_name[old], 191, 0);
+            lv_obj_set_style_text_opa(strip_name[old], 220, 0);
             lv_obj_set_style_text_color(strip_time_lbl[old], COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(strip_time_lbl[old], 115, 0);
+            lv_obj_set_style_text_opa(strip_time_lbl[old], 220, 0);
             lv_obj_set_style_bg_color(strip_dot[old], COLOR_DIM, 0);
-            lv_obj_set_style_bg_opa(strip_dot[old], 51, 0);
+            lv_obj_set_style_bg_opa(strip_dot[old], 130, 0);
             lv_obj_set_style_shadow_opa(strip_dot[old], 0, 0);
         }
 
@@ -355,26 +306,24 @@ namespace UiPageHome
 
             if (done)
             {
-                lv_obj_set_style_opa(strip_col[i], 153, 0); // HTML done opa=0.45 → boosted to 0.60 for LCD readability
+                lv_obj_set_style_opa(strip_col[i], 205, 0);
                 lv_obj_set_style_bg_opa(strip_col[i], LV_OPA_TRANSP, 0);
                 lv_obj_set_style_bg_grad_dir(strip_col[i], LV_GRAD_DIR_NONE, 0);
-                lv_obj_set_style_text_color(strip_name[i], COLOR_DIM, 0);
-                lv_obj_set_style_text_opa(strip_name[i], 242, 0); // 0.95; eff = 0.45*0.95 ≈ 0.43
-                lv_obj_set_style_text_color(strip_time_lbl[i], COLOR_DIM, 0);
-                lv_obj_set_style_text_opa(strip_time_lbl[i], 179, 0); // 0.70; eff = 0.45*0.70 ≈ 0.32
+                lv_obj_set_style_text_color(strip_name[i], COLOR_TEXT, 0);
+                lv_obj_set_style_text_opa(strip_name[i], 235, 0);
+                lv_obj_set_style_text_color(strip_time_lbl[i], COLOR_TEXT, 0);
+                lv_obj_set_style_text_opa(strip_time_lbl[i], 235, 0);
                 lv_obj_set_style_bg_color(strip_dot[i], COLOR_GREEN, 0);
-                lv_obj_set_style_bg_opa(strip_dot[i], 180, 0);
+                lv_obj_set_style_bg_opa(strip_dot[i], 220, 0);
                 lv_obj_set_style_shadow_opa(strip_dot[i], 0, 0);
             }
             else if (active)
             {
                 lv_obj_set_style_opa(strip_col[i], LV_OPA_COVER, 0);
-                // Gradient bg top→bottom GOLD opa:33 → GOLD opa:10
-                lv_obj_set_style_bg_color(strip_col[i], COLOR_GOLD, 0);
-                lv_obj_set_style_bg_grad_color(strip_col[i], COLOR_GOLD, 0);
-                lv_obj_set_style_bg_grad_dir(strip_col[i], LV_GRAD_DIR_VER, 0);
-                lv_obj_set_style_bg_opa(strip_col[i], 33, 0);
-                lv_obj_set_style_bg_grad_stop(strip_col[i], 255, 0); // end opa lower via obj opa
+                // Active tile: darker block like HTML reference (#252840)
+                lv_obj_set_style_bg_color(strip_col[i], lv_color_hex(0x252840), 0);
+                lv_obj_set_style_bg_grad_dir(strip_col[i], LV_GRAD_DIR_NONE, 0);
+                lv_obj_set_style_bg_opa(strip_col[i], LV_OPA_COVER, 0);
                 lv_obj_set_style_text_color(strip_name[i], COLOR_GOLD_LIGHT, 0);
                 lv_obj_set_style_text_opa(strip_name[i], LV_OPA_COVER, 0);
                 lv_obj_set_style_text_color(strip_time_lbl[i], COLOR_GOLD, 0);
@@ -385,12 +334,12 @@ namespace UiPageHome
                 lv_obj_set_style_shadow_spread(strip_dot[i], 4, 0);
                 lv_obj_set_style_shadow_opa(strip_dot[i], 200, 0);
 
-                // Create glow bar at bottom of this column (progress=0 — animated later)
+                // Create a constant yellow indicator at the bottom of active column.
                 if (strip_glow_bar)
                     lv_obj_del(strip_glow_bar);
                 strip_glow_bar = lv_obj_create(strip_col[i]);
                 lv_obj_remove_style_all(strip_glow_bar);
-                lv_obj_set_size(strip_glow_bar, 0, 2);
+                lv_obj_set_size(strip_glow_bar, 80, 2);
                 lv_obj_align(strip_glow_bar, LV_ALIGN_BOTTOM_LEFT, 0, 0);
                 lv_obj_set_style_bg_color(strip_glow_bar, COLOR_GOLD_LIGHT, 0);
                 lv_obj_set_style_bg_grad_color(strip_glow_bar, COLOR_GOLD, 0);
@@ -401,7 +350,7 @@ namespace UiPageHome
                 lv_obj_set_style_shadow_opa(strip_glow_bar, 180, 0);
                 lv_obj_set_style_radius(strip_glow_bar, 0, 0);
                 lv_obj_set_style_border_width(strip_glow_bar, 0, 0);
-                lv_obj_set_pos(strip_glow_bar, 0, 58); // pin to very bottom of 60px strip
+                lv_obj_set_pos(strip_glow_bar, 0, 60);
             }
             else
             {
@@ -409,12 +358,12 @@ namespace UiPageHome
                 lv_obj_set_style_opa(strip_col[i], LV_OPA_COVER, 0);
                 lv_obj_set_style_bg_opa(strip_col[i], LV_OPA_TRANSP, 0);
                 lv_obj_set_style_bg_grad_dir(strip_col[i], LV_GRAD_DIR_NONE, 0);
-                lv_obj_set_style_text_color(strip_name[i], COLOR_DIM, 0);
-                lv_obj_set_style_text_opa(strip_name[i], 191, 0);
-                lv_obj_set_style_text_color(strip_time_lbl[i], COLOR_DIM, 0);
-                lv_obj_set_style_text_opa(strip_time_lbl[i], 115, 0);
+                lv_obj_set_style_text_color(strip_name[i], COLOR_TEXT, 0);
+                lv_obj_set_style_text_opa(strip_name[i], 230, 0);
+                lv_obj_set_style_text_color(strip_time_lbl[i], COLOR_TEXT, 0);
+                lv_obj_set_style_text_opa(strip_time_lbl[i], 230, 0);
                 lv_obj_set_style_bg_color(strip_dot[i], COLOR_DIM, 0);
-                lv_obj_set_style_bg_opa(strip_dot[i], 51, 0);
+                lv_obj_set_style_bg_opa(strip_dot[i], 120, 0);
                 lv_obj_set_style_shadow_opa(strip_dot[i], 0, 0);
             }
         }
@@ -422,26 +371,18 @@ namespace UiPageHome
 
     void setActivePrayerProgress(uint8_t pct)
     {
+        (void)pct;
         if (!strip_glow_bar || cur_active_idx < 0)
             return;
-        int32_t target_w = ((int32_t)pct * 80) / 100;
 
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_exec_cb(&a, [](void *o, int32_t v)
-                            { lv_obj_set_width((lv_obj_t *)o, (lv_coord_t)v); });
-        lv_anim_set_var(&a, strip_glow_bar);
-        lv_anim_set_values(&a, lv_obj_get_width(strip_glow_bar), target_w);
-        lv_anim_set_time(&a, 1000);
-        lv_anim_start(&a);
+        // Keep active indicator constant width (no progress animation).
+        lv_obj_set_width(strip_glow_bar, 80);
     }
 
     void setGreeting(const char *left, const char *right)
     {
-        if (lbl_greet_l && left)
-            lv_label_set_text(lbl_greet_l, LocaleTR::toUpperTR(left));
-        if (lbl_greet_r && right)
-            lv_label_set_text(lbl_greet_r, LocaleTR::toUpperTR(right));
+        (void)left;
+        (void)right;
     }
 
     void setIftarDelta(bool visible, const char *text)
@@ -461,6 +402,11 @@ namespace UiPageHome
     void setStatusBarCity(const char *city, const char *dateAbbrev)
     {
         UiComponents::updateStatusBarCity(sb_handles, city, dateAbbrev);
+    }
+
+    void setMuted(bool muted)
+    {
+        UiComponents::updateStatusBarMute(sb_handles, muted);
     }
 
     void setWifi(uint8_t bars)

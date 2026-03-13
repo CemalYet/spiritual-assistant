@@ -11,6 +11,7 @@
 #include "audio_player.h"
 #include "lvgl_display.h"
 #include "app_state.h"
+#include "ui_components.h"
 #include "ui_page_settings.h"
 #include "prayer_types.h"
 
@@ -118,6 +119,16 @@ static void onSettingsPressed()
     PortalHandler::open();
 }
 
+static void onMutePressed()
+{
+    const bool newMuted = !g_state.muted;
+    AppStateHelper::setMuted(newMuted);
+    SettingsManager::setMuted(newMuted);
+
+    // Apply immediately so current playback reflects status-bar toggle instantly.
+    setVolume(newMuted ? 0 : g_state.volume);
+}
+
 // ── Setup ────────────────────────────────────────────────
 
 void setup()
@@ -166,14 +177,18 @@ void setup()
     WifiManager::init(BootManager::didConnectWiFi());
 
     UiPageSettings::setAdvancedCallback(onSettingsPressed);
+    UiComponents::setMuteToggleCallback(onMutePressed);
 
     // Volume — all 0-100 everywhere
     uint8_t vol = SettingsManager::getVolume();
     AppStateHelper::setVolume(vol);
     setVolume(vol); // Apply NVS volume to ES8311 codec
+    UiPageSettings::setVolumeLevel(vol);
 
     // Mute state — persisted in NVS
-    g_state.muted = SettingsManager::getMuted();
+    AppStateHelper::setMuted(SettingsManager::getMuted());
+    // Settings page is created before persisted state is loaded; sync controls once.
+    UiPageSettings::syncToggles();
 
     PowerManager::init();
 

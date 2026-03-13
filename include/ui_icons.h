@@ -20,6 +20,7 @@ namespace UiIcons
     void drawMosqueIcon(lv_obj_t *cont, lv_color_t col);
     void drawMenuIcon(lv_obj_t *cont, lv_color_t col);
     void drawSpeakerIcon(lv_obj_t *cont, bool isMuted, lv_color_t col, bool available = true);
+    void drawBrightnessIcon(lv_obj_t *cont, lv_color_t col);
     void drawWiFiIcon(lv_obj_t *cont, lv_color_t col, bool connected = true);
     void drawSyncIcon(lv_obj_t *cont, lv_color_t col, bool synced = true);
 

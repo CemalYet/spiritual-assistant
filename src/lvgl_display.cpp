@@ -83,11 +83,12 @@ static bool touchActive = false;
 static bool gestureActive = false; // suppress clicks during swipe
 static bool swipeFired = false;    // prevent double-fire per touch
 
-static const int SWIPE_MIN_PX = 60; // minimum horizontal distance for swipe
+static const int SWIPE_MIN_PX = 40; // minimum horizontal distance for swipe
 static int currentPage = 0;
 static bool suppressSwipe = false; // set when touch interacts with a widget — blocks swipe for entire session
 static int touchFrames = 0;        // frames since touch began — delays swipe so LVGL can acquire widget
-static void goToPage(int page);    // forward declaration
+static bool touchStartOnSlider = false;
+static void goToPage(int page); // forward declaration
 
 // Dynamic page count: 3 normally, 4 when portal screen is active
 static int getNumPages()
@@ -121,27 +122,23 @@ static void lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
             swipeFired = false;
             suppressSwipe = false;
             touchFrames = 0;
-
-            // On settings page, suppress swipe if touch starts on a slider track
-            if (currentPage == 2 && UiPageSettings::isSliderHit(touchStart.x, touchStart.y))
-                suppressSwipe = true;
+            touchStartOnSlider = (currentPage == 2 && UiPageSettings::isSliderHit(touchStart.x, touchStart.y));
         }
         ++touchFrames;
-        // Once LVGL acquires a widget (slider, toggle, button), lock out swipe
-        if (!suppressSwipe)
-        {
-            lv_obj_t *pressed = lv_indev_get_obj_act();
-            if (pressed && pressed != lv_scr_act())
-                suppressSwipe = true;
-        }
-        // Detect swipe — delay a few frames so LVGL can acquire widgets first
-        if (!swipeFired && !suppressSwipe && touchFrames > 2)
+
+        // Detect intent from direction first, then decide whether slider should own the gesture.
+        if (!swipeFired && !suppressSwipe)
         {
             int dx = data->point.x - touchStart.x;
             int dy = data->point.y - touchStart.y;
             int adx = dx < 0 ? -dx : dx;
             int ady = dy < 0 ? -dy : dy;
-            if (adx >= SWIPE_MIN_PX && adx > ady)
+
+            if (touchStartOnSlider && ady > adx + 8 && ady >= 16)
+            {
+                suppressSwipe = true;
+            }
+            else if (adx >= SWIPE_MIN_PX && adx > ady + 3)
             {
                 swipeFired = true;
                 gestureActive = true;
@@ -156,6 +153,7 @@ static void lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
     else
     {
         touchActive = false;
+        touchStartOnSlider = false;
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }

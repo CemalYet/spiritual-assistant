@@ -17,6 +17,21 @@ static uint8_t *motif_buf = nullptr; // heap-allocated pixel data
 
 namespace UiComponents
 {
+    static MuteToggleCallback muteToggleCallback = nullptr;
+    static uint32_t lastMuteClick = 0;
+    static constexpr uint32_t MUTE_DEBOUNCE_MS = 90;
+
+    static void onMuteClick(lv_event_t *e)
+    {
+        (void)e;
+        uint32_t now = lv_tick_get();
+        if (now - lastMuteClick < MUTE_DEBOUNCE_MS)
+            return;
+        lastMuteClick = now;
+        if (muteToggleCallback)
+            muteToggleCallback();
+    }
+
     // ── createStatusBar ──────────────────────────────────────────────────────
     StatusBarHandles createStatusBar(lv_obj_t *parent, StatusBarIcon icon)
     {
@@ -24,113 +39,87 @@ namespace UiComponents
 
         lv_obj_t *bar = lv_obj_create(parent);
         lv_obj_remove_style_all(bar);
-        lv_obj_set_size(bar, 480, 22);
+        lv_obj_set_size(bar, 480, 48);
         lv_obj_set_pos(bar, 0, 0);
         noScrollNoBorder(bar);
         lv_obj_set_style_bg_color(bar, COLOR_BG, 0);
         lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
         lv_obj_set_style_pad_left(bar, 16, 0);
         lv_obj_set_style_pad_right(bar, 16, 0);
-        lv_obj_set_style_pad_top(bar, 8, 0);
+        lv_obj_set_style_pad_top(bar, 0, 0);
 
-        // ── Left: icon + city + date abbrev ──────────────────────────────────
+        // ── Left: icon + city (date removed for cleaner top bar) ─────────────
         lv_obj_t *left = lv_obj_create(bar);
         lv_obj_remove_style_all(left);
         noScrollNoBorder(left);
-        lv_obj_set_size(left, LV_SIZE_CONTENT, 16);
+        lv_obj_set_size(left, LV_SIZE_CONTENT, 48);
         lv_obj_align(left, LV_ALIGN_LEFT_MID, 0, 0);
         lv_obj_set_flex_flow(left, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(left, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(left, 6, 0);
+        lv_obj_set_style_pad_column(left, 8, 0);
 
-        // Leading icon — map pin (location) or gear (settings)
-        // U+F3C5 = fa-map-marker-alt (pin icon matching HTML SVG)
-        static const char ICON_MAP_PIN[] = "\xEF\x8F\x85"; // U+F3C5
+        // Leading icon — use built-in LVGL symbols for guaranteed glyph coverage.
         lv_obj_t *pin = lv_label_create(left);
-        lv_obj_set_style_text_font(pin, FONT_HEADING_12, 0);
-        lv_obj_set_style_text_color(pin, COLOR_GOLD, 0);
-        lv_obj_set_style_text_opa(pin, 190, 0);
-        lv_label_set_text(pin, icon == StatusBarIcon::SETTINGS ? LV_SYMBOL_SETTINGS : ICON_MAP_PIN);
+        lv_obj_set_style_text_font(pin, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(pin, COLOR_DIM, 0);
+        lv_obj_set_style_text_opa(pin, UiTheme::ICON_OPA_DEFAULT, 0);
+        lv_label_set_text(pin, icon == StatusBarIcon::SETTINGS ? LV_SYMBOL_SETTINGS : LV_SYMBOL_GPS);
 
         h.lbl_city = lv_label_create(left);
-        lv_obj_set_style_text_font(h.lbl_city, FONT_BODY_12, 0);
+        lv_obj_set_style_text_font(h.lbl_city, FONT_BODY_14, 0);
         lv_obj_set_style_text_color(h.lbl_city, COLOR_TEXT, 0);
         lv_obj_set_style_text_letter_space(h.lbl_city, 2, 0);
         lv_label_set_text(h.lbl_city, "");
 
-        h.lbl_dateabbr = lv_label_create(left);
-        lv_obj_set_style_text_font(h.lbl_dateabbr, FONT_HEADING_10, 0);
-        lv_obj_set_style_text_color(h.lbl_dateabbr, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(h.lbl_dateabbr, 209, 0);
-        lv_label_set_text(h.lbl_dateabbr, "");
+        h.lbl_dateabbr = nullptr;
 
-        // ── Right: wifi icon + battery outline + percent ─────────────────────
+        // ── Right: speaker control ───────────────────────────────────────────
         lv_obj_t *right = lv_obj_create(bar);
         lv_obj_remove_style_all(right);
         noScrollNoBorder(right);
-        lv_obj_set_size(right, LV_SIZE_CONTENT, 16);
+        lv_obj_set_size(right, 56, 48);
         lv_obj_align(right, LV_ALIGN_RIGHT_MID, 0, 0);
         lv_obj_set_flex_flow(right, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(right, 10, 0);
+        lv_obj_set_style_pad_column(right, 6, 0);
+        lv_obj_add_flag(right, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
-        // WiFi — use LVGL built-in symbol
-        h.lbl_wifi = lv_label_create(right);
-        lv_obj_set_style_text_font(h.lbl_wifi, FONT_HEADING_12, 0);
-        lv_obj_set_style_text_color(h.lbl_wifi, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(h.lbl_wifi, 140, 0);
-        lv_label_set_text(h.lbl_wifi, LV_SYMBOL_WIFI);
+        h.mute_btn = lv_obj_create(right);
+        lv_obj_remove_style_all(h.mute_btn);
+        lv_obj_set_size(h.mute_btn, 48, 48);
+        lv_obj_set_style_radius(h.mute_btn, 12, 0);
+        lv_obj_set_style_bg_color(h.mute_btn, COLOR_BG2, 0);
+        lv_obj_set_style_bg_opa(h.mute_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(h.mute_btn, 1, 0);
+        lv_obj_set_style_border_color(h.mute_btn, COLOR_BORDER, 0);
+        lv_obj_set_style_border_opa(h.mute_btn, 64, 0);
+        lv_obj_set_style_pad_left(h.mute_btn, 0, 0);
+        lv_obj_set_style_pad_right(h.mute_btn, 0, 0);
+        lv_obj_set_style_pad_top(h.mute_btn, 0, 0);
+        lv_obj_set_style_pad_bottom(h.mute_btn, 0, 0);
+        lv_obj_set_style_pad_column(h.mute_btn, 0, 0);
+        lv_obj_clear_flag(h.mute_btn, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(h.mute_btn, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_ext_click_area(h.mute_btn, 20);
+        lv_obj_add_event_cb(h.mute_btn, onMuteClick, LV_EVENT_PRESSED, nullptr);
 
-        // Battery wrapper (w=24 h=11): outline + nub positioned absolutely
-        lv_obj_t *bat_wrap = lv_obj_create(right);
-        lv_obj_remove_style_all(bat_wrap);
-        lv_obj_set_size(bat_wrap, 24, 11);
-        lv_obj_set_style_bg_opa(bat_wrap, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(bat_wrap, 0, 0);
-        lv_obj_clear_flag(bat_wrap, LV_OBJ_FLAG_SCROLLABLE);
+        h.lbl_mute_icon = lv_obj_create(h.mute_btn);
+        lv_obj_remove_style_all(h.lbl_mute_icon);
+        lv_obj_set_size(h.lbl_mute_icon, UiTheme::ICON_SIZE_STATUS, UiTheme::ICON_SIZE_STATUS);
+        lv_obj_clear_flag(h.lbl_mute_icon, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_opa(h.lbl_mute_icon, UiTheme::ICON_OPA_DEFAULT, 0);
+        UiIcons::drawSpeakerIcon(h.lbl_mute_icon, false, COLOR_DIM, true);
+        lv_obj_center(h.lbl_mute_icon);
 
-        lv_obj_t *bat_outer = lv_obj_create(bat_wrap);
-        lv_obj_remove_style_all(bat_outer);
-        lv_obj_set_size(bat_outer, 20, 11);
-        lv_obj_set_pos(bat_outer, 0, 0);
-        lv_obj_set_style_radius(bat_outer, 2, 0);
-        lv_obj_set_style_border_width(bat_outer, 1, 0);
-        lv_obj_set_style_border_color(bat_outer, COLOR_GOLD, 0);
-        lv_obj_set_style_border_opa(bat_outer, 102, 0);
-        lv_obj_set_style_bg_opa(bat_outer, LV_OPA_TRANSP, 0);
-        lv_obj_clear_flag(bat_outer, LV_OBJ_FLAG_SCROLLABLE);
+        h.lbl_mute_text = nullptr;
 
-        lv_obj_t *bat_nub = lv_obj_create(bat_wrap);
-        lv_obj_remove_style_all(bat_nub);
-        lv_obj_set_size(bat_nub, 3, 6);
-        lv_obj_set_pos(bat_nub, 21, 3);
-        lv_obj_set_style_radius(bat_nub, 1, 0);
-        lv_obj_set_style_bg_color(bat_nub, COLOR_DIM, 0);
-        lv_obj_set_style_bg_opa(bat_nub, 130, 0);
-        lv_obj_set_style_border_width(bat_nub, 0, 0);
+        h.lbl_wifi = nullptr;
 
-        h.bat_fill = lv_obj_create(bat_outer);
-        lv_obj_remove_style_all(h.bat_fill);
-        lv_obj_set_size(h.bat_fill, 12, 7);
-        lv_obj_set_pos(h.bat_fill, 2, 2);
-        lv_obj_set_style_radius(h.bat_fill, 1, 0);
-        lv_obj_set_style_bg_color(h.bat_fill, COLOR_GREEN, 0);
-        lv_obj_set_style_bg_opa(h.bat_fill, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(h.bat_fill, 0, 0);
-        lv_obj_clear_flag(h.bat_fill, LV_OBJ_FLAG_SCROLLABLE);
+        h.bat_fill = nullptr;
+        h.lbl_charge = nullptr;
+        h.lbl_bat_pct = nullptr;
 
-        h.lbl_charge = lv_label_create(bat_outer);
-        lv_obj_set_style_text_font(h.lbl_charge, FONT_HEADING_8, 0);
-        lv_obj_set_style_text_color(h.lbl_charge, COLOR_GOLD, 0);
-        lv_label_set_text(h.lbl_charge, "\xE2\x9A\xA1"); // ⚡ U+26A1
-        lv_obj_center(h.lbl_charge);
-        lv_obj_add_flag(h.lbl_charge, LV_OBJ_FLAG_HIDDEN);
-
-        h.lbl_bat_pct = lv_label_create(right);
-        lv_obj_set_style_text_font(h.lbl_bat_pct, FONT_MONO_10, 0);
-        lv_obj_set_style_text_color(h.lbl_bat_pct, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(h.lbl_bat_pct, 209, 0);
-        lv_label_set_text(h.lbl_bat_pct, "--%");
+        updateStatusBarMute(h, false);
 
         return h;
     }
@@ -138,37 +127,15 @@ namespace UiComponents
     // ── createSeparator ──────────────────────────────────────────────────────
     void createSeparator(lv_obj_t *parent)
     {
-        // Left half: COLOR_BG → COLOR_GOLD (2px tall, stronger opa + glow)
-        lv_obj_t *sl = lv_obj_create(parent);
-        lv_obj_remove_style_all(sl);
-        lv_obj_set_size(sl, 240, 2);
-        lv_obj_set_pos(sl, 0, 27);
-        lv_obj_set_style_bg_grad_dir(sl, LV_GRAD_DIR_HOR, 0);
-        lv_obj_set_style_bg_color(sl, COLOR_BG, 0);
-        lv_obj_set_style_bg_grad_color(sl, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(sl, 230, 0);
-        lv_obj_set_style_shadow_color(sl, COLOR_GOLD, 0);
-        lv_obj_set_style_shadow_width(sl, 8, 0);
-        lv_obj_set_style_shadow_opa(sl, 90, 0);
-        lv_obj_set_style_shadow_spread(sl, 0, 0);
-        lv_obj_set_style_border_width(sl, 0, 0);
-        lv_obj_clear_flag(sl, LV_OBJ_FLAG_SCROLLABLE);
-
-        // Right half: COLOR_GOLD → COLOR_BG
-        lv_obj_t *sr = lv_obj_create(parent);
-        lv_obj_remove_style_all(sr);
-        lv_obj_set_size(sr, 240, 2);
-        lv_obj_set_pos(sr, 240, 27);
-        lv_obj_set_style_bg_grad_dir(sr, LV_GRAD_DIR_HOR, 0);
-        lv_obj_set_style_bg_color(sr, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_grad_color(sr, COLOR_BG, 0);
-        lv_obj_set_style_bg_opa(sr, 230, 0);
-        lv_obj_set_style_shadow_color(sr, COLOR_GOLD, 0);
-        lv_obj_set_style_shadow_width(sr, 8, 0);
-        lv_obj_set_style_shadow_opa(sr, 90, 0);
-        lv_obj_set_style_shadow_spread(sr, 0, 0);
-        lv_obj_set_style_border_width(sr, 0, 0);
-        lv_obj_clear_flag(sr, LV_OBJ_FLAG_SCROLLABLE);
+        // Single gold separator line under status bar.
+        lv_obj_t *line = lv_obj_create(parent);
+        lv_obj_remove_style_all(line);
+        lv_obj_set_size(line, 480, 1);
+        lv_obj_set_pos(line, 0, 47);
+        lv_obj_set_style_bg_color(line, COLOR_GOLD, 0);
+        lv_obj_set_style_bg_opa(line, 170, 0);
+        lv_obj_set_style_border_width(line, 0, 0);
+        lv_obj_clear_flag(line, LV_OBJ_FLAG_SCROLLABLE);
     }
 
     static NavClickCallback navClickCallback = nullptr;
@@ -215,7 +182,7 @@ namespace UiComponents
         for (int i = 0; i < 3; i++)
         {
             bool active = (i == activePage);
-            lv_color_t col = active ? COLOR_GOLD_LIGHT : COLOR_DIM;
+            lv_color_t col = active ? COLOR_GOLD : COLOR_DIM;
 
             lv_obj_t *btn = lv_btn_create(bar);
             lv_obj_remove_style_all(btn);
@@ -227,9 +194,10 @@ namespace UiComponents
             lv_obj_t *icon = lv_obj_create(btn);
             lv_obj_remove_style_all(icon);
             lv_obj_add_style(icon, getStyleTransparent(), 0);
-            lv_obj_set_size(icon, NAV_ICON_SIZE, NAV_ICON_SIZE);
+            lv_obj_set_size(icon, UiTheme::ICON_SIZE_NAV, UiTheme::ICON_SIZE_NAV);
             lv_obj_align(icon, LV_ALIGN_CENTER, 0, -4);
             lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(icon, active ? UiTheme::ICON_OPA_ACTIVE : UiTheme::ICON_OPA_DEFAULT, 0);
 
             if (i == 0)
                 UiIcons::drawHomeIcon(icon, col);
@@ -282,28 +250,57 @@ namespace UiComponents
     }
 
     // ── Shared status-bar data setters ────────────────────────────────────────
+    void setMuteToggleCallback(MuteToggleCallback cb)
+    {
+        muteToggleCallback = cb;
+    }
+
     void updateStatusBarCity(const StatusBarHandles &h, const char *city, const char *dateAbbrev)
     {
         if (h.lbl_city && city)
             lv_label_set_text(h.lbl_city, LocaleTR::toUpperTR(city));
-        if (h.lbl_dateabbr && dateAbbrev)
-            lv_label_set_text(h.lbl_dateabbr, LocaleTR::toUpperTR(dateAbbrev));
+        (void)dateAbbrev;
+    }
+
+    void updateStatusBarMute(const StatusBarHandles &h, bool muted)
+    {
+        if (!h.mute_btn || !h.lbl_mute_icon)
+            return;
+
+        if (muted)
+        {
+            lv_obj_set_style_bg_color(h.mute_btn, COLOR_BG2, 0);
+            lv_obj_set_style_bg_opa(h.mute_btn, 220, 0);
+            lv_obj_set_style_border_color(h.mute_btn, COLOR_AMBER, 0);
+            lv_obj_set_style_border_opa(h.mute_btn, 96, 0);
+            lv_obj_set_style_opa(h.lbl_mute_icon, UiTheme::ICON_OPA_ACTIVE, 0);
+            UiIcons::drawSpeakerIcon(h.lbl_mute_icon, true, COLOR_AMBER, true);
+        }
+        else
+        {
+            lv_obj_set_style_bg_color(h.mute_btn, COLOR_BG2, 0);
+            lv_obj_set_style_bg_opa(h.mute_btn, 200, 0);
+            lv_obj_set_style_border_color(h.mute_btn, COLOR_BORDER, 0);
+            lv_obj_set_style_border_opa(h.mute_btn, 64, 0);
+            lv_obj_set_style_opa(h.lbl_mute_icon, UiTheme::ICON_OPA_DEFAULT, 0);
+            UiIcons::drawSpeakerIcon(h.lbl_mute_icon, false, COLOR_DIM, true);
+        }
     }
 
     void updateStatusBarWifi(const StatusBarHandles &h, uint8_t bars)
     {
         if (!h.lbl_wifi)
             return;
-        // Change color/opacity based on signal strength
+        // Redraw vector icon to avoid font-glyph dependency.
         if (bars == 0)
         {
-            lv_obj_set_style_text_color(h.lbl_wifi, COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(h.lbl_wifi, 80, 0);
+            UiIcons::drawWiFiIcon(h.lbl_wifi, COLOR_DIM, false);
+            lv_obj_set_style_opa(h.lbl_wifi, 130, 0);
         }
         else
         {
-            lv_obj_set_style_text_color(h.lbl_wifi, COLOR_GREEN, 0);
-            lv_obj_set_style_text_opa(h.lbl_wifi, (bars >= 2) ? 220 : 140, 0);
+            UiIcons::drawWiFiIcon(h.lbl_wifi, COLOR_GREEN, true);
+            lv_obj_set_style_opa(h.lbl_wifi, (bars >= 2) ? 255 : 180, 0);
         }
     }
 

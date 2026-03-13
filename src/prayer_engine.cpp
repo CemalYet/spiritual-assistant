@@ -10,6 +10,7 @@
 #include "settings_server.h"
 #include "audio_player.h"
 #include "lvgl_display.h"
+#include "display_ticker.h"
 #include "power_manager.h"
 #include "app_state.h"
 #include <Arduino.h>
@@ -27,7 +28,7 @@ namespace PrayerEngine
     static int s_lastDay = -1;
 
     static uint8_t s_currentVolume = 0;
-    static int s_lastAdhanMinute = -1;
+    static bool s_adhanPlaying = false;
 
     static int getDayOffset()
     {
@@ -152,17 +153,13 @@ namespace PrayerEngine
     static void onAdhanLoop()
     {
         LvglDisplay::loop();
+        DisplayTicker::tick();
+        PowerManager::tick();
         SettingsServer::handle();
 
-        const auto now = CurrentTime::now();
-        if (now._minutes != s_lastAdhanMinute)
-        {
-            s_lastAdhanMinute = now._minutes;
-            // Keep time state current while adhan is playing (main loop is blocked)
-            struct tm timeinfo;
-            if (getLocalTime(&timeinfo))
-                AppStateHelper::setTime(timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        }
+        // Run normal tick cycle (countdown, progress, iftar pill)
+        // s_adhanPlaying flag prevents re-entering checkAndPlayAdhan
+        tick();
 
         if (g_state.muted)
         {
@@ -182,12 +179,11 @@ namespace PrayerEngine
         }
     }
 
-    static void checkAndPlayAdhan()
+    static void checkAndPlayAdhan(PrayerType currentPrayer)
     {
-        if (!s_prayersFetched || !s_nextPrayer)
+        if (!s_prayersFetched)
             return;
 
-        PrayerType currentPrayer = *s_nextPrayer;
         Serial.printf("\n\n🕌 === PRAYER TIME: %s === 🕌\n\n",
                       getPrayerName(currentPrayer).data());
 
@@ -206,7 +202,9 @@ namespace PrayerEngine
                           s_currentVolume, g_state.muted ? " (muted)" : "", adhanFile.data());
             setVolume(s_currentVolume);
 
+            s_adhanPlaying = true;
             bool ok = playAudioFileBlocking(adhanFile.data(), onAdhanLoop);
+            s_adhanPlaying = false;
             Serial.printf("[Adhan] %s\n", ok ? "Finished OK" : "PLAYBACK FAILED");
         }
         else
@@ -214,19 +212,6 @@ namespace PrayerEngine
             Serial.printf("[Adhan] Skipped for %s (disabled)\n",
                           getPrayerName(currentPrayer).data());
         }
-
-        // Load tomorrow if last prayer passed
-        const auto now = CurrentTime::now();
-        auto next = s_prayers.findNext(now._minutes);
-
-        if (!next)
-        {
-            Serial.println("[Prayer] Last prayer — loading tomorrow");
-            int method = SettingsManager::getPrayerMethod();
-            s_prayersFetched = loadPrayerTimes(method, 1);
-        }
-
-        displayNextPrayer();
     }
 
     bool init()
@@ -291,23 +276,32 @@ namespace PrayerEngine
         // Adhan check
         if (s_nextPrayerSeconds > 0)
         {
-            if (s_showingTomorrow && now._seconds > s_nextPrayerSeconds)
-                return;
+            const int secondsUntil = s_showingTomorrow
+                                         ? (86400 - now._seconds) + s_nextPrayerSeconds
+                                         : s_nextPrayerSeconds - now._seconds;
 
-            const int secondsUntil = s_nextPrayerSeconds - now._seconds;
-
-            if (secondsUntil <= 0)
+            if (secondsUntil <= 0 && !s_adhanPlaying)
             {
-                // Push zero countdown so UI doesn't stay stuck at old value
                 AppStateHelper::setCountdown(0);
-                checkAndPlayAdhan();
-                s_nextPrayer = std::nullopt;
-                s_nextPrayerSeconds = -1;
-                s_slotStartSeconds = -1;
+
+                // Remember triggered prayer, then advance BEFORE adhan
+                // so hero/iftar update during playback
+                PrayerType triggeredPrayer = *s_nextPrayer;
+
+                const auto freshNow = CurrentTime::now();
+                auto next = s_prayers.findNext(freshNow._minutes);
+                if (!next)
+                {
+                    int method = SettingsManager::getPrayerMethod();
+                    s_prayersFetched = loadPrayerTimes(method, 1);
+                }
+                displayNextPrayer();
+
+                checkAndPlayAdhan(triggeredPrayer);
                 return;
             }
 
-            AppStateHelper::setCountdown(static_cast<uint32_t>(secondsUntil));
+            AppStateHelper::setCountdown(secondsUntil > 0 ? static_cast<uint32_t>(secondsUntil) : 0);
 
             if (s_slotStartSeconds < 0)
                 return;

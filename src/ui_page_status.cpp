@@ -15,6 +15,11 @@ namespace UiPageStatus
 
     static lv_obj_t *scr = nullptr;
 
+    lv_obj_t *getScreen()
+    {
+        return scr;
+    }
+
     static void createScreen()
     {
         if (scr)
