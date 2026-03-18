@@ -50,6 +50,7 @@ namespace UiPageHome
     void setStatusBarCity(const char *city, const char *dateAbbrev);
 
     // WiFi bars (0–3) and battery (0–100, charging flag)
+    void setMuted(bool muted);
     void setWifi(uint8_t bars);
     void setBattery(uint8_t pct, bool charging);
 

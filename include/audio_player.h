@@ -17,10 +17,14 @@ namespace AudioConfig
     constexpr int MCLK_FREQ = SAMPLE_RATE * MCLK_MULTIPLE; // 11,289,600 Hz
     // Volume range: 0-21 (ESP32-audioI2S library I2S digital gain)
     constexpr uint8_t MAX_VOLUME = 21;
+    constexpr uint8_t I2S_PLAYBACK_VOLUME = 16; // Keep digital headroom to reduce clipping
 
     // Codec / percentage volume constants
-    constexpr uint8_t MAX_VOLUME_PCT = 100; // Max ES8311 codec percentage
-    constexpr uint8_t DEFAULT_VOLUME = 80;  // Default volume (0-100%)
+    constexpr uint8_t MAX_VOLUME_PCT = 100;    // Max ES8311 codec percentage
+    constexpr uint8_t DEFAULT_VOLUME = 80;     // Default volume (0-100%)
+    constexpr uint8_t CODEC_SOFT_CAP_PCT = 80; // Internal top-end cap for cleaner output
+    constexpr uint8_t CODEC_KNEE_PCT = 70;     // Start compressing top-end after this UI volume
+    constexpr float VOLUME_GAMMA = 0.78f;      // Perceptual curve: boosts low-mid, softens upper jumps
 }
 
 bool audioPlayerInit();

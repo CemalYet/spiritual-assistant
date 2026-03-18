@@ -18,7 +18,8 @@ static void sntpSyncCallback(struct timeval *tv)
     gmtime_r(&tv->tv_sec, &t);
     Serial.printf("[SNTP] Clock set! UTC=%02d:%02d:%02d (epoch=%ld)\n",
                   t.tm_hour, t.tm_min, t.tm_sec, (long)tv->tv_sec);
-    RtcManager::writeSystemClockToRTC();
+    RtcManager::markNtpSync();
+    RtcManager::writeSystemClockToRTC(tv->tv_sec);
 }
 
 // WiFi event handler - only log important events

@@ -107,11 +107,7 @@ namespace UiPagePrayer
         lv_obj_set_style_text_letter_space(lbl_city, 2, 0);
         lv_label_set_text(lbl_city, "");
 
-        lbl_dateabbr = lv_label_create(left);
-        lv_obj_set_style_text_font(lbl_dateabbr, FONT_HEADING_10, 0);
-        lv_obj_set_style_text_color(lbl_dateabbr, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(lbl_dateabbr, 209, 0);
-        lv_label_set_text(lbl_dateabbr, "");
+        lbl_dateabbr = nullptr;
 
         // Right: flex row gap=6
         lv_obj_t *right = lv_obj_create(bar);
@@ -141,50 +137,8 @@ namespace UiPagePrayer
             lv_obj_set_style_border_width(wifi_bars[i], 0, 0);
         }
 
-        // Battery wrapper (w=21 h=9)
-        lv_obj_t *bat_wrap = lv_obj_create(right);
-        lv_obj_remove_style_all(bat_wrap);
-        lv_obj_set_size(bat_wrap, 21, 9);
-        lv_obj_set_style_bg_opa(bat_wrap, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(bat_wrap, 0, 0);
-        lv_obj_clear_flag(bat_wrap, LV_OBJ_FLAG_SCROLLABLE);
-
-        lv_obj_t *bat_outer = lv_obj_create(bat_wrap);
-        lv_obj_remove_style_all(bat_outer);
-        lv_obj_set_size(bat_outer, 18, 9);
-        lv_obj_set_pos(bat_outer, 0, 0);
-        lv_obj_set_style_radius(bat_outer, 2, 0);
-        lv_obj_set_style_border_width(bat_outer, 1, 0);
-        lv_obj_set_style_border_color(bat_outer, COLOR_GOLD, 0);
-        lv_obj_set_style_border_opa(bat_outer, 102, 0);
-        lv_obj_set_style_bg_opa(bat_outer, LV_OPA_TRANSP, 0);
-        lv_obj_clear_flag(bat_outer, LV_OBJ_FLAG_SCROLLABLE);
-
-        lv_obj_t *bat_nub = lv_obj_create(bat_wrap);
-        lv_obj_remove_style_all(bat_nub);
-        lv_obj_set_size(bat_nub, 2, 5);
-        lv_obj_set_pos(bat_nub, 19, 2);
-        lv_obj_set_style_radius(bat_nub, 0, 0);
-        lv_obj_set_style_bg_color(bat_nub, COLOR_DIM, 0);
-        lv_obj_set_style_bg_opa(bat_nub, 130, 0);
-        lv_obj_set_style_border_width(bat_nub, 0, 0);
-
-        bat_fill = lv_obj_create(bat_outer);
-        lv_obj_remove_style_all(bat_fill);
-        lv_obj_set_size(bat_fill, 10, 5);
-        lv_obj_set_pos(bat_fill, 2, 2);
-        lv_obj_set_style_radius(bat_fill, 1, 0);
-        lv_obj_set_style_bg_color(bat_fill, COLOR_GREEN, 0);
-        lv_obj_set_style_bg_opa(bat_fill, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(bat_fill, 0, 0);
-        lv_obj_clear_flag(bat_fill, LV_OBJ_FLAG_SCROLLABLE);
-
-        lbl_charge = lv_label_create(bat_outer);
-        lv_obj_set_style_text_font(lbl_charge, FONT_MONO_10, 0);
-        lv_obj_set_style_text_color(lbl_charge, COLOR_GOLD, 0);
-        lv_label_set_text(lbl_charge, "\xE2\x9A\xA1");
-        lv_obj_center(lbl_charge);
-        lv_obj_add_flag(lbl_charge, LV_OBJ_FLAG_HIDDEN);
+        bat_fill = nullptr;
+        lbl_charge = nullptr;
     }
 
     // ── Separator gradient ─────────────────────────────────────────
@@ -381,7 +335,6 @@ namespace UiPagePrayer
         lv_obj_set_style_border_width(scr, 0, 0);
         lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-        UiComponents::applyMotif(scr);
         buildStatusBar(scr);
         buildSeparator(scr);
         buildContent(scr);

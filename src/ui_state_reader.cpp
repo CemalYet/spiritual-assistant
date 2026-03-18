@@ -20,6 +20,7 @@
 namespace UiStateReader
 {
     static lv_timer_t *updateTimer = nullptr;
+    static lv_obj_t *lastNormalScreen = nullptr;
 
     // Timer callback - runs every 50ms
     static void timerCallback(lv_timer_t *timer)
@@ -61,6 +62,14 @@ namespace UiStateReader
         // ═══════════════════════════════════════════════════
         if (g_state.isDirty(DirtyFlag::STATUS_SCREEN))
         {
+            lv_obj_t *active = lv_scr_act();
+            if (g_state.statusScreen != StatusScreenType::NONE)
+            {
+                lv_obj_t *statusScr = UiPageStatus::getScreen();
+                if (active && active != statusScr)
+                    lastNormalScreen = active;
+            }
+
             switch (g_state.statusScreen)
             {
             case StatusScreenType::CONNECTING:
@@ -80,13 +89,17 @@ namespace UiStateReader
                                         g_state.statusLine1.c_str());
                 break;
             case StatusScreenType::NONE:
-                // Return to home screen (only if pages are created)
-                if (UiPageHome::getScreen() != nullptr)
+                // Return to previously active non-status screen if possible.
+                if (lastNormalScreen)
+                {
+                    lv_scr_load(lastNormalScreen);
+                }
+                else if (UiPageHome::getScreen() != nullptr)
                 {
                     lv_scr_load(UiPageHome::getScreen());
-                    // Mark all dirty to refresh home screen
-                    g_state.markDirty(DirtyFlag::ALL & ~DirtyFlag::STATUS_SCREEN);
                 }
+                // Mark all dirty to refresh whichever screen becomes active.
+                g_state.markDirty(DirtyFlag::ALL & ~DirtyFlag::STATUS_SCREEN);
                 break;
             }
             g_state.clearDirty(DirtyFlag::STATUS_SCREEN);
@@ -120,33 +133,11 @@ namespace UiStateReader
         if (g_state.isDirty(DirtyFlag::HIJRI))
         {
             UiPageClock::setHijriDate(g_state.hijriDate.c_str());
-
-            // Derive greeting for home screen from hijri + time of day
-            const char *greetL = "";
-            if (g_state.hour >= 5 && g_state.hour < 12)
-                greetL = "Hay\xc4\xb1rl\xc4\xb1 Sabahlar \xe2\x80\x94";
-            else if (g_state.hour >= 12 && g_state.hour < 17)
-                greetL = "Hay\xc4\xb1rl\xc4\xb1 G\xc3\xbcnler \xe2\x80\x94";
-            else if (g_state.hour >= 17 && g_state.hour < 21)
-                greetL = "Hay\xc4\xb1rl\xc4\xb1 Ak\xc5\x9f"
-                         "amlar \xe2\x80\x94";
-            else
-                greetL = "Hay\xc4\xb1rl\xc4\xb1 Geceler \xe2\x80\x94";
-
-            // If Ramazan, show "Ramazan X. Gün" as right side
+            // Greeting row removed from Home UI; keep only Ramadan mode detection.
             const char *hijri = g_state.hijriDate.c_str();
-            static char greetR[32];
-            greetR[0] = '\0';
             const char *ramPos = strstr(hijri, "Ramazan");
             // Auto-detect Ramadan mode from Hijri month
             g_state.ramadanMode = (ramPos != nullptr);
-            if (ramPos && hijri[0] >= '0' && hijri[0] <= '9')
-            {
-                // hijri = "17 Ramazan 1447" -> extract day
-                int day = atoi(hijri);
-                snprintf(greetR, sizeof(greetR), "Ramazan %d. G\xc3\xbcn", day);
-            }
-            UiPageHome::setGreeting(greetL, greetR);
             g_state.clearDirty(DirtyFlag::HIJRI);
         }
 
@@ -196,8 +187,16 @@ namespace UiStateReader
             g_state.clearDirty(DirtyFlag::PROGRESS);
         }
 
-        // NTP_SYNCED, ADHAN_AVAILABLE, MUTED — not in current home screen API; clear to prevent stale dirty loops
-        g_state.clearDirty(DirtyFlag::NTP_SYNCED | DirtyFlag::ADHAN_AVAILABLE | DirtyFlag::MUTED);
+        if (g_state.isDirty(DirtyFlag::MUTED))
+        {
+            UiPageHome::setMuted(g_state.muted);
+            UiPageClock::setMuted(g_state.muted);
+            UiPageSettings::setMuted(g_state.muted);
+            g_state.clearDirty(DirtyFlag::MUTED);
+        }
+
+        // NTP_SYNCED, ADHAN_AVAILABLE are not rendered in current UI
+        g_state.clearDirty(DirtyFlag::NTP_SYNCED | DirtyFlag::ADHAN_AVAILABLE);
 
         // ═══════════════════════════════════════════════════
         // SETTINGS PAGE UPDATES

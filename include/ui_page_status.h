@@ -10,6 +10,9 @@
 
 namespace UiPageStatus
 {
+    // Returns status screen object (nullptr until created)
+    lv_obj_t *getScreen();
+
     // Show "Connecting to WiFi..." screen
     void showConnecting(const char *ssid);
 

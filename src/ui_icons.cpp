@@ -23,12 +23,18 @@ namespace UiIcons
     static lv_point_t menu_line2[] = {{4, 14}, {24, 14}};
     static lv_point_t menu_line3[] = {{4, 21}, {24, 21}};
 
-    // Speaker icon - clean wedge shape with sound waves
-    static lv_point_t speaker_body[] = {{4, 11}, {8, 11}, {14, 6}, {14, 22}, {8, 17}, {4, 17}, {4, 11}};
-    static lv_point_t speaker_wave1[] = {{17, 11}, {19, 14}, {17, 17}};
-    static lv_point_t speaker_wave2[] = {{20, 8}, {24, 14}, {20, 20}};
+    // Speaker icon - centered wedge + smooth waves
+    static lv_point_t speaker_body[] = {{4, 10}, {8, 10}, {13, 6}, {13, 22}, {8, 18}, {4, 18}, {4, 10}};
     static lv_point_t speaker_mute_x[] = {{17, 9}, {25, 19}};
     static lv_point_t speaker_mute_x2[] = {{17, 19}, {25, 9}};
+    static lv_point_t sun_ray_top[] = {{14, 2}, {14, 6}};
+    static lv_point_t sun_ray_bottom[] = {{14, 22}, {14, 26}};
+    static lv_point_t sun_ray_left[] = {{2, 14}, {6, 14}};
+    static lv_point_t sun_ray_right[] = {{22, 14}, {26, 14}};
+    static lv_point_t sun_ray_tl[] = {{5, 5}, {8, 8}};
+    static lv_point_t sun_ray_tr[] = {{20, 8}, {23, 5}};
+    static lv_point_t sun_ray_bl[] = {{5, 23}, {8, 20}};
+    static lv_point_t sun_ray_br[] = {{20, 20}, {23, 23}};
 
     // Sync/Check icon
     static lv_point_t check_mark[] = {{4, 14}, {10, 20}, {24, 6}};
@@ -137,9 +143,53 @@ namespace UiIcons
             drawLine(cont, speaker_mute_x2, 2, col);
             return;
         }
-        // Sound on - show waves
-        drawLine(cont, speaker_wave1, 3, col);
-        drawLine(cont, speaker_wave2, 3, col);
+        // Sound on - use smooth arc waves for a cleaner visual language.
+        lv_obj_t *wave1 = lv_arc_create(cont);
+        lv_obj_set_size(wave1, 10, 10);
+        lv_obj_set_pos(wave1, 15, 9);
+        lv_arc_set_rotation(wave1, 300);
+        lv_arc_set_bg_angles(wave1, 0, 120);
+        lv_arc_set_value(wave1, 100);
+        lv_obj_remove_style(wave1, NULL, LV_PART_KNOB);
+        lv_obj_set_style_arc_width(wave1, 2, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(wave1, col, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_opa(wave1, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_clear_flag(wave1, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t *wave2 = lv_arc_create(cont);
+        lv_obj_set_size(wave2, 16, 16);
+        lv_obj_set_pos(wave2, 14, 6);
+        lv_arc_set_rotation(wave2, 300);
+        lv_arc_set_bg_angles(wave2, 0, 120);
+        lv_arc_set_value(wave2, 100);
+        lv_obj_remove_style(wave2, NULL, LV_PART_KNOB);
+        lv_obj_set_style_arc_width(wave2, 2, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(wave2, col, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_opa(wave2, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_clear_flag(wave2, LV_OBJ_FLAG_CLICKABLE);
+    }
+
+    void drawBrightnessIcon(lv_obj_t *cont, lv_color_t col)
+    {
+        lv_obj_clean(cont);
+
+        lv_obj_t *sun_core = lv_obj_create(cont);
+        lv_obj_set_size(sun_core, 10, 10);
+        lv_obj_set_pos(sun_core, 9, 9);
+        lv_obj_set_style_radius(sun_core, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(sun_core, col, 0);
+        lv_obj_set_style_bg_opa(sun_core, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(sun_core, 0, 0);
+        lv_obj_clear_flag(sun_core, LV_OBJ_FLAG_CLICKABLE);
+
+        drawLine(cont, sun_ray_top, 2, col);
+        drawLine(cont, sun_ray_bottom, 2, col);
+        drawLine(cont, sun_ray_left, 2, col);
+        drawLine(cont, sun_ray_right, 2, col);
+        drawLine(cont, sun_ray_tl, 2, col);
+        drawLine(cont, sun_ray_tr, 2, col);
+        drawLine(cont, sun_ray_bl, 2, col);
+        drawLine(cont, sun_ray_br, 2, col);
     }
 
     void drawWiFiIcon(lv_obj_t *cont, lv_color_t col, bool connected)

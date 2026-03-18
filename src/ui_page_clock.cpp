@@ -56,15 +56,18 @@ namespace UiPageClock
     {
         lv_obj_t *cont = lv_obj_create(parent);
         lv_obj_remove_style_all(cont);
-        lv_obj_set_size(cont, 480, 286);
-        lv_obj_set_pos(cont, 0, 29);
+        lv_obj_set_size(cont, 480, 272);
+        lv_obj_set_pos(cont, 0, 48);
         lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(cont, 0, 0);
-        lv_obj_set_style_pad_all(cont, 0, 0);
+        lv_obj_set_style_pad_top(cont, 0, 0);
+        lv_obj_set_style_pad_bottom(cont, 0, 0);
+        lv_obj_set_style_pad_left(cont, 0, 0);
+        lv_obj_set_style_pad_right(cont, 0, 0);
         lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_row(cont, 4, 0);
+        lv_obj_set_style_pad_row(cont, 12, 0);
 
         // Clock row: HH + : + MM
         lv_obj_t *clock_row = lv_obj_create(cont);
@@ -81,7 +84,7 @@ namespace UiPageClock
         lbl_h = lv_label_create(clock_row);
         lv_obj_set_style_text_font(lbl_h, FONT_CLOCK_72, 0);
         lv_obj_set_style_text_color(lbl_h, COLOR_TEXT, 0);
-        lv_obj_set_style_text_letter_space(lbl_h, 4, 0);
+        lv_obj_set_style_text_letter_space(lbl_h, 2, 0);
         lv_label_set_text(lbl_h, "--");
 
         lbl_colon = lv_label_create(clock_row);
@@ -92,7 +95,7 @@ namespace UiPageClock
         lbl_m = lv_label_create(clock_row);
         lv_obj_set_style_text_font(lbl_m, FONT_CLOCK_72, 0);
         lv_obj_set_style_text_color(lbl_m, COLOR_TEXT, 0);
-        lv_obj_set_style_text_letter_space(lbl_m, 4, 0);
+        lv_obj_set_style_text_letter_space(lbl_m, 2, 0);
         lv_label_set_text(lbl_m, "--");
 
         // Decorative divider: line + ✦ + line
@@ -109,36 +112,37 @@ namespace UiPageClock
 
         lv_obj_t *dl = lv_obj_create(divider);
         lv_obj_remove_style_all(dl);
-        lv_obj_set_size(dl, 60, 1);
+        lv_obj_set_size(dl, 52, 1);
         lv_obj_set_style_bg_color(dl, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(dl, 115, 0);
+        lv_obj_set_style_bg_opa(dl, 145, 0);
         lv_obj_set_style_border_width(dl, 0, 0);
 
         lv_obj_t *star = lv_label_create(divider);
         lv_obj_set_style_text_font(star, FONT_HEADING_10, 0);
         lv_obj_set_style_text_color(star, COLOR_GOLD, 0);
-        lv_obj_set_style_text_opa(star, 90, 0);
+        lv_obj_set_style_text_opa(star, 170, 0);
         lv_label_set_text(star, "\xC2\xB7"); // · middle dot U+00B7 (in font range)
 
         lv_obj_t *dr = lv_obj_create(divider);
         lv_obj_remove_style_all(dr);
-        lv_obj_set_size(dr, 60, 1);
+        lv_obj_set_size(dr, 52, 1);
         lv_obj_set_style_bg_color(dr, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(dr, 115, 0);
+        lv_obj_set_style_bg_opa(dr, 145, 0);
         lv_obj_set_style_border_width(dr, 0, 0);
 
         // Gregorian date
         lbl_date = lv_label_create(cont);
         lv_obj_set_style_text_font(lbl_date, FONT_HIJRI_18, 0);
-        lv_obj_set_style_text_color(lbl_date, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(lbl_date, 209, 0);
+        lv_obj_set_style_text_color(lbl_date, COLOR_TEXT, 0);
+        lv_obj_set_style_text_opa(lbl_date, 225, 0);
         lv_label_set_text(lbl_date, "");
 
         // Hijri date
         lbl_hijri = lv_label_create(cont);
         lv_obj_set_style_text_font(lbl_hijri, FONT_PRAYER_24, 0);
-        lv_obj_set_style_text_color(lbl_hijri, COLOR_GOLD, 0);
-        lv_obj_set_style_text_opa(lbl_hijri, 209, 0);
+        lv_obj_set_style_text_color(lbl_hijri, COLOR_GOLD_LIGHT, 0);
+        lv_obj_set_style_text_opa(lbl_hijri, 220, 0);
+        lv_obj_set_style_pad_top(lbl_hijri, 2, 0);
         lv_label_set_text(lbl_hijri, "");
     }
 
@@ -165,8 +169,7 @@ namespace UiPageClock
         lv_obj_set_style_border_width(scr, 0, 0);
         lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-        UiComponents::applyMotif(scr);
-        UiComponents::createAmbientGlow(scr);
+        // Keep clock background clean to match HTML direction
 
         sb_handles = UiComponents::createStatusBar(scr);
         UiComponents::createSeparator(scr);
@@ -222,6 +225,11 @@ namespace UiPageClock
     void setStatusBarCity(const char *city, const char *dateAbbrev)
     {
         UiComponents::updateStatusBarCity(sb_handles, city, dateAbbrev);
+    }
+
+    void setMuted(bool muted)
+    {
+        UiComponents::updateStatusBarMute(sb_handles, muted);
     }
 
     void setWifi(uint8_t bars)
