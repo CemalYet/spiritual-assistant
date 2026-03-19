@@ -115,10 +115,6 @@ namespace UiComponents
 
         h.lbl_wifi = nullptr;
 
-        h.bat_fill = nullptr;
-        h.lbl_charge = nullptr;
-        h.lbl_bat_pct = nullptr;
-
         updateStatusBarMute(h, false);
 
         return h;
@@ -301,35 +297,6 @@ namespace UiComponents
         {
             UiIcons::drawWiFiIcon(h.lbl_wifi, COLOR_GREEN, true);
             lv_obj_set_style_opa(h.lbl_wifi, (bars >= 2) ? 255 : 180, 0);
-        }
-    }
-
-    void updateStatusBarBattery(const StatusBarHandles &h, uint8_t pct, bool charging)
-    {
-        if (!h.bat_fill)
-            return;
-        int32_t w = ((int32_t)pct * 16) / 100;
-        if (w < 0)
-            w = 0;
-        if (w > 16)
-            w = 16;
-        lv_obj_set_width(h.bat_fill, (lv_coord_t)w);
-        lv_color_t col = (pct > 20) ? COLOR_GREEN : lv_color_hex(0xFF4444);
-        lv_obj_set_style_bg_color(h.bat_fill, col, 0);
-
-        if (h.lbl_bat_pct)
-        {
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%d%%", (int)pct);
-            lv_label_set_text(h.lbl_bat_pct, buf);
-        }
-
-        if (h.lbl_charge)
-        {
-            if (charging)
-                lv_obj_clear_flag(h.lbl_charge, LV_OBJ_FLAG_HIDDEN);
-            else
-                lv_obj_add_flag(h.lbl_charge, LV_OBJ_FLAG_HIDDEN);
         }
     }
 

@@ -58,8 +58,8 @@ namespace RtcManager
         if (!s_i2cMutex)
             s_i2cMutex = xSemaphoreCreateMutex();
 
-        // Wire already started by Wire.begin(SDA,SCL) in main.cpp
-        if (!rtc.begin(Wire, I2C_SDA, I2C_SCL))
+        // I2C bus is initialized by PMU init earlier in boot sequence.
+        if (!rtc.begin(Wire))
         {
             Serial.println("[RTC] PCF85063 not found at 0x51");
             return false;
@@ -70,6 +70,7 @@ namespace RtcManager
         if (!rtc.isClockIntegrityGuaranteed())
         {
             Serial.println("[RTC] Clock integrity lost — need NTP");
+
             s_validTime = false;
             return true;
         }

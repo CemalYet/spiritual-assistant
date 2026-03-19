@@ -30,7 +30,6 @@ namespace UiPagePrayer
     // Status bar
     void setStatusBarCity(const char *city, const char *dateAbbrev);
     void setWifi(uint8_t bars);
-    void setBattery(uint8_t pct, bool charging);
 
 } // namespace UiPagePrayer
 

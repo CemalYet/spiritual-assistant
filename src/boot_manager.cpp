@@ -106,6 +106,7 @@ namespace BootManager
         }
 
         Serial.println("[Boot] WiFi failed — starting portal");
+
         showStatus("Baglanti Basarisiz", "WiFi agina baglanilamadi");
         delay(2000);
         return runPortalBlocking();

@@ -1,6 +1,7 @@
 #include "wifi_portal.h"
 #include "http_helpers.h"
 #include "settings_manager.h"
+#include "volume_control.h"
 #include "prayer_types.h"
 #include "time_utils.h"
 #include "rtc_manager.h"
@@ -366,8 +367,8 @@ namespace WiFiPortal
         if (doc["volume"].is<int>())
         {
             int vol = doc["volume"].as<int>();
-            if (vol >= 0 && vol <= 100)
-                SettingsManager::setVolume(static_cast<uint8_t>(vol));
+            if (VolumeControl::isValid(vol))
+                VolumeControl::commit(VolumeControl::normalize(vol));
         }
 
         // Adhan toggles

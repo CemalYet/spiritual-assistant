@@ -22,6 +22,7 @@
 #include "display_ticker.h"
 #include "tca_expander.h"
 #include "rtc_manager.h"
+#include "volume_control.h"
 #include "pmu_manager.h"
 #include "power_manager.h"
 #include "imu_manager.h"
@@ -181,8 +182,7 @@ void setup()
 
     // Volume — all 0-100 everywhere
     uint8_t vol = SettingsManager::getVolume();
-    AppStateHelper::setVolume(vol);
-    setVolume(vol); // Apply NVS volume to ES8311 codec
+    VolumeControl::applyRuntime(vol); // Apply persisted boot volume to runtime + codec
     UiPageSettings::setVolumeLevel(vol);
 
     // Mute state — persisted in NVS
@@ -192,7 +192,7 @@ void setup()
 
     PowerManager::init();
 
-    Serial.println("\n[System] Ready!\n");
+    Serial.printf("[System] Ready  heap=%lu\n", (unsigned long)ESP.getFreeHeap());
 }
 
 // ── Loop ─────────────────────────────────────────────────
@@ -204,6 +204,7 @@ void loop()
     PortalHandler::tick();
     WifiManager::tick();
     PrayerEngine::tick();
+    AudioPlayer::tick();
     DisplayTicker::tick();
     PowerManager::tick();
     RtcManager::correctDriftFromRTC();

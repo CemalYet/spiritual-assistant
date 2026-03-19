@@ -75,7 +75,7 @@ namespace DisplayTicker
             pushNtpStatus();
         }
 
-        // Update WiFi signal + battery every 5 seconds
+        // Update WiFi signal every 5 seconds
         if (now - s_lastSignalCheck >= 5000)
         {
             s_lastSignalCheck = now;
@@ -93,14 +93,6 @@ namespace DisplayTicker
                     bars = 1;
             }
             AppStateHelper::setWifiSignal(bars);
-
-            // Battery
-            int pct = PmuManager::getBatteryPercent();
-            if (pct < 0)
-                pct = 0;
-            if (pct > 100)
-                pct = 100;
-            AppStateHelper::setBatteryStatus(static_cast<uint8_t>(pct), PmuManager::isCharging());
         }
     }
 

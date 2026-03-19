@@ -23,6 +23,9 @@
 // --- COMPILE-TIME CONFIGURATION ---
 namespace Config
 {
+    // Keep sleep wake-early and clock-jump catch-up window aligned across modules.
+    constexpr int PRAYER_WAKE_EARLY_SEC = 5;
+
     constexpr std::string_view WIFI_SSID = "";
     constexpr std::string_view WIFI_PASS = "";
 

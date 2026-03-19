@@ -22,9 +22,9 @@ namespace AudioConfig
     // Codec / percentage volume constants
     constexpr uint8_t MAX_VOLUME_PCT = 100;    // Max ES8311 codec percentage
     constexpr uint8_t DEFAULT_VOLUME = 80;     // Default volume (0-100%)
-    constexpr uint8_t CODEC_SOFT_CAP_PCT = 80; // Internal top-end cap for cleaner output
+    constexpr uint8_t CODEC_SOFT_CAP_PCT = 80; // Internal top-end cap (80 = proven safe max, no clipping)
     constexpr uint8_t CODEC_KNEE_PCT = 70;     // Start compressing top-end after this UI volume
-    constexpr float VOLUME_GAMMA = 0.78f;      // Perceptual curve: boosts low-mid, softens upper jumps
+    constexpr float VOLUME_GAMMA = 0.45f;      // Perceptual curve: boosts low-mid, softens upper jumps
 }
 
 bool audioPlayerInit();
@@ -34,13 +34,14 @@ bool isPlaying();
 bool isAudioFinished();
 void stopAudio();
 void setVolume(uint8_t vol); // 0-100 percentage → ES8311 codec
-void enableAmp();            // Enable audio output (unmute codec)
-void disableAmp();           // Disable audio output (mute codec)
-void audioPlayerSuspend();   // Power down codec before light sleep
-void audioPlayerResume();    // Re-init codec after light sleep wake
+void setTargetVolume(uint8_t vol);
+void volumeRampTick();
+void enableAmp();          // Enable audio output (unmute codec)
+void disableAmp();         // Disable audio output (mute codec)
+void audioPlayerSuspend(); // Power down codec before light sleep
+void audioPlayerResume();  // Re-init codec after light sleep wake
 
-// Callback type for work during playback (e.g., handle server, update volume)
-using PlaybackCallback = void (*)();
-
-// Play audio file and block until finished, calling callback each iteration
-bool playAudioFileBlocking(const char *filename, PlaybackCallback onLoop = nullptr);
+namespace AudioPlayer
+{
+    void tick();
+}

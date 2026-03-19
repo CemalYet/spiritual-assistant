@@ -29,8 +29,6 @@ namespace UiPagePrayer
     static lv_obj_t *lbl_city = nullptr;
     static lv_obj_t *lbl_dateabbr = nullptr;
     static lv_obj_t *wifi_bars[3] = {};
-    static lv_obj_t *bat_fill = nullptr;
-    static lv_obj_t *lbl_charge = nullptr;
     // Clock
     static lv_obj_t *lbl_h = nullptr;
     static lv_obj_t *lbl_colon = nullptr;
@@ -136,9 +134,6 @@ namespace UiPagePrayer
             lv_obj_set_style_bg_opa(wifi_bars[i], 128, 0);
             lv_obj_set_style_border_width(wifi_bars[i], 0, 0);
         }
-
-        bat_fill = nullptr;
-        lbl_charge = nullptr;
     }
 
     // ── Separator gradient ─────────────────────────────────────────
@@ -321,7 +316,6 @@ namespace UiPagePrayer
             lbl_city = lbl_dateabbr = nullptr;
             for (int i = 0; i < 3; i++)
                 wifi_bars[i] = nullptr;
-            bat_fill = lbl_charge = nullptr;
             lbl_h = lbl_colon = lbl_m = lbl_sec = nullptr;
             lbl_date = lbl_hijri = nullptr;
             for (int i = 0; i < 4; i++)
@@ -397,27 +391,6 @@ namespace UiPagePrayer
             bool lit = (i < bars);
             lv_obj_set_style_bg_color(wifi_bars[i], lit ? COLOR_GREEN : COLOR_DIM, 0);
             lv_obj_set_style_bg_opa(wifi_bars[i], lit ? LV_OPA_COVER : 50, 0);
-        }
-    }
-
-    void setBattery(uint8_t pct, bool charging)
-    {
-        if (!bat_fill)
-            return;
-        int32_t fill_w = ((int32_t)pct * 14) / 100;
-        if (fill_w < 0)
-            fill_w = 0;
-        if (fill_w > 14)
-            fill_w = 14;
-        lv_obj_set_width(bat_fill, (lv_coord_t)fill_w);
-        lv_color_t col = (pct > 20) ? COLOR_GREEN : lv_color_hex(0xFF4444);
-        lv_obj_set_style_bg_color(bat_fill, col, 0);
-        if (lbl_charge)
-        {
-            if (charging)
-                lv_obj_clear_flag(lbl_charge, LV_OBJ_FLAG_HIDDEN);
-            else
-                lv_obj_add_flag(lbl_charge, LV_OBJ_FLAG_HIDDEN);
         }
     }
 

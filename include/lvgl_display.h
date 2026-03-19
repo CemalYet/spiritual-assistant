@@ -37,6 +37,10 @@ namespace LvglDisplay
     /// Navigate to portal screen (page 3)
     void goToPortalPage();
 
+    /// If portal page is active, return to settings page before sleep.
+    /// Returns true when a page switch happened.
+    bool leavePortalPageIfActive();
+
 } // namespace LvglDisplay
 
 #endif // LVGL_DISPLAY_H

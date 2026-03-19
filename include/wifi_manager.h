@@ -7,4 +7,5 @@ namespace WifiManager
     void reconnect();
     void disconnect();
     void resetTimeout();
+    void notifySleep();
 }

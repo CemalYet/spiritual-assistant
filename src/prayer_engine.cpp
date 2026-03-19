@@ -7,18 +7,23 @@
 #include "prayer_api.h"
 #include "prayer_calculator.h"
 #include "settings_manager.h"
-#include "settings_server.h"
 #include "audio_player.h"
-#include "lvgl_display.h"
-#include "display_ticker.h"
 #include "power_manager.h"
 #include "app_state.h"
 #include <Arduino.h>
+#include <climits>
 #include <cmath>
 #include <optional>
 
 namespace PrayerEngine
 {
+    static constexpr uint8_t INVALID_WAKE_LOCK = 0xFF;
+    static constexpr int CLOCK_JUMP_THRESHOLD_SEC = 3;
+    static constexpr int JUMP_CATCHUP_WINDOW_SEC = Config::PRAYER_WAKE_EARLY_SEC;
+    static constexpr int SECONDS_PER_DAY = 86400;
+    static constexpr int HALF_DAY_SECONDS = SECONDS_PER_DAY / 2;
+    static constexpr int PROGRESS_MAX_PERCENT = 100;
+
     static DailyPrayers s_prayers;
     static std::optional<PrayerType> s_nextPrayer;
     static int s_nextPrayerSeconds = -1;
@@ -27,41 +32,19 @@ namespace PrayerEngine
     static bool s_showingTomorrow = false;
     static int s_lastDay = -1;
 
-    static uint8_t s_currentVolume = 0;
     static bool s_adhanPlaying = false;
+    static uint8_t s_adhanWakeLockId = INVALID_WAKE_LOCK;
+    static int s_prevNowSeconds = -1;
+    static int s_prevSecondsUntil = INT_MAX;
 
-    static int getDayOffset()
+    static int computeSecondsUntil(int nowSeconds)
     {
-        struct tm timeinfo;
-        if (!getLocalTime(&timeinfo))
-            return 0;
+        if (s_nextPrayerSeconds < 0)
+            return -1;
 
-        const int currentMinutes = timeinfo.tm_hour * 60 + timeinfo.tm_min;
-        int method = SettingsManager::getPrayerMethod();
-
-        DailyPrayers tempPrayers;
-        bool loaded = false;
-
-        if (method == PRAYER_METHOD_DIYANET)
-        {
-            loaded = PrayerAPI::getCachedPrayerTimes(tempPrayers, false);
-        }
-        else
-        {
-            double lat = SettingsManager::getLatitude();
-            double lng = SettingsManager::getLongitude();
-            if (!std::isnan(lat) && !std::isnan(lng))
-                loaded = PrayerCalculator::calculateTimes(tempPrayers, method, lat, lng, 0, false);
-        }
-
-        if (loaded)
-        {
-            const int ishaMinutes = tempPrayers[PrayerType::Isha].toMinutes();
-            if (currentMinutes > ishaMinutes)
-                return 1;
-        }
-
-        return 0;
+        return s_showingTomorrow
+                   ? (SECONDS_PER_DAY - nowSeconds) + s_nextPrayerSeconds
+                   : s_nextPrayerSeconds - nowSeconds;
     }
 
     static bool loadPrayerTimes(int method, int dayOffset = 0)
@@ -112,7 +95,7 @@ namespace PrayerEngine
         if (!s_nextPrayer)
         {
             s_nextPrayerSeconds = -1;
-            AppStateHelper::setNextPrayer("SABAH", "Yarin");
+            AppStateHelper::setNextPrayer("IMSAK", "Yarin");
             return;
         }
 
@@ -125,9 +108,10 @@ namespace PrayerEngine
                       prayerTime.value.data(),
                       s_showingTomorrow ? " (tomorrow)" : "");
 
-        AppStateHelper::setNextPrayer(
-            getPrayerName(prayer, true).data(),
-            prayerTime.value.data());
+        const char *nextPrayerLabel = (prayer == PrayerType::Fajr)
+                                          ? "IMSAK"
+                                          : getPrayerName(prayer, true).data();
+        AppStateHelper::setNextPrayer(nextPrayerLabel, prayerTime.value.data());
         AppStateHelper::setPrayerTimes(
             s_prayers[PrayerType::Fajr].value.data(),
             s_prayers[PrayerType::Sunrise].value.data(),
@@ -135,7 +119,7 @@ namespace PrayerEngine
             s_prayers[PrayerType::Asr].value.data(),
             s_prayers[PrayerType::Maghrib].value.data(),
             s_prayers[PrayerType::Isha].value.data(),
-            s_showingTomorrow ? -1 : static_cast<int>(prayer));
+            s_showingTomorrow ? static_cast<int>(PrayerType::Fajr) : static_cast<int>(prayer));
 
         // Track start of current slot for progress calculation
         if (s_showingTomorrow)
@@ -150,38 +134,33 @@ namespace PrayerEngine
                                  : 0; // before Fajr — slot started at midnight
     }
 
-    static void onAdhanLoop()
+    static void advanceNextPrayerAfterTrigger()
     {
-        LvglDisplay::loop();
-        DisplayTicker::tick();
-        PowerManager::tick();
-        SettingsServer::handle();
-
-        // Run normal tick cycle (countdown, progress, iftar pill)
-        // s_adhanPlaying flag prevents re-entering checkAndPlayAdhan
-        tick();
-
-        if (g_state.muted)
+        const auto freshNow = CurrentTime::now();
+        auto next = s_prayers.findNext(freshNow._minutes);
+        if (!next)
         {
-            if (s_currentVolume != 0)
-            {
-                s_currentVolume = 0;
-                setVolume(0);
-            }
-            return;
+            int method = SettingsManager::getPrayerMethod();
+            s_prayersFetched = loadPrayerTimes(method, 1);
         }
-
-        uint8_t newVolume = SettingsManager::getVolume();
-        if (newVolume != s_currentVolume)
-        {
-            s_currentVolume = newVolume;
-            setVolume(SettingsManager::getVolume());
-        }
+        displayNextPrayer();
+        s_prevSecondsUntil = INT_MAX;
     }
 
-    static void checkAndPlayAdhan(PrayerType currentPrayer)
+    static void finishAdhan(bool ok)
     {
-        if (!s_prayersFetched)
+        s_adhanPlaying = false;
+        if (s_adhanWakeLockId != INVALID_WAKE_LOCK)
+        {
+            PowerManager::releaseWakeLock(s_adhanWakeLockId);
+            s_adhanWakeLockId = INVALID_WAKE_LOCK;
+        }
+        Serial.printf("[Adhan] %s\n", ok ? "Finished OK" : "PLAYBACK FAILED");
+    }
+
+    static void startAdhan(PrayerType currentPrayer)
+    {
+        if (!s_prayersFetched || s_adhanPlaying)
             return;
 
         Serial.printf("\n\n🕌 === PRAYER TIME: %s === 🕌\n\n",
@@ -194,18 +173,18 @@ namespace PrayerEngine
 
         if (shouldPlay)
         {
-            ScopedWakeLock lock("adhan");
+            s_adhanWakeLockId = PowerManager::acquireWakeLock("adhan");
             PowerManager::wakeScreen();
 
-            s_currentVolume = g_state.muted ? 0 : SettingsManager::getVolume();
+            const uint8_t startVolume = g_state.muted ? 0 : g_state.volume;
             Serial.printf("[Adhan] Volume: %d%%%s, File: %s\n",
-                          s_currentVolume, g_state.muted ? " (muted)" : "", adhanFile.data());
-            setVolume(s_currentVolume);
+                          startVolume, g_state.muted ? " (muted)" : "", adhanFile.data());
+            setVolume(startVolume);
+            setTargetVolume(startVolume);
 
             s_adhanPlaying = true;
-            bool ok = playAudioFileBlocking(adhanFile.data(), onAdhanLoop);
-            s_adhanPlaying = false;
-            Serial.printf("[Adhan] %s\n", ok ? "Finished OK" : "PLAYBACK FAILED");
+            if (!playAudioFile(adhanFile.data()))
+                finishAdhan(false);
         }
         else
         {
@@ -225,12 +204,17 @@ namespace PrayerEngine
         }
 
         int method = SettingsManager::getPrayerMethod();
-        s_prayersFetched = loadPrayerTimes(method, getDayOffset());
+        s_prayersFetched = loadPrayerTimes(method, 0);
+
+        if (s_prayersFetched && !s_prayers.findNext(CurrentTime::now()._minutes))
+            s_prayersFetched = loadPrayerTimes(method, 1);
 
         if (s_prayersFetched)
         {
             AppStateHelper::setLocation(SettingsManager::getShortCityName());
             displayNextPrayer();
+            // Seed crossing guard so a past prayer does not trigger on first tick
+            s_prevSecondsUntil = computeSecondsUntil(CurrentTime::now()._seconds);
             return true;
         }
 
@@ -245,6 +229,13 @@ namespace PrayerEngine
             return;
 
         const auto now = CurrentTime::now();
+
+        if (s_adhanPlaying)
+        {
+            setTargetVolume(g_state.muted ? 0 : g_state.volume);
+            if (isAudioFinished())
+                finishAdhan(true);
+        }
 
         if (SettingsManager::needsRecalculation())
         {
@@ -263,6 +254,7 @@ namespace PrayerEngine
                 int method = SettingsManager::getPrayerMethod();
                 s_prayersFetched = loadPrayerTimes(method, 0);
                 displayNextPrayer();
+                s_prevSecondsUntil = INT_MAX;
             }
             s_lastDay = timeinfo.tm_mday;
         }
@@ -271,16 +263,50 @@ namespace PrayerEngine
         if (s_nextPrayerSeconds == -1)
         {
             displayNextPrayer();
+            s_prevSecondsUntil = INT_MAX;
         }
+
+        if (s_prevNowSeconds >= 0)
+        {
+            int delta = now._seconds - s_prevNowSeconds;
+            if (delta < -HALF_DAY_SECONDS)
+                delta += SECONDS_PER_DAY;
+            else if (delta > HALF_DAY_SECONDS)
+                delta -= SECONDS_PER_DAY;
+
+            if (delta < -CLOCK_JUMP_THRESHOLD_SEC || delta > CLOCK_JUMP_THRESHOLD_SEC)
+            {
+                const int jumpSecondsUntil = computeSecondsUntil(now._seconds);
+                const bool jumpCatchup = !s_adhanPlaying &&
+                                         s_nextPrayer.has_value() &&
+                                         s_prevSecondsUntil > 0 &&
+                                         s_prevSecondsUntil <= JUMP_CATCHUP_WINDOW_SEC &&
+                                         jumpSecondsUntil <= 0 &&
+                                         jumpSecondsUntil >= -JUMP_CATCHUP_WINDOW_SEC;
+
+                Serial.printf("[Prayer] Clock jump detected (%+d s) — revalidating\n", delta);
+
+                if (jumpCatchup)
+                {
+                    const PrayerType triggeredPrayer = *s_nextPrayer;
+                    advanceNextPrayerAfterTrigger();
+                    startAdhan(triggeredPrayer);
+                    s_prevNowSeconds = now._seconds;
+                    return;
+                }
+
+                displayNextPrayer();
+                s_prevSecondsUntil = INT_MAX;
+            }
+        }
+        s_prevNowSeconds = now._seconds;
 
         // Adhan check
         if (s_nextPrayerSeconds > 0)
         {
-            const int secondsUntil = s_showingTomorrow
-                                         ? (86400 - now._seconds) + s_nextPrayerSeconds
-                                         : s_nextPrayerSeconds - now._seconds;
+            const int secondsUntil = computeSecondsUntil(now._seconds);
 
-            if (secondsUntil <= 0 && !s_adhanPlaying)
+            if (!s_adhanPlaying && s_nextPrayer.has_value() && s_prevSecondsUntil > 0 && secondsUntil <= 0)
             {
                 AppStateHelper::setCountdown(0);
 
@@ -288,18 +314,12 @@ namespace PrayerEngine
                 // so hero/iftar update during playback
                 PrayerType triggeredPrayer = *s_nextPrayer;
 
-                const auto freshNow = CurrentTime::now();
-                auto next = s_prayers.findNext(freshNow._minutes);
-                if (!next)
-                {
-                    int method = SettingsManager::getPrayerMethod();
-                    s_prayersFetched = loadPrayerTimes(method, 1);
-                }
-                displayNextPrayer();
-
-                checkAndPlayAdhan(triggeredPrayer);
+                advanceNextPrayerAfterTrigger();
+                startAdhan(triggeredPrayer);
                 return;
             }
+
+            s_prevSecondsUntil = secondsUntil;
 
             AppStateHelper::setCountdown(secondsUntil > 0 ? static_cast<uint32_t>(secondsUntil) : 0);
 
@@ -313,8 +333,8 @@ namespace PrayerEngine
             int pct = ((now._seconds - s_slotStartSeconds) * 100) / slotDuration;
             if (pct < 0)
                 pct = 0;
-            if (pct > 100)
-                pct = 100;
+            if (pct > PROGRESS_MAX_PERCENT)
+                pct = PROGRESS_MAX_PERCENT;
             AppStateHelper::setProgress(static_cast<uint8_t>(pct));
         }
     }
@@ -322,12 +342,16 @@ namespace PrayerEngine
     void recalculate()
     {
         int method = SettingsManager::getPrayerMethod();
-        s_prayersFetched = loadPrayerTimes(method, getDayOffset());
+        s_prayersFetched = loadPrayerTimes(method, 0);
+
+        if (s_prayersFetched && !s_prayers.findNext(CurrentTime::now()._minutes))
+            s_prayersFetched = loadPrayerTimes(method, 1);
 
         if (s_prayersFetched)
         {
             s_nextPrayer = std::nullopt;
             s_nextPrayerSeconds = -1;
+            s_prevSecondsUntil = INT_MAX;
             AppStateHelper::setLocation(SettingsManager::getShortCityName());
             displayNextPrayer();
         }
@@ -338,14 +362,14 @@ namespace PrayerEngine
         return s_prayersFetched;
     }
 
-    int getNextPrayerSeconds()
+    int getSecondsUntilNextPrayer()
     {
-        return s_nextPrayerSeconds;
+        return computeSecondsUntil(CurrentTime::now()._seconds);
     }
 
-    bool isShowingTomorrow()
+    bool isAdhanPlaying()
     {
-        return s_showingTomorrow;
+        return s_adhanPlaying;
     }
 
 } // namespace PrayerEngine

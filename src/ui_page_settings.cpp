@@ -15,6 +15,7 @@
 #include "settings_manager.h"
 #include "audio_player.h"
 #include "app_state.h"
+#include "volume_control.h"
 #include "network.h"
 #include "wifi_portal.h"
 #include "lvgl_display.h"
@@ -108,6 +109,7 @@ namespace UiPageSettings
     static void showPortalOverlay();
     static void hidePortalOverlay();
     static void showConnectedQRPage(const char *ip);
+    static void setWiFiButtonEnabled(bool enabled);
     static void setVolumeSliderEnabled(bool enabled);
     static void clearPortalScreenIfPresent(bool returnToSettingsIfActive);
 
@@ -210,7 +212,7 @@ namespace UiPageSettings
         lv_obj_t *row = lv_obj_create(parent);
         lv_obj_remove_style_all(row);
         lv_obj_set_size(row, lv_pct(100), ROW_H);
-        lv_obj_set_style_bg_color(row, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_color(row, COLOR_BG2, 0);
         lv_obj_set_style_bg_opa(row, ROW_BG_OPA, 0);
         lv_obj_set_style_border_width(row, 1, 0);
         lv_obj_set_style_border_color(row, COLOR_BORDER, 0);
@@ -275,7 +277,7 @@ namespace UiPageSettings
         lv_obj_t *card = lv_obj_create(parent);
         lv_obj_remove_style_all(card);
         lv_obj_set_size(card, SLIDER_CARD_W, lv_pct(100));
-        lv_obj_set_style_bg_color(card, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_color(card, COLOR_BG2, 0);
         lv_obj_set_style_bg_opa(card, 8, 0);
         lv_obj_set_style_border_width(card, 1, 0);
         lv_obj_set_style_border_color(card, COLOR_BORDER, 0);
@@ -302,7 +304,7 @@ namespace UiPageSettings
         lv_obj_t *track = lv_obj_create(card);
         lv_obj_remove_style_all(track);
         lv_obj_set_size(track, SLIDER_TRACK_W, SLIDER_TRACK_H);
-        lv_obj_set_style_bg_color(track, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_color(track, COLOR_DIM, 0);
         lv_obj_set_style_bg_opa(track, 38, 0);
         lv_obj_set_style_radius(track, 12, 0);
         lv_obj_clear_flag(track, LV_OBJ_FLAG_SCROLLABLE);
@@ -377,6 +379,23 @@ namespace UiPageSettings
                 lv_obj_set_style_text_color(vol_val_lbl, COLOR_DIM, 0);
             if (vol_track_icon)
                 lv_obj_set_style_opa(vol_track_icon, ICON_OPA_DISABLED, 0);
+        }
+    }
+
+    static void setWiFiButtonEnabled(bool enabled)
+    {
+        if (!wifi_btn)
+            return;
+
+        if (enabled)
+        {
+            lv_obj_add_flag(wifi_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(wifi_btn, LV_OPA_COVER, 0);
+        }
+        else
+        {
+            lv_obj_clear_flag(wifi_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(wifi_btn, 180, 0);
         }
     }
 
@@ -488,7 +507,7 @@ namespace UiPageSettings
             drag.start = point;
         }
 
-        constexpr int16_t DIR_LOCK_THRESHOLD_PX = 10;
+        const int16_t dirLockThresholdPx = 5;
         if (!drag.locked)
         {
             int16_t dx = point.x - drag.start.x;
@@ -498,7 +517,7 @@ namespace UiPageSettings
             if (dy < 0)
                 dy = -dy;
 
-            if (dx >= DIR_LOCK_THRESHOLD_PX || dy >= DIR_LOCK_THRESHOLD_PX)
+            if (dx >= dirLockThresholdPx || dy >= dirLockThresholdPx)
             {
                 drag.locked = true;
                 drag.vertical = (dy >= dx);
@@ -539,9 +558,8 @@ namespace UiPageSettings
 
             currentVolumeLevel = pct;
             updateSliderVisual(vol_fill, vol_thumb, vol_val_lbl, currentVolumeLevel);
-            // Apply volume to codec immediately (no NVS write during drag)
-            ::setVolume(static_cast<uint8_t>(currentVolumeLevel));
-            AppStateHelper::setVolume(static_cast<uint8_t>(currentVolumeLevel));
+            // Apply volume to codec/state immediately (no NVS write during drag)
+            VolumeControl::applyRuntime(static_cast<uint8_t>(currentVolumeLevel));
         }
     }
 
@@ -557,7 +575,7 @@ namespace UiPageSettings
         {
             if (g_state.muted)
                 return;
-            SettingsManager::setVolume(static_cast<uint8_t>(currentVolumeLevel));
+            VolumeControl::persist(static_cast<uint8_t>(currentVolumeLevel));
         }
     }
 
@@ -588,8 +606,11 @@ namespace UiPageSettings
             return;
         }
 
+        setWiFiButtonEnabled(false);
         if (wifi_btn_name)
-            lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Baslatiliyor..."));
+            lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
+        if (wifi_btn_desc)
+            lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Hazirlaniyor..."));
         lv_refr_now(NULL);
         if (advancedCallback)
             advancedCallback();
@@ -928,6 +949,11 @@ namespace UiPageSettings
 
     void setWiFiButtonState(WifiState state, const char *ip)
     {
+        if (!scr)
+            return;
+
+        setWiFiButtonEnabled(state != WifiState::CONNECTING);
+
         if (state == WifiState::PORTAL && portal_overlay && qr_code_obj)
         {
             // Replace connected QR page with portal info page when entering AP mode.
@@ -1041,11 +1067,6 @@ namespace UiPageSettings
     void setWifi(uint8_t bars)
     {
         UiComponents::updateStatusBarWifi(sb_handles, bars);
-    }
-
-    void setBattery(uint8_t pct, bool charging)
-    {
-        UiComponents::updateStatusBarBattery(sb_handles, pct, charging);
     }
 
 } // namespace UiPageSettings

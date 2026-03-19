@@ -59,7 +59,7 @@ namespace PmuManager
         pmu.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_200MA);
         pmu.setChargerTerminationCurr(XPOWERS_AXP2101_CHG_ITERM_25MA);
         pmu.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V1);
-        pmu.setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+        pmu.setChargingLedMode(XPOWERS_CHG_LED_OFF);
 
         enableBatteryMonitoring();
         enableButtonBatteryCharge();

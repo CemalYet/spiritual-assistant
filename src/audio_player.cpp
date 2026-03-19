@@ -8,12 +8,62 @@
 static constexpr int AUDIO_BUFFER_SIZE = 8000;
 static constexpr int AUDIO_BUFFER_SIZE_PSRAM = 80000;
 static constexpr int CODEC_STABILIZE_MS = 10;
+static constexpr uint32_t VOLUME_RAMP_INTERVAL_MS = 20;
+static constexpr int16_t VOLUME_RAMP_FAST_DELTA = 8;
+static constexpr uint8_t VOLUME_RAMP_FAST_STEP = 3;
+static constexpr uint8_t VOLUME_RAMP_SLOW_STEP = 1;
 
 static Audio audio;
 static volatile bool audioFinished = false;
 static TaskHandle_t audioTaskHandle = NULL;
 static SemaphoreHandle_t audioMutex = NULL;
 static es8311_handle_t codecHandle = NULL;
+static uint8_t s_currentRampVolume = AudioConfig::DEFAULT_VOLUME;
+static uint8_t s_targetRampVolume = AudioConfig::DEFAULT_VOLUME;
+static uint32_t s_lastVolumeRampMs = 0;
+
+static void applyCodecVolume(uint8_t vol, bool syncRampState)
+{
+    // Map UI 0-100 through a perceptual curve so mid values feel less "too quiet"
+    // while upper range ramps more smoothly and avoids sudden loud jumps.
+    uint8_t clamped = (vol > AudioConfig::MAX_VOLUME_PCT) ? AudioConfig::MAX_VOLUME_PCT : vol;
+    const float norm = static_cast<float>(clamped) / static_cast<float>(AudioConfig::MAX_VOLUME_PCT);
+    const float shaped = powf(norm, AudioConfig::VOLUME_GAMMA);
+    uint8_t mapped = static_cast<uint8_t>(lroundf(shaped * AudioConfig::CODEC_SOFT_CAP_PCT));
+
+    // Avoid near-zero dead zone when user expects audible output.
+    if (clamped > 0 && mapped < 2)
+        mapped = 2;
+
+    if (codecHandle)
+        es8311_voice_volume_set(codecHandle, mapped, NULL);
+
+    if (syncRampState)
+    {
+        s_currentRampVolume = clamped;
+        s_targetRampVolume = clamped;
+    }
+}
+
+static uint8_t rampVolumeTowardTarget(uint8_t current, uint8_t target)
+{
+    if (current == target)
+        return current;
+
+    int16_t delta = static_cast<int16_t>(target) - static_cast<int16_t>(current);
+    uint8_t step = (delta > VOLUME_RAMP_FAST_DELTA || delta < -VOLUME_RAMP_FAST_DELTA)
+                       ? VOLUME_RAMP_FAST_STEP
+                       : VOLUME_RAMP_SLOW_STEP;
+
+    if (delta > 0)
+    {
+        uint16_t next = static_cast<uint16_t>(current) + step;
+        return static_cast<uint8_t>(next > target ? target : next);
+    }
+
+    int16_t next = static_cast<int16_t>(current) - step;
+    return static_cast<uint8_t>(next < target ? target : next);
+}
 
 // Thread-safe audio access
 static inline void audioLock()
@@ -155,19 +205,29 @@ void stopAudio()
 
 void setVolume(uint8_t vol)
 {
-    // Map UI 0-100 through a perceptual curve so mid values feel less "too quiet"
-    // while upper range ramps more smoothly and avoids sudden loud jumps.
-    uint8_t clamped = (vol > AudioConfig::MAX_VOLUME_PCT) ? AudioConfig::MAX_VOLUME_PCT : vol;
-    const float norm = static_cast<float>(clamped) / static_cast<float>(AudioConfig::MAX_VOLUME_PCT);
-    const float shaped = powf(norm, AudioConfig::VOLUME_GAMMA);
-    uint8_t mapped = static_cast<uint8_t>(lroundf(shaped * AudioConfig::CODEC_SOFT_CAP_PCT));
+    applyCodecVolume(vol, true);
+}
 
-    // Avoid near-zero dead zone when user expects audible output.
-    if (clamped > 0 && mapped < 2)
-        mapped = 2;
+void setTargetVolume(uint8_t vol)
+{
+    s_targetRampVolume = (vol > AudioConfig::MAX_VOLUME_PCT) ? AudioConfig::MAX_VOLUME_PCT : vol;
+}
 
-    if (codecHandle)
-        es8311_voice_volume_set(codecHandle, mapped, NULL);
+void volumeRampTick()
+{
+    if (!isPlaying())
+        return;
+
+    if (s_currentRampVolume == s_targetRampVolume)
+        return;
+
+    const uint32_t now = millis();
+    if (now - s_lastVolumeRampMs < VOLUME_RAMP_INTERVAL_MS)
+        return;
+
+    s_lastVolumeRampMs = now;
+    s_currentRampVolume = rampVolumeTowardTarget(s_currentRampVolume, s_targetRampVolume);
+    applyCodecVolume(s_currentRampVolume, false);
 }
 
 void enableAmp()
@@ -231,18 +291,10 @@ void audio_eof_mp3(const char *info)
     disableAmp();
 }
 
-bool playAudioFileBlocking(const char *filename, PlaybackCallback onLoop)
+namespace AudioPlayer
 {
-    if (!playAudioFile(filename))
-        return false;
-
-    while (!isAudioFinished())
+    void tick()
     {
-        if (onLoop)
-            onLoop();
-
-        delay(1);
+        volumeRampTick();
     }
-
-    return true;
 }

@@ -1,14 +1,19 @@
 #include "power_manager.h"
+#include "config.h"
 #include "tft_config.h"
 #include "settings_manager.h"
 #include "lvgl_display.h"
 #include "audio_player.h"
 #include "ui_state_reader.h"
+#include "settings_server.h"
+#include "ui_page_settings.h"
+#include "app_state.h"
+#include "imu_manager.h"
+#include "wifi_manager.h"
 
 #include "rtc_manager.h"
 
 #include "prayer_engine.h"
-#include "current_time.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -16,28 +21,22 @@
 #include <driver/gpio.h>
 
 static constexpr uint8_t INVALID_LOCK = 0xFF;
-static constexpr uint32_t FALLBACK_SLEEP_SEC = 3600;
-static constexpr uint32_t MAX_SLEEP_SEC = 8 * 3600;
-static constexpr int SECONDS_PER_DAY = 86400;
+static constexpr uint32_t SECONDS_PER_HOUR = 3600;
+static constexpr uint32_t FALLBACK_SLEEP_RETRY_SEC = 60;
+static constexpr uint32_t MAX_SLEEP_SEC = 8 * SECONDS_PER_HOUR;
 static constexpr uint64_t USEC_PER_SEC = 1'000'000ULL;
-static constexpr int WAKE_EARLY_SEC = 5;
+static constexpr int WAKE_EARLY_SEC = Config::PRAYER_WAKE_EARLY_SEC;
 
 static uint32_t computeSleepSeconds()
 {
-    int nextSec = PrayerEngine::getNextPrayerSeconds();
-    if (nextSec < 0)
-        return FALLBACK_SLEEP_SEC;
+    const int secondsUntil = PrayerEngine::getSecondsUntilNextPrayer();
+    if (secondsUntil < 0)
+        return FALLBACK_SLEEP_RETRY_SEC;
 
-    int nowSec = CurrentTime::now()._seconds;
-    int sleepSec = nextSec - nowSec;
-
-    if (PrayerEngine::isShowingTomorrow())
-        sleepSec += SECONDS_PER_DAY;
-
-    sleepSec -= WAKE_EARLY_SEC;
+    int sleepSec = secondsUntil - WAKE_EARLY_SEC;
 
     if (sleepSec <= 0)
-        return FALLBACK_SLEEP_SEC;
+        return FALLBACK_SLEEP_RETRY_SEC;
 
     if (static_cast<uint32_t>(sleepSec) > MAX_SLEEP_SEC)
         return MAX_SLEEP_SEC;
@@ -47,6 +46,7 @@ static uint32_t computeSleepSeconds()
 
 static PowerManager::State currentState = PowerManager::State::ACTIVE;
 static uint32_t lastActivityMs = 0;
+static bool s_loggedPrayerImminent = false;
 
 struct WakeLockEntry
 {
@@ -133,6 +133,21 @@ namespace PowerManager
         case State::SCREEN_OFF:
             if (cachedMode == PowerMode::SCREEN_OFF)
             {
+                if (PrayerEngine::isAdhanPlaying())
+                    break;
+
+                const int secondsUntil = PrayerEngine::getSecondsUntilNextPrayer();
+                if (secondsUntil >= 0 && secondsUntil <= WAKE_EARLY_SEC)
+                {
+                    if (!s_loggedPrayerImminent)
+                    {
+                        Serial.println("[Power] Prayer imminent — staying awake");
+                        s_loggedPrayerImminent = true;
+                    }
+                    break;
+                }
+                s_loggedPrayerImminent = false;
+
                 Serial.println("[Power] SCREEN_OFF — entering light sleep...");
                 enterLightSleep();
                 auto cause = esp_sleep_get_wakeup_cause();
@@ -146,6 +161,18 @@ namespace PowerManager
                     Serial.println("[Power] Timer wake → restoring screen for adhan");
                 }
                 wakeScreen();
+
+                // Post-wake housekeeping (screen is already visible)
+                ImuManager::clearWakeStatus();
+                ImuManager::disarmAfterWake();
+
+                if (!RtcManager::setSystemClockFromRTC())
+                {
+                    Serial.println("[Power] RTC read failed after wake — scheduling immediate NTP sync");
+                    RtcManager::postponeSync(0);
+                }
+
+                audioPlayerResume();
             }
             break;
         }
@@ -172,10 +199,24 @@ namespace PowerManager
 
     void enterLightSleep()
     {
+        if (SettingsServer::isActive())
+            SettingsServer::stop();
+        AppStateHelper::setWifiState(WifiState::DISCONNECTED);
+        WifiManager::notifySleep();
+
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
 
         audioPlayerSuspend();
+
+        ImuManager::clearWakeStatus();
+        const bool imuWakeArmed = ImuManager::armWakeOnMotion();
+        if (imuWakeArmed)
+            Serial.println("[Power] IMU wake-on-motion armed");
+
+        // Allow IMU INT1 line to settle after sensor reset inside armWakeOnMotion().
+        delay(20);
+        Serial.printf("[Power] WAKE_PIN level before sleep: %d\n", gpio_get_level(WAKE_PIN));
 
         gpio_wakeup_enable(WAKE_PIN, GPIO_INTR_LOW_LEVEL);
         esp_sleep_enable_gpio_wakeup();
@@ -189,16 +230,7 @@ namespace PowerManager
 
         // Re-init UART — USB-CDC drops during light sleep
         Serial.begin(115200);
-        delay(50);
-
-        // Re-anchor system time to external RTC after light sleep.
-        if (!RtcManager::setSystemClockFromRTC())
-        {
-            Serial.println("[Power] RTC read failed after wake — scheduling immediate NTP sync");
-            RtcManager::postponeSync(0);
-        }
-
-        audioPlayerResume();
+        delay(10);
     }
 
     State getState()
@@ -254,6 +286,7 @@ namespace PowerManager
         LvglDisplay::displayOn();
         LvglDisplay::setBacklight(ACTIVE_BRIGHTNESS);
         UiStateReader::resume();
+        UiPageSettings::updatePowerModeUI();
         lastActivityMs = millis();
         currentState = State::ACTIVE;
         Serial.println("[Power] Screen woken → ACTIVE");
