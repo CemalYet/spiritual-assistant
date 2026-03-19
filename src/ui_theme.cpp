@@ -1,12 +1,12 @@
 #include "ui_theme.h"
+#include "config.h"
 
 namespace UiTheme
 {
-    //       bg        bg2       stripBg   accent    accent2   text      dim       border    green     amber
+    //       bg        bg2       stripBg   accent    accent2   text      dim       border    green     amber     btnHi     btnLo
     static constexpr ThemePalette PALETTES[] = {
-        {0x10141C, 0x182131, 0x0D121B, 0xE2B45A, 0xF0CA85, 0xF3ECDD, 0xC8BEA9, 0x343E55, 0x2FA968, 0xD86C0F}, // Altın Gece
-        {0xF5F0E8, 0xEDE6D4, 0xEAE4D8, 0xB8860B, 0x7A5C00, 0x2A2200, 0x6A5E48, 0xD0C8B0, 0x1A7A3A, 0xC45000}, // Krem Altın
-        {0x1A1810, 0x252015, 0x14120C, 0xD4C898, 0xEDE4C0, 0xF5F0E0, 0xB8B0A0, 0x3A3528, 0x2FA968, 0xD86C0F}, // Gece Krem
+        {0x10141C, 0x182131, 0x0D121B, 0xE2B45A, 0xF0CA85, 0xF3ECDD, 0xC8BEA9, 0x343E55, 0x2FA968, 0xD86C0F, 0x2A3044, 0x141824}, // Altın Gece
+        {0xF5F0E8, 0xEDE6D4, 0xEAE4D8, 0xB8860B, 0x7A5C00, 0x2A2200, 0x6A5E48, 0xD0C8B0, 0x1A7A3A, 0xC45000, 0xE8E0D0, 0xD8D0BE}, // Krem Altın
     };
     static_assert(sizeof(PALETTES) / sizeof(PALETTES[0]) == static_cast<uint8_t>(ThemeMode::COUNT),
                   "PALETTES size must match ThemeMode::COUNT");
@@ -18,7 +18,7 @@ namespace UiTheme
     static lv_style_t style_indicator;
     static lv_style_t style_transparent;
     static bool styles_initialized = false;
-    static ThemeMode current_theme = ThemeMode::ALTIN_GECE;
+    static ThemeMode current_theme = FORCE_DAY_THEME ? ThemeMode::KREM_ALTIN : ThemeMode::ALTIN_GECE;
 
     const ThemePalette &p()
     {

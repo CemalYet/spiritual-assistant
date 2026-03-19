@@ -50,7 +50,6 @@ namespace UiPageSettings
     // Status bar updates (wifi/battery icons)
     void setStatusBarCity(const char *city, const char *dateAbbrev);
     void setMuted(bool muted);
-    void setWifi(uint8_t bars);
 
 } // namespace UiPageSettings
 

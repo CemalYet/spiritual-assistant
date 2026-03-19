@@ -33,7 +33,6 @@ namespace UiPageClock
     // Status bar
     void setStatusBarCity(const char *city, const char *dateAbbrev);
     void setMuted(bool muted);
-    void setWifi(uint8_t bars);
 
 } // namespace UiPageClock
 

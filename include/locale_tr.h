@@ -11,12 +11,12 @@
 namespace LocaleTR
 {
     constexpr const char *MONTHS[] = {
-        "Ocak", "Subat", "Mart", "Nisan", "Mayis", "Haziran",
-        "Temmuz", "Agustos", "Eylul", "Ekim", "Kasim", "Aralik"};
+        "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+        "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"};
 
     constexpr const char *DAYS[] = {
-        "Pazar", "Pazartesi", "Sali", "Carsamba",
-        "Persembe", "Cuma", "Cumartesi"};
+        "Pazar", "Pazartesi", "Salı", "Çarşamba",
+        "Perşembe", "Cuma", "Cumartesi"};
 
     /// Turkish-aware UTF-8 uppercase converter.
     /// Returns pointer to internal static buffer — valid until next call.

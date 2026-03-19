@@ -89,6 +89,8 @@ struct AppState
 
     // Hijri date string, e.g. "17 Ramazan 1447"
     etl::string<32> hijriDate;
+    uint8_t hijriDay = 0;   // 1-30
+    uint8_t hijriMonth = 0; // 1-12 (9 = Ramadan)
 
     // Progress 0-100 through current prayer slot
     uint8_t activePrayerProgress = 0;
@@ -409,18 +411,24 @@ namespace AppStateHelper
             }
 
             // Determine: before Maghrib → İftara Kaldı, after Maghrib → Sahura Kaldı
+            // But: last day of Ramadan after iftar → no sahur (Ramadan is over)
+            //       pre-Ramadan (Sha'ban 29-30) → only show sahur, not iftar
+            const bool isPreRamadan = (g_state.hijriMonth == 8);
+            const bool isLastRamadan = (g_state.hijriMonth == 9 && g_state.hijriDay >= 29);
+
             int targetSec = -1;
             const char *prefix = nullptr;
-            if (maghribSec >= 0 && nowSec < maghribSec)
+            if (!isPreRamadan && maghribSec >= 0 && nowSec < maghribSec)
             {
-                // Daytime: count to Iftar (Maghrib)
+                // Daytime during Ramadan: count to Iftar (Maghrib)
                 targetSec = maghribSec - nowSec;
                 prefix = "\xc4\xb0"
                          "ftara";
             }
-            else if (fajrSec >= 0)
+            else if (fajrSec >= 0 && !(isLastRamadan && nowSec >= maghribSec))
             {
                 // Nighttime: count to Sahur (Fajr)
+                // But skip if it's last day of Ramadan after iftar
                 targetSec = fajrSec - nowSec;
                 if (targetSec <= 0)
                     targetSec += 86400; // wrap past midnight

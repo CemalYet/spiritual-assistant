@@ -35,7 +35,7 @@ namespace UiPageHome
 
     // Strip: 6 columns
     static const char *STRIP_NAMES[6] = {
-        "\xC4\xB0MSAK", "G\xC3\x9CNES", "\xC3\x96\xC4\x9ELE",
+        "\xC4\xB0MSAK", "G\xC3\x9CNE\xC5\x9E", "\xC3\x96\xC4\x9ELE",
         "\xC4\xB0K\xC4\xB0ND\xC4\xB0", "AK\xC5\x9E"
                                        "AM",
         "YATSI"};
@@ -415,11 +415,6 @@ namespace UiPageHome
     void setMuted(bool muted)
     {
         UiComponents::updateStatusBarMute(sb_handles, muted);
-    }
-
-    void setWifi(uint8_t bars)
-    {
-        UiComponents::updateStatusBarWifi(sb_handles, bars);
     }
 
 } // namespace UiPageHome

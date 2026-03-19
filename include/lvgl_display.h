@@ -22,7 +22,7 @@ namespace LvglDisplay
     /// Initialize home screen UI (prayer data set by main.cpp)
     void showPrayerScreen();
 
-    /// Format prayer date string (e.g. "1 Subat Cumartesi")
+    /// Format prayer date string (e.g. "1 Şubat Cumartesi")
     /// dayOffset: 0 = today, 1 = tomorrow
     /// Returns pointer to static buffer (valid until next call)
     const char *formatPrayerDate(int dayOffset = 0);

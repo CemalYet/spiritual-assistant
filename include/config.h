@@ -20,6 +20,11 @@
 // Set to true to see detailed cache logs
 #define DEBUG_CACHE_LOGS true
 
+// --- UI THEME TEST MODE ---
+// Set to true to force daytime palette on boot for visual testing.
+// This is compile-time only and does not affect persisted settings.
+#define FORCE_DAY_THEME false
+
 // --- COMPILE-TIME CONFIGURATION ---
 namespace Config
 {
