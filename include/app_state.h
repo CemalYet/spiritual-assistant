@@ -109,10 +109,6 @@ struct AppState
     etl::string<32> wifiSsid;
     uint8_t wifiStrength = 0; // 0-3 bars
 
-    // Battery
-    uint8_t batteryPct = 0;
-    bool charging = false;
-
     // Settings (mirrored for display)
     uint8_t brightness = 70;
     bool adhanEnabled = true;
@@ -229,14 +225,46 @@ namespace AppStateHelper
                                etl::string_view maghrib, etl::string_view isha,
                                int8_t activeIndex)
     {
-        g_state.fajr.assign(fajr.begin(), fajr.end());
-        g_state.sunrise.assign(sunrise.begin(), sunrise.end());
-        g_state.dhuhr.assign(dhuhr.begin(), dhuhr.end());
-        g_state.asr.assign(asr.begin(), asr.end());
-        g_state.maghrib.assign(maghrib.begin(), maghrib.end());
-        g_state.isha.assign(isha.begin(), isha.end());
-        g_state.activePrayerIndex = activeIndex;
-        g_state.markDirty(DirtyFlag::PRAYER_TIMES);
+        bool changed = false;
+
+        if (g_state.fajr != fajr)
+        {
+            g_state.fajr.assign(fajr.begin(), fajr.end());
+            changed = true;
+        }
+        if (g_state.sunrise != sunrise)
+        {
+            g_state.sunrise.assign(sunrise.begin(), sunrise.end());
+            changed = true;
+        }
+        if (g_state.dhuhr != dhuhr)
+        {
+            g_state.dhuhr.assign(dhuhr.begin(), dhuhr.end());
+            changed = true;
+        }
+        if (g_state.asr != asr)
+        {
+            g_state.asr.assign(asr.begin(), asr.end());
+            changed = true;
+        }
+        if (g_state.maghrib != maghrib)
+        {
+            g_state.maghrib.assign(maghrib.begin(), maghrib.end());
+            changed = true;
+        }
+        if (g_state.isha != isha)
+        {
+            g_state.isha.assign(isha.begin(), isha.end());
+            changed = true;
+        }
+        if (g_state.activePrayerIndex != activeIndex)
+        {
+            g_state.activePrayerIndex = activeIndex;
+            changed = true;
+        }
+
+        if (changed)
+            g_state.markDirty(DirtyFlag::PRAYER_TIMES);
     }
 
     // Set WiFi state
@@ -302,17 +330,6 @@ namespace AppStateHelper
         if (g_state.wifiStrength != bars)
         {
             g_state.wifiStrength = bars;
-            g_state.markDirty(DirtyFlag::SIGNAL_BATTERY);
-        }
-    }
-
-    // Set battery status
-    inline void setBatteryStatus(uint8_t pct, bool isCharging)
-    {
-        if (g_state.batteryPct != pct || g_state.charging != isCharging)
-        {
-            g_state.batteryPct = pct;
-            g_state.charging = isCharging;
             g_state.markDirty(DirtyFlag::SIGNAL_BATTERY);
         }
     }

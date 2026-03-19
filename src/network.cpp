@@ -292,6 +292,7 @@ namespace Network
 
         // Retry in 1 hour instead of immediately
         Serial.println("[NTP] Failed to sync time — retry in 1h");
+
         RtcManager::postponeSync(60UL * 60 * 1000);
     }
 

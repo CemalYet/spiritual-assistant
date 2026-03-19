@@ -12,6 +12,7 @@
 #include "ui_page_clock.h"
 #include "ui_page_settings.h"
 #include "ui_page_status.h"
+#include "lvgl_display.h"
 #include <lvgl.h>
 #include <cstring>
 #include <cstdlib>
@@ -39,6 +40,10 @@ namespace UiStateReader
 
     void pause()
     {
+        // Portal page is dynamic — clean it up before screen-off / sleep
+        // so no dangling LVGL pointers remain when WiFi state changes.
+        LvglDisplay::leavePortalPageIfActive();
+
         if (updateTimer)
             lv_timer_pause(updateTimer);
     }
@@ -219,15 +224,10 @@ namespace UiStateReader
         if (g_state.isDirty(DirtyFlag::SIGNAL_BATTERY))
         {
             uint8_t bars = g_state.wifiStrength;
-            uint8_t pct = g_state.batteryPct;
-            bool chg = g_state.charging;
 
             UiPageHome::setWifi(bars);
-            UiPageHome::setBattery(pct, chg);
             UiPageClock::setWifi(bars);
-            UiPageClock::setBattery(pct, chg);
             UiPageSettings::setWifi(bars);
-            UiPageSettings::setBattery(pct, chg);
 
             g_state.clearDirty(DirtyFlag::SIGNAL_BATTERY);
         }

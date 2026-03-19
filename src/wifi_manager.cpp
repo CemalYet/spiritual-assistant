@@ -164,4 +164,10 @@ namespace WifiManager
         s_connectedAt = millis();
     }
 
+    void notifySleep()
+    {
+        s_wasConnected = false;
+        enterState(State::IDLE);
+    }
+
 } // namespace WifiManager

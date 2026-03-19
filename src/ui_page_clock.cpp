@@ -237,9 +237,4 @@ namespace UiPageClock
         UiComponents::updateStatusBarWifi(sb_handles, bars);
     }
 
-    void setBattery(uint8_t pct, bool charging)
-    {
-        UiComponents::updateStatusBarBattery(sb_handles, pct, charging);
-    }
-
 } // namespace UiPageClock

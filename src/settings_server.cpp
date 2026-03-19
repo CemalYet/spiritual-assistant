@@ -5,6 +5,7 @@
 #include "prayer_api.h"
 #include "audio_player.h"
 #include "app_state.h"
+#include "volume_control.h"
 #include "time_utils.h"
 #include "wifi_credentials.h"
 #include <WiFi.h>
@@ -39,6 +40,8 @@ namespace SettingsServer
     static void handleRestart();
     static void handleGetWifi();
     static void handleSaveWifi();
+    static void handleGetLog();
+    static void handleClearLog();
     static void handleNotFound();
     static void checkTestAudioTimeout();
 
@@ -247,12 +250,8 @@ namespace SettingsServer
         if (doc["volume"].is<int>())
         {
             int vol = doc["volume"].as<int>();
-            if (vol >= 0 && vol <= 100)
-            {
-                changed |= SettingsManager::setVolume(static_cast<uint8_t>(vol));
-                setVolume(static_cast<uint8_t>(vol)); // Apply to codec immediately
-                AppStateHelper::setVolume(static_cast<uint8_t>(vol));
-            }
+            if (VolumeControl::isValid(vol))
+                changed |= VolumeControl::commit(VolumeControl::normalize(vol));
         }
 
         // Adhan toggles
@@ -490,12 +489,10 @@ namespace SettingsServer
             return;
 
         int vol = server->arg("volume").toInt();
-        if (vol < 0 || vol > AudioConfig::MAX_VOLUME_PCT)
+        if (!VolumeControl::isValid(vol))
             return;
 
-        setVolume(static_cast<uint8_t>(vol));
-        SettingsManager::setVolume(static_cast<uint8_t>(vol));
-        AppStateHelper::setVolume(static_cast<uint8_t>(vol));
+        VolumeControl::commit(VolumeControl::normalize(vol));
     }
 
     static void sendTestAudioResponse()

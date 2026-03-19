@@ -35,7 +35,7 @@ namespace UiPageHome
 
     // Strip: 6 columns
     static const char *STRIP_NAMES[6] = {
-        "\xC4\xB0MSAK", "SABAH", "\xC3\x96\xC4\x9ELE",
+        "\xC4\xB0MSAK", "G\xC3\x9CNES", "\xC3\x96\xC4\x9ELE",
         "\xC4\xB0K\xC4\xB0ND\xC4\xB0", "AK\xC5\x9E"
                                        "AM",
         "YATSI"};
@@ -285,6 +285,14 @@ namespace UiPageHome
         int8_t old = cur_active_idx;
         cur_active_idx = idx;
 
+        // When there is no active prayer slot (e.g., showing tomorrow times),
+        // remove the previous highlight bar so focus does not stick on Isha.
+        if (idx < 0 && strip_glow_bar)
+        {
+            lv_obj_del(strip_glow_bar);
+            strip_glow_bar = nullptr;
+        }
+
         // Reset old active column
         if (old >= 0 && old < 6)
         {
@@ -321,7 +329,7 @@ namespace UiPageHome
             {
                 lv_obj_set_style_opa(strip_col[i], LV_OPA_COVER, 0);
                 // Active tile: darker block like HTML reference (#252840)
-                lv_obj_set_style_bg_color(strip_col[i], lv_color_hex(0x252840), 0);
+                lv_obj_set_style_bg_color(strip_col[i], COLOR_BG2, 0);
                 lv_obj_set_style_bg_grad_dir(strip_col[i], LV_GRAD_DIR_NONE, 0);
                 lv_obj_set_style_bg_opa(strip_col[i], LV_OPA_COVER, 0);
                 lv_obj_set_style_text_color(strip_name[i], COLOR_GOLD_LIGHT, 0);
@@ -412,11 +420,6 @@ namespace UiPageHome
     void setWifi(uint8_t bars)
     {
         UiComponents::updateStatusBarWifi(sb_handles, bars);
-    }
-
-    void setBattery(uint8_t pct, bool charging)
-    {
-        UiComponents::updateStatusBarBattery(sb_handles, pct, charging);
     }
 
 } // namespace UiPageHome

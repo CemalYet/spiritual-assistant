@@ -53,9 +53,6 @@ namespace UiComponents
         lv_obj_t *lbl_mute_icon;
         lv_obj_t *lbl_mute_text;
         lv_obj_t *lbl_wifi; // WiFi symbol label
-        lv_obj_t *bat_fill;
-        lv_obj_t *lbl_charge;  // ⚡ overlay — hidden unless charging
-        lv_obj_t *lbl_bat_pct; // "XX%" label
     };
 
     using MuteToggleCallback = void (*)();
@@ -96,7 +93,6 @@ namespace UiComponents
     void updateStatusBarCity(const StatusBarHandles &h, const char *city, const char *dateAbbrev);
     void updateStatusBarMute(const StatusBarHandles &h, bool muted);
     void updateStatusBarWifi(const StatusBarHandles &h, uint8_t bars);
-    void updateStatusBarBattery(const StatusBarHandles &h, uint8_t pct, bool charging);
 
 } // namespace UiComponents
 

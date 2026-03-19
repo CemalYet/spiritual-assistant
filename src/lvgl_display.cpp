@@ -43,6 +43,12 @@ static const uint16_t GFX_H = 480;
 static const uint16_t SCR_W = 480;
 static const uint16_t SCR_H = 320;
 
+// Single switch for opposite-landscape orientation.
+// true  = rotate UI 180° within landscape (other side)
+// false = current orientation
+static constexpr bool FLIP_LANDSCAPE_180 = true;
+static constexpr uint16_t TOUCH_ROTATION = FLIP_LANDSCAPE_180 ? 3 : 1;
+
 static Arduino_DataBus *bus = new Arduino_ESP32QSPI(
     QSPI_CS, QSPI_CLK, QSPI_D0, QSPI_D1, QSPI_D2, QSPI_D3);
 
@@ -64,6 +70,20 @@ static bool initialized = false;
 // LVGL CALLBACKS
 // ═══════════════════════════════════════════════════════════════
 
+// Reverse pixel order in-place for 180° flip (fast — ~0.5ms on ESP32)
+static void reverseBuffer16(uint16_t *buf, uint32_t count)
+{
+    uint32_t i = 0, j = count - 1;
+    while (i < j)
+    {
+        uint16_t tmp = buf[i];
+        buf[i] = buf[j];
+        buf[j] = tmp;
+        i++;
+        j--;
+    }
+}
+
 static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p)
 {
     // direct_mode: buf1 is persistent full-screen landscape buffer.
@@ -72,7 +92,18 @@ static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t 
     // which does 90° CW rotation DURING the QSPI DMA transfer — no rot_buf needed.
     if (lv_disp_flush_is_last(drv))
     {
-        gfx->draw16bitBeRGBBitmapR1(0, 0, (uint16_t *)buf1, SCR_W, SCR_H);
+        if (FLIP_LANDSCAPE_180)
+        {
+            // 180° flip: reverse buffer, send via proven R1 DMA, then restore for LVGL direct_mode.
+            const uint32_t pixelCount = (uint32_t)SCR_W * SCR_H;
+            reverseBuffer16((uint16_t *)buf1, pixelCount);
+            gfx->draw16bitBeRGBBitmapR1(0, 0, (uint16_t *)buf1, SCR_W, SCR_H);
+            reverseBuffer16((uint16_t *)buf1, pixelCount);
+        }
+        else
+        {
+            gfx->draw16bitBeRGBBitmapR1(0, 0, (uint16_t *)buf1, SCR_W, SCR_H);
+        }
     }
     lv_disp_flush_ready(drv);
 }
@@ -109,7 +140,7 @@ static void lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 
     if (bsp_touch_get_coordinates(&touch_data))
     {
-        // Touch library rotation=1 already maps portrait→landscape coords
+        // Touch library rotation maps portrait touch coordinates to current landscape orientation.
         data->state = LV_INDEV_STATE_PRESSED;
         data->point.x = touch_data.coords[0].x;
         data->point.y = touch_data.coords[0].y;
@@ -235,8 +266,8 @@ namespace LvglDisplay
         // Init LVGL
         lv_init();
 
-        // Init capacitive touch (I2C, rotation=1 for landscape coord mapping)
-        bsp_touch_init(&Wire, TOUCH_RST, 1, SCR_W, SCR_H);
+        // Init capacitive touch (I2C, rotation follows selected landscape orientation)
+        bsp_touch_init(&Wire, TOUCH_RST, TOUCH_ROTATION, SCR_W, SCR_H);
 
         // Buffer in PSRAM for LVGL rendering (no rotation buffer needed)
         size_t buf_size = SCR_W * SCR_H;
@@ -365,6 +396,21 @@ namespace LvglDisplay
         currentPage = 3;
         lv_scr_load(portalScr);
         lv_refr_now(NULL);
+    }
+
+    bool leavePortalPageIfActive()
+    {
+        if (currentPage != 3)
+            return false;
+
+        lv_obj_t *settingsScr = UiPageSettings::getScreen();
+        if (!settingsScr)
+            return false;
+
+        currentPage = 2;
+        lv_scr_load(settingsScr);
+        lv_refr_now(NULL);
+        return true;
     }
 
 } // namespace LvglDisplay
