@@ -14,3 +14,4 @@ data/*.gz
 
 # Font source files (used by scripts/generate_fonts.sh, not needed in repo)
 scripts/ttf/
+nul

@@ -25,7 +25,7 @@ constexpr std::array<std::string_view, 6> PRAYER_NAMES_EN = {
     "Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"};
 
 constexpr std::array<std::string_view, 6> PRAYER_NAMES_TR = {
-    "Sabah", "Gunes", "Ogle", "Ikindi", "Aksam", "Yatsi"};
+    "Sabah", "Güneş", "Öğle", "İkindi", "Akşam", "Yatsı"};
 
 constexpr std::string_view getPrayerName(PrayerType type, bool turkish = true)
 {

@@ -30,6 +30,8 @@ namespace DisplayTicker
         g_state.gregorianFull = gbuf;
 
         HijriDate h = gregorianToHijri(1900 + t.tm_year, t.tm_mon + 1, t.tm_mday);
+        g_state.hijriDay = h.day;
+        g_state.hijriMonth = h.month;
         char hbuf[32];
         snprintf(hbuf, sizeof(hbuf), "%d %s %d", h.day, getHijriMonth(h.month), h.year);
         AppStateHelper::setHijriDate(hbuf);

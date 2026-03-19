@@ -38,10 +38,8 @@ namespace UiPageSettings
     // Sliders
     static lv_obj_t *bright_fill = nullptr;
     static lv_obj_t *bright_thumb = nullptr;
-    static lv_obj_t *bright_val_lbl = nullptr;
     static lv_obj_t *vol_fill = nullptr;
     static lv_obj_t *vol_thumb = nullptr;
-    static lv_obj_t *vol_val_lbl = nullptr;
     static lv_obj_t *vol_track = nullptr;
     static lv_obj_t *vol_track_icon = nullptr;
 
@@ -51,12 +49,11 @@ namespace UiPageSettings
     // WiFi / connect button
     static lv_obj_t *wifi_btn = nullptr;
     static lv_obj_t *wifi_btn_name = nullptr;
-    static lv_obj_t *wifi_btn_desc = nullptr;
+
 
     // Portal overlay & QR
     static lv_obj_t *portal_overlay = nullptr;
     static lv_obj_t *qr_code_obj = nullptr;
-    static lv_obj_t *qr_ip_lbl = nullptr;
     static char lastQrData[128] = "";
 
     // State
@@ -97,6 +94,10 @@ namespace UiPageSettings
     static constexpr lv_opa_t SECTION_OPA = 199;
     static constexpr lv_opa_t ROW_BG_OPA = 26;
     static constexpr lv_opa_t ROW_BORDER_OPA = 56;
+    static constexpr const char *TXT_DEVICE_SETTINGS = "Cihaz Ayarları";
+    static constexpr const char *TXT_LOADING = "Hazırlanıyor...";
+    static constexpr const char *TXT_RETRY = "Tekrar dene";
+    static constexpr const char *TXT_PORTAL_ON = "Portal Açık";
 
     // ═══════════════════════════════════════════════════════════════
     // FORWARD DECLARATIONS
@@ -116,7 +117,7 @@ namespace UiPageSettings
     // ═══════════════════════════════════════════════════════════════
     // SLIDER UPDATE HELPERS
     // ═══════════════════════════════════════════════════════════════
-    static void updateSliderVisual(lv_obj_t *fill, lv_obj_t *thumb, lv_obj_t *val_lbl, int pct)
+    static void updateSliderVisual(lv_obj_t *fill, lv_obj_t *thumb, int pct)
     {
         if (pct < 0)
             pct = 0;
@@ -131,7 +132,6 @@ namespace UiPageSettings
         if (thumb)
         {
             int16_t thumb_y = SLIDER_TRACK_H - clamped_fill_h - (THUMB_SIZE / 2);
-            // Keep thumb fully inside track to avoid covering the value label at 100%.
             const int16_t min_y = 0;
             const int16_t max_y = SLIDER_TRACK_H - THUMB_SIZE;
             if (thumb_y < min_y)
@@ -140,38 +140,45 @@ namespace UiPageSettings
                 thumb_y = max_y;
             lv_obj_set_pos(thumb, (SLIDER_TRACK_W - THUMB_SIZE) / 2, thumb_y);
         }
-
-        if (val_lbl)
-        {
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%d%%", pct);
-            lv_label_set_text(val_lbl, buf);
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════
     // TOGGLE HELPERS
     // ═══════════════════════════════════════════════════════════════
-    static void setToggleVisual(lv_obj_t *tog, bool on)
+    static constexpr uint16_t TOG_ANIM_MS = 300;
+
+    static void _togKnobAnimCb(void *obj, int32_t v)
+    {
+        lv_obj_set_x(static_cast<lv_obj_t *>(obj), static_cast<lv_coord_t>(v));
+    }
+
+    static void setToggleVisual(lv_obj_t *tog, bool on, bool animate = false)
     {
         if (!tog)
             return;
         lv_obj_t *knob = lv_obj_get_child(tog, 0);
-        if (on)
+
+        const int16_t target_x = on ? (TOG_W - TOG_KNOB - TOG_INSET) : TOG_INSET;
+
+        // Colors & opacity snap instantly (no semi-transparent mid-frames)
+        lv_obj_set_style_bg_color(tog, COLOR_GOLD, 0);
+        lv_obj_set_style_bg_opa(tog, on ? LV_OPA_COVER : 26, 0);
+
+
+        if (animate && knob)
         {
-            lv_obj_set_style_bg_color(tog, COLOR_GOLD, 0);
-            lv_obj_set_style_bg_opa(tog, LV_OPA_COVER, 0);
-            lv_obj_set_style_border_color(tog, COLOR_GOLD, 0);
-            if (knob)
-                lv_obj_set_x(knob, TOG_W - TOG_KNOB - TOG_INSET);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, knob);
+            lv_anim_set_values(&a, lv_obj_get_x(knob), target_x);
+            lv_anim_set_time(&a, TOG_ANIM_MS);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+            lv_anim_set_exec_cb(&a, _togKnobAnimCb);
+            lv_anim_start(&a);
         }
-        else
+        else if (knob)
         {
-            lv_obj_set_style_bg_color(tog, COLOR_GOLD, 0);
-            lv_obj_set_style_bg_opa(tog, 26, 0); // rgba(234,201,106,0.10)
-            lv_obj_set_style_border_color(tog, COLOR_BORDER, 0);
-            if (knob)
-                lv_obj_set_x(knob, TOG_INSET);
+            lv_obj_set_x(knob, target_x);
         }
     }
 
@@ -198,11 +205,11 @@ namespace UiPageSettings
     {
         lv_obj_t *lbl = lv_label_create(parent);
         lv_label_set_text(lbl, LocaleTR::toUpperTR(text));
-        lv_obj_set_style_text_font(lbl, FONT_HEADING_10, 0);
-        lv_obj_set_style_text_color(lbl, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(lbl, SECTION_OPA, 0);
-        lv_obj_set_style_text_letter_space(lbl, 3, 0);
-        lv_obj_set_style_pad_left(lbl, 2, 0);
+        lv_obj_set_style_text_font(lbl, FONT_HEADING_12, 0);
+        lv_obj_set_style_text_color(lbl, COLOR_TEXT, 0);
+        lv_obj_set_style_text_opa(lbl, 245, 0);
+        lv_obj_set_style_text_letter_space(lbl, 2, 0);
+        lv_obj_set_style_pad_left(lbl, ROW_PAD_X, 0);
         return lbl;
     }
 
@@ -246,8 +253,8 @@ namespace UiPageSettings
         lv_obj_set_width(nm, lv_pct(100));
         lv_label_set_long_mode(nm, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_font(nm, FONT_BODY_12, 0);
-        lv_obj_set_style_text_color(nm, COLOR_TEXT, 0);
-        lv_obj_set_style_text_opa(nm, 245, 0);
+        lv_obj_set_style_text_color(nm, COLOR_DIM, 0);
+        lv_obj_set_style_text_opa(nm, LV_OPA_COVER, 0);
         lv_obj_set_style_text_letter_space(nm, 1, 0);
 
         if (desc && desc[0] != '\0')
@@ -262,13 +269,12 @@ namespace UiPageSettings
         }
     }
 
-    // Slider control: track + fill + thumb + value label
+    // Slider control: track + fill + thumb
     struct SliderWidgets
     {
         lv_obj_t *track;
         lv_obj_t *fill;
         lv_obj_t *thumb;
-        lv_obj_t *val_lbl;
         lv_obj_t *icon;
     };
 
@@ -299,13 +305,11 @@ namespace UiPageSettings
         lv_obj_set_style_text_opa(lbl, 245, 0);
         lv_obj_set_style_text_letter_space(lbl, 2, 0);
 
-        lv_obj_t *val = nullptr;
-
         lv_obj_t *track = lv_obj_create(card);
         lv_obj_remove_style_all(track);
         lv_obj_set_size(track, SLIDER_TRACK_W, SLIDER_TRACK_H);
-        lv_obj_set_style_bg_color(track, COLOR_DIM, 0);
-        lv_obj_set_style_bg_opa(track, 38, 0);
+        lv_obj_set_style_bg_color(track, COLOR_BORDER, 0);
+        lv_obj_set_style_bg_opa(track, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(track, 12, 0);
         lv_obj_clear_flag(track, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(track, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_OVERFLOW_VISIBLE);
@@ -345,8 +349,8 @@ namespace UiPageSettings
 
         lv_obj_move_foreground(track_icon);
 
-        SliderWidgets sw{track, fill, nullptr, val, track_icon};
-        updateSliderVisual(fill, nullptr, val, initialPct);
+        SliderWidgets sw{track, fill, nullptr, track_icon};
+        updateSliderVisual(fill, nullptr, initialPct);
         return sw;
     }
 
@@ -357,26 +361,16 @@ namespace UiPageSettings
 
         if (enabled)
         {
-            lv_obj_set_style_bg_opa(vol_track, 38, 0);
-            if (vol_thumb)
-                lv_obj_set_style_bg_opa(vol_thumb, LV_OPA_COVER, 0);
             if (vol_fill)
                 lv_obj_set_style_bg_opa(vol_fill, LV_OPA_COVER, 0);
-            if (vol_val_lbl)
-                lv_obj_set_style_text_color(vol_val_lbl, COLOR_GOLD, 0);
             if (vol_track_icon)
                 lv_obj_set_style_opa(vol_track_icon, ICON_OPA_DEFAULT, 0);
         }
         else
         {
             // Keep slider interactive; dragging while muted should auto-unmute.
-            lv_obj_set_style_bg_opa(vol_track, 26, 0);
-            if (vol_thumb)
-                lv_obj_set_style_bg_opa(vol_thumb, 90, 0);
             if (vol_fill)
                 lv_obj_set_style_bg_opa(vol_fill, 120, 0);
-            if (vol_val_lbl)
-                lv_obj_set_style_text_color(vol_val_lbl, COLOR_DIM, 0);
             if (vol_track_icon)
                 lv_obj_set_style_opa(vol_track_icon, ICON_OPA_DISABLED, 0);
         }
@@ -399,6 +393,15 @@ namespace UiPageSettings
         }
     }
 
+    static void setWiFiButtonLabel(const char *text, lv_color_t color)
+    {
+        if (wifi_btn_name)
+        {
+            lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR(text));
+            lv_obj_set_style_text_color(wifi_btn_name, color, 0);
+        }
+    }
+
     // Toggle switch
     static lv_obj_t *createToggle(lv_obj_t *row, bool initialOn, int tag)
     {
@@ -406,7 +409,7 @@ namespace UiPageSettings
         lv_obj_remove_style_all(tog);
         lv_obj_set_size(tog, TOG_W, TOG_H);
         lv_obj_set_style_radius(tog, TOG_H / 2, 0);
-        lv_obj_set_style_border_width(tog, 1, 0);
+        lv_obj_set_style_border_width(tog, 0, 0);
         lv_obj_set_style_bg_opa(tog, LV_OPA_COVER, 0);
         lv_obj_clear_flag(tog, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(tog, LV_OBJ_FLAG_CLICKABLE);
@@ -430,57 +433,61 @@ namespace UiPageSettings
         return tog;
     }
 
-    // QR-nav button (gold gradient bg, "Gelismis Ayarlar")
+    // QR-nav button (primary action style, "Cihaz Ayarları")
     static void createQRButton(lv_obj_t *parent)
     {
         wifi_btn = lv_obj_create(parent);
         lv_obj_remove_style_all(wifi_btn);
         lv_obj_set_size(wifi_btn, lv_pct(100), ROW_H);
-        lv_obj_set_style_bg_color(wifi_btn, COLOR_GOLD, 0);
-        lv_obj_set_style_bg_opa(wifi_btn, 33, 0);
-        lv_obj_set_style_border_width(wifi_btn, 1, 0);
-        lv_obj_set_style_border_color(wifi_btn, COLOR_GOLD, 0);
-        lv_obj_set_style_border_opa(wifi_btn, 61, 0);
+
+        // Raised-button: gradient bg (lighter top → darker bottom = convex surface)
+        lv_obj_set_style_bg_color(wifi_btn, COLOR_BTN_HI, 0);
+        lv_obj_set_style_bg_opa(wifi_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_grad_color(wifi_btn, COLOR_BTN_LO, 0);
+        lv_obj_set_style_bg_grad_dir(wifi_btn, LV_GRAD_DIR_VER, 0);
+
+        lv_obj_set_style_border_width(wifi_btn, 0, 0);
         lv_obj_set_style_radius(wifi_btn, ROW_RADIUS, 0);
+
+        // Drop shadow below → elevated / floating feel
+        lv_obj_set_style_shadow_color(wifi_btn, lv_color_black(), 0);
+        lv_obj_set_style_shadow_width(wifi_btn, 12, 0);
+        lv_obj_set_style_shadow_opa(wifi_btn, 90, 0);
+        lv_obj_set_style_shadow_ofs_y(wifi_btn, 4, 0);
+
+        // Pressed: shadow shrinks + shifts down = "pushed in" feel
+        lv_obj_set_style_bg_color(wifi_btn, COLOR_BTN_LO, LV_STATE_PRESSED);
+        lv_obj_set_style_bg_grad_color(wifi_btn, COLOR_BTN_LO, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_width(wifi_btn, 4, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_opa(wifi_btn, 30, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_ofs_y(wifi_btn, 1, LV_STATE_PRESSED);
+        lv_obj_set_style_translate_y(wifi_btn, 2, LV_STATE_PRESSED);
         lv_obj_set_style_pad_left(wifi_btn, ROW_PAD_X, 0);
         lv_obj_set_style_pad_right(wifi_btn, ROW_PAD_X, 0);
         lv_obj_set_style_pad_top(wifi_btn, 10, 0);
         lv_obj_set_style_pad_bottom(wifi_btn, 10, 0);
-        lv_obj_set_style_min_height(wifi_btn, 64, 0);
+        lv_obj_set_size(wifi_btn, lv_pct(100), 52);
         lv_obj_clear_flag(wifi_btn, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(wifi_btn, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_ext_click_area(wifi_btn, 16);
         lv_obj_add_event_cb(wifi_btn, onWiFiBtn, LV_EVENT_CLICKED, nullptr);
         lv_obj_set_flex_flow(wifi_btn, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(wifi_btn, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-        lv_obj_t *left = lv_obj_create(wifi_btn);
-        lv_obj_remove_style_all(left);
-        lv_obj_set_size(left, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow(left, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_row(left, 0, 0);
-        lv_obj_clear_flag(left, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(left, LV_OBJ_FLAG_CLICKABLE);
-
-        wifi_btn_name = lv_label_create(left);
-        lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-        lv_obj_set_style_text_font(wifi_btn_name, FONT_BODY_12, 0);
-        lv_obj_set_style_text_color(wifi_btn_name, COLOR_GOLD_LIGHT, 0);
-        lv_obj_clear_flag(wifi_btn_name, LV_OBJ_FLAG_CLICKABLE);
-
-        wifi_btn_desc = lv_label_create(left);
-        lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Dokunarak Ac"));
-        lv_obj_set_style_text_font(wifi_btn_desc, FONT_HEADING_10, 0);
-        lv_obj_set_style_text_color(wifi_btn_desc, COLOR_TEXT, 0);
-        lv_obj_set_style_text_opa(wifi_btn_desc, 210, 0);
-        lv_obj_clear_flag(wifi_btn_desc, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_flex_align(wifi_btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(wifi_btn, 8, 0);
 
         lv_obj_t *icon = lv_label_create(wifi_btn);
         lv_label_set_text(icon, LV_SYMBOL_SETTINGS);
-        lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(icon, &lv_font_montserrat_14, 0);
         lv_obj_set_style_text_color(icon, COLOR_GOLD, 0);
-        lv_obj_set_style_text_opa(icon, 140, 0);
+        lv_obj_set_style_text_opa(icon, 200, 0);
         lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
+
+        wifi_btn_name = lv_label_create(wifi_btn);
+        lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR(TXT_DEVICE_SETTINGS));
+        lv_obj_set_style_text_font(wifi_btn_name, FONT_BODY_12, 0);
+        lv_obj_set_style_text_color(wifi_btn_name, COLOR_GOLD_LIGHT, 0);
+        lv_obj_set_style_text_opa(wifi_btn_name, 245, 0);
+        lv_obj_clear_flag(wifi_btn_name, LV_OBJ_FLAG_CLICKABLE);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -542,7 +549,7 @@ namespace UiPageSettings
         if (tag == 0)
         {
             currentBrightness = pct;
-            updateSliderVisual(bright_fill, bright_thumb, bright_val_lbl, pct);
+            updateSliderVisual(bright_fill, bright_thumb, pct);
             const uint8_t mappedBacklight = static_cast<uint8_t>(MIN_VISIBLE_BACKLIGHT + ((pct * (255 - MIN_VISIBLE_BACKLIGHT)) / 100));
             LvglDisplay::setBacklight(mappedBacklight);
             g_state.brightness = static_cast<uint8_t>(pct);
@@ -550,14 +557,10 @@ namespace UiPageSettings
         else
         {
             if (g_state.muted)
-            {
-                SettingsManager::setMuted(false);
-                AppStateHelper::setMuted(false);
-                setVolumeSliderEnabled(true);
-            }
+                return;
 
             currentVolumeLevel = pct;
-            updateSliderVisual(vol_fill, vol_thumb, vol_val_lbl, currentVolumeLevel);
+            updateSliderVisual(vol_fill, vol_thumb, currentVolumeLevel);
             // Apply volume to codec/state immediately (no NVS write during drag)
             VolumeControl::applyRuntime(static_cast<uint8_t>(currentVolumeLevel));
         }
@@ -585,12 +588,12 @@ namespace UiPageSettings
         int tag = static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
         lv_obj_t *tog = lv_event_get_target(e);
         bool newState = !getToggleState(tog);
-        setToggleVisual(tog, newState);
+        setToggleVisual(tog, newState, true);
 
         switch (tag)
         {
         case 1:
-            // ON means "Ekran Hep Acik" (Apple-style positive toggle semantics).
+            // ON means "Ekran Hep Açık" (Apple-style positive toggle semantics).
             SettingsManager::setPowerMode(newState ? PowerMode::ALWAYS_ON : PowerMode::SCREEN_OFF);
             g_state.sleepMode = !newState;
             break;
@@ -607,10 +610,7 @@ namespace UiPageSettings
         }
 
         setWiFiButtonEnabled(false);
-        if (wifi_btn_name)
-            lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-        if (wifi_btn_desc)
-            lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Hazirlaniyor..."));
+        setWiFiButtonLabel(TXT_LOADING, COLOR_DIM);
         lv_refr_now(NULL);
         if (advancedCallback)
             advancedCallback();
@@ -636,51 +636,45 @@ namespace UiPageSettings
             lv_obj_clear_flag(portal_overlay, LV_OBJ_FLAG_SCROLLABLE);
 
             lv_obj_t *title = lv_label_create(portal_overlay);
-            lv_label_set_text(title, LocaleTR::toUpperTR("WiFi Bilgileri"));
-            lv_obj_set_style_text_color(title, COLOR_GOLD, 0);
-            lv_obj_set_style_text_font(title, FONT_HEADING_12, 0);
+            lv_label_set_text(title, LocaleTR::toUpperTR("WiFi'ye Bağlanın"));
+            lv_obj_set_style_text_color(title, COLOR_GOLD_LIGHT, 0);
+            lv_obj_set_style_text_font(title, FONT_BODY_12, 0);
+            lv_obj_set_style_text_letter_space(title, 2, 0);
             lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 40);
 
             lv_obj_t *wifi_icon = lv_label_create(portal_overlay);
             lv_label_set_text(wifi_icon, LV_SYMBOL_WIFI);
             lv_obj_set_style_text_color(wifi_icon, COLOR_GOLD, 0);
             lv_obj_set_style_text_font(wifi_icon, &lv_font_montserrat_20, 0);
-            lv_obj_align(wifi_icon, LV_ALIGN_TOP_MID, 0, 70);
+            lv_obj_align(wifi_icon, LV_ALIGN_TOP_MID, 0, 75);
 
-            lv_obj_t *inst = lv_label_create(portal_overlay);
-            lv_label_set_text(inst, LocaleTR::toUpperTR("Telefonunuzdan baglanin:"));
-            lv_obj_set_style_text_color(inst, COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(inst, 165, 0);
-            lv_obj_set_style_text_font(inst, FONT_BODY_12, 0);
-            lv_obj_align(inst, LV_ALIGN_CENTER, 0, -30);
+            lv_obj_t *ssid_title = lv_label_create(portal_overlay);
+            lv_label_set_text(ssid_title, LocaleTR::toUpperTR("Ağ Adı"));
+            lv_obj_set_style_text_color(ssid_title, COLOR_DIM, 0);
+            lv_obj_set_style_text_opa(ssid_title, 165, 0);
+            lv_obj_set_style_text_font(ssid_title, FONT_HEADING_10, 0);
+            lv_obj_align(ssid_title, LV_ALIGN_CENTER, 0, -30);
 
             lv_obj_t *ssid_lbl = lv_label_create(portal_overlay);
             lv_label_set_text(ssid_lbl, WiFiPortal::AP_SSID);
             lv_obj_set_style_text_color(ssid_lbl, COLOR_TEXT, 0);
             lv_obj_set_style_text_font(ssid_lbl, FONT_HIJRI_18, 0);
-            lv_obj_align(ssid_lbl, LV_ALIGN_CENTER, 0, 0);
+            lv_obj_align(ssid_lbl, LV_ALIGN_CENTER, 0, -6);
 
             lv_obj_t *pass_title = lv_label_create(portal_overlay);
-            lv_label_set_text(pass_title, LocaleTR::toUpperTR("Sifre:"));
+            lv_label_set_text(pass_title, LocaleTR::toUpperTR("Şifre"));
             lv_obj_set_style_text_color(pass_title, COLOR_DIM, 0);
             lv_obj_set_style_text_opa(pass_title, 165, 0);
-            lv_obj_set_style_text_font(pass_title, FONT_BODY_12, 0);
-            lv_obj_align(pass_title, LV_ALIGN_CENTER, 0, 30);
+            lv_obj_set_style_text_font(pass_title, FONT_HEADING_10, 0);
+            lv_obj_align(pass_title, LV_ALIGN_CENTER, 0, 26);
 
             lv_obj_t *pass_lbl = lv_label_create(portal_overlay);
             lv_label_set_text(pass_lbl, WiFiPortal::AP_PASSWORD);
             lv_obj_set_style_text_color(pass_lbl, COLOR_GOLD, 0);
-            lv_obj_set_style_text_font(pass_lbl, FONT_HEADING_12, 0);
+            lv_obj_set_style_text_font(pass_lbl, FONT_HIJRI_18, 0);
             lv_obj_align(pass_lbl, LV_ALIGN_CENTER, 0, 50);
 
-            lv_obj_t *ip_lbl = lv_label_create(portal_overlay);
-            lv_label_set_text(ip_lbl, LocaleTR::toUpperTR("Sonra tarayicida: 192.168.4.1"));
-            lv_obj_set_style_text_color(ip_lbl, COLOR_DIM, 0);
-            lv_obj_set_style_text_opa(ip_lbl, 165, 0);
-            lv_obj_set_style_text_font(ip_lbl, FONT_MONO_10, 0);
-            lv_obj_align(ip_lbl, LV_ALIGN_CENTER, 0, 80);
-
-            UiComponents::createNavDots(portal_overlay, 3, 4);
+            UiComponents::createNavDots(portal_overlay, 2);
         }
 
         // Navigate to portal screen
@@ -696,7 +690,6 @@ namespace UiPageSettings
         lv_obj_del(portal_overlay);
         portal_overlay = nullptr;
         qr_code_obj = nullptr;
-        qr_ip_lbl = nullptr;
         lastQrData[0] = '\0';
 
         if (returnToSettingsIfActive && wasActive && scr)
@@ -719,7 +712,6 @@ namespace UiPageSettings
             lv_obj_del(portal_overlay);
             portal_overlay = nullptr;
             qr_code_obj = nullptr;
-            qr_ip_lbl = nullptr;
             lastQrData[0] = '\0';
         }
 
@@ -731,32 +723,28 @@ namespace UiPageSettings
 
         // Title
         lv_obj_t *title = lv_label_create(portal_overlay);
-        lv_label_set_text(title, LocaleTR::toUpperTR("Gelismis Ayarlar"));
+        lv_label_set_text(title, LocaleTR::toUpperTR(TXT_DEVICE_SETTINGS));
         lv_obj_set_style_text_color(title, COLOR_GOLD_LIGHT, 0);
         lv_obj_set_style_text_font(title, FONT_BODY_12, 0);
+        lv_obj_set_style_text_letter_space(title, 2, 0);
         lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 26);
 
-        // Container: QR on left, text on right
-        lv_obj_t *box = lv_obj_create(portal_overlay);
-        lv_obj_remove_style_all(box);
-        lv_obj_add_style(box, UiTheme::getStyleCard(), 0);
-        lv_obj_set_size(box, 430, 220);
-        lv_obj_align(box, LV_ALIGN_CENTER, 0, 12);
-        lv_obj_set_style_bg_color(box, COLOR_BG2, 0);
-        lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(box, 12, 0);
-        lv_obj_set_style_border_width(box, 1, 0);
-        lv_obj_set_style_border_color(box, COLOR_BORDER, 0);
-        lv_obj_set_style_border_opa(box, 92, 0);
-        lv_obj_set_style_pad_left(box, 18, 0);
-        lv_obj_set_style_pad_right(box, 18, 0);
-        lv_obj_set_style_pad_top(box, 18, 0);
-        lv_obj_set_style_pad_bottom(box, 18, 0);
-        lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+        // QR code: large, centered, with soft rounded frame
+        lv_obj_t *qr_frame = lv_obj_create(portal_overlay);
+        lv_obj_remove_style_all(qr_frame);
+        lv_obj_set_size(qr_frame, 210, 210);
+        lv_obj_align(qr_frame, LV_ALIGN_CENTER, 0, 4);
+        lv_obj_set_style_bg_color(qr_frame, lv_color_white(), 0);
+        lv_obj_set_style_bg_opa(qr_frame, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(qr_frame, 14, 0);
+        lv_obj_set_style_shadow_color(qr_frame, lv_color_black(), 0);
+        lv_obj_set_style_shadow_width(qr_frame, 20, 0);
+        lv_obj_set_style_shadow_opa(qr_frame, 60, 0);
+        lv_obj_set_style_shadow_ofs_y(qr_frame, 4, 0);
+        lv_obj_clear_flag(qr_frame, LV_OBJ_FLAG_SCROLLABLE);
 
-        // QR code (larger for faster phone camera lock)
-        qr_code_obj = lv_qrcode_create(box, 156, lv_color_black(), lv_color_white());
-        lv_obj_align(qr_code_obj, LV_ALIGN_LEFT_MID, 0, 0);
+        qr_code_obj = lv_qrcode_create(qr_frame, 190, lv_color_black(), lv_color_white());
+        lv_obj_center(qr_code_obj);
 
         char url[64];
         snprintf(url, sizeof(url), "http://%s", ip ? ip : "192.168.4.1");
@@ -764,28 +752,7 @@ namespace UiPageSettings
         strncpy(lastQrData, url, sizeof(lastQrData) - 1);
         lastQrData[sizeof(lastQrData) - 1] = '\0';
 
-        // Right side text: "Telefonla Tara"
-        lv_obj_t *scan_lbl = lv_label_create(box);
-        lv_label_set_text(scan_lbl, LocaleTR::toUpperTR("Telefonla Tara"));
-        lv_obj_set_style_text_color(scan_lbl, COLOR_GOLD, 0);
-        lv_obj_set_style_text_font(scan_lbl, FONT_BODY_12, 0);
-        lv_obj_align(scan_lbl, LV_ALIGN_TOP_RIGHT, -12, 36);
-
-        // IP/URL details remain on QR page (not on settings button).
-        qr_ip_lbl = lv_label_create(box);
-        lv_label_set_text(qr_ip_lbl, ip ? ip : "192.168.4.1");
-        lv_obj_set_style_text_color(qr_ip_lbl, COLOR_TEXT, 0);
-        lv_obj_set_style_text_font(qr_ip_lbl, FONT_BODY_12, 0);
-        lv_obj_align(qr_ip_lbl, LV_ALIGN_TOP_RIGHT, -12, 68);
-
-        lv_obj_t *hint = lv_label_create(box);
-        lv_label_set_text(hint, LocaleTR::toUpperTR("Tarayicida: http://192.168.4.1"));
-        lv_obj_set_style_text_color(hint, COLOR_DIM, 0);
-        lv_obj_set_style_text_opa(hint, 175, 0);
-        lv_obj_set_style_text_font(hint, FONT_HEADING_10, 0);
-        lv_obj_align(hint, LV_ALIGN_TOP_RIGHT, -12, 96);
-
-        UiComponents::createNavDots(portal_overlay, 3, 4);
+        UiComponents::createNavDots(portal_overlay, 2);
 
         // Navigate to QR page
         LvglDisplay::goToPortalPage();
@@ -803,14 +770,13 @@ namespace UiPageSettings
         {
             lv_obj_del(scr);
             scr = nullptr;
-            bright_fill = bright_thumb = bright_val_lbl = nullptr;
-            vol_fill = vol_thumb = vol_val_lbl = nullptr;
+            bright_fill = bright_thumb = nullptr;
+            vol_fill = vol_thumb = nullptr;
             tog_sleep = nullptr;
             vol_track = vol_track_icon = nullptr;
-            wifi_btn_name = wifi_btn_desc = nullptr;
+            wifi_btn_name = nullptr;
             portal_overlay = nullptr;
             qr_code_obj = nullptr;
-            qr_ip_lbl = nullptr;
             lastQrData[0] = '\0';
         }
 
@@ -853,17 +819,15 @@ namespace UiPageSettings
         lv_obj_set_style_pad_column(left_col, SLIDER_CARD_GAP, 0);
 
         currentBrightness = g_state.brightness;
-        auto bright_sw = createSliderCtrl(left_col, "Parlaklik", LV_SYMBOL_EYE_OPEN, currentBrightness, 0);
+        auto bright_sw = createSliderCtrl(left_col, "Parlaklık", LV_SYMBOL_EYE_OPEN, currentBrightness, 0);
         bright_fill = bright_sw.fill;
         bright_thumb = bright_sw.thumb;
-        bright_val_lbl = bright_sw.val_lbl;
 
         currentVolumeLevel = g_state.volume;
         auto vol_sw = createSliderCtrl(left_col, "Ses", LV_SYMBOL_AUDIO, currentVolumeLevel, 1);
         vol_track = vol_sw.track;
         vol_fill = vol_sw.fill;
         vol_thumb = vol_sw.thumb;
-        vol_val_lbl = vol_sw.val_lbl;
         vol_track_icon = vol_sw.icon;
         setVolumeSliderEnabled(!g_state.muted);
 
@@ -872,14 +836,18 @@ namespace UiPageSettings
         lv_obj_remove_style_all(right_col);
         lv_obj_set_size(right_col, RIGHT_COL_W, lv_pct(100));
         lv_obj_clear_flag(right_col, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(right_col, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
         lv_obj_set_flex_flow(right_col, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(right_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         lv_obj_set_style_pad_row(right_col, 6, 0);
+        lv_obj_set_style_pad_bottom(right_col, 4, 0);
 
         {
+            createSectionLabel(right_col, "Ekran");
+
             lv_obj_t *row = createRow(right_col);
             lv_obj_set_style_min_height(row, 48, 0);
-            createRowLeft(row, "Her Zaman Acik Ekran", nullptr);
+            createRowLeft(row, "Sürekli Açık", nullptr);
             tog_sleep = createToggle(row, SettingsManager::getPowerMode() == PowerMode::ALWAYS_ON, 1);
         }
 
@@ -919,7 +887,7 @@ namespace UiPageSettings
         if (pct > 100)
             pct = 100;
         currentVolumeLevel = pct;
-        updateSliderVisual(vol_fill, vol_thumb, vol_val_lbl, currentVolumeLevel);
+        updateSliderVisual(vol_fill, vol_thumb, currentVolumeLevel);
     }
 
     int getVolumeLevel() { return currentVolumeLevel; }
@@ -931,7 +899,7 @@ namespace UiPageSettings
         if (pct > 100)
             pct = 100;
         currentBrightness = pct;
-        updateSliderVisual(bright_fill, bright_thumb, bright_val_lbl, pct);
+        updateSliderVisual(bright_fill, bright_thumb, pct);
     }
 
     void syncToggles()
@@ -973,65 +941,24 @@ namespace UiPageSettings
         switch (state)
         {
         case WifiState::DISCONNECTED:
-            if (wifi_btn_name)
-                lv_obj_set_style_text_color(wifi_btn_name, COLOR_GOLD_LIGHT, 0);
-            if (wifi_btn_desc)
-                lv_obj_set_style_text_color(wifi_btn_desc, COLOR_DIM, 0);
-            if (wifi_btn_name)
-                lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-            if (wifi_btn_desc)
-                lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Dokunarak Ac"));
+            setWiFiButtonLabel(TXT_DEVICE_SETTINGS, COLOR_GOLD_LIGHT);
             break;
 
         case WifiState::CONNECTING:
-            if (wifi_btn_name)
-                lv_obj_set_style_text_color(wifi_btn_name, COLOR_GOLD_LIGHT, 0);
-            if (wifi_btn_desc)
-                lv_obj_set_style_text_color(wifi_btn_desc, COLOR_DIM, 0);
-            if (wifi_btn_name)
-                lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-            if (wifi_btn_desc)
-                lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Hazirlaniyor..."));
+            setWiFiButtonLabel(TXT_LOADING, COLOR_DIM);
             break;
 
         case WifiState::CONNECTED:
-        {
-            // Show QR page with device IP
             showConnectedQRPage(ip);
-            if (wifi_btn_name)
-            {
-                lv_obj_set_style_text_color(wifi_btn_name, COLOR_GOLD_LIGHT, 0);
-                lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-            }
-            if (wifi_btn_desc)
-            {
-                lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Telefonla Tara"));
-                lv_obj_set_style_text_color(wifi_btn_desc, COLOR_GREEN, 0);
-            }
+            setWiFiButtonLabel(TXT_DEVICE_SETTINGS, COLOR_GOLD_LIGHT);
             break;
-        }
 
         case WifiState::FAILED:
-            if (wifi_btn_name)
-            {
-                lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-                lv_obj_set_style_text_color(wifi_btn_name, COLOR_AMBER, 0);
-            }
-            if (wifi_btn_desc)
-                lv_obj_set_style_text_color(wifi_btn_desc, COLOR_DIM, 0);
-            if (wifi_btn_desc)
-                lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Tekrar dene"));
+            setWiFiButtonLabel(TXT_RETRY, COLOR_AMBER);
             break;
 
         case WifiState::PORTAL:
-            if (wifi_btn_name)
-                lv_obj_set_style_text_color(wifi_btn_name, COLOR_GOLD_LIGHT, 0);
-            if (wifi_btn_desc)
-                lv_obj_set_style_text_color(wifi_btn_desc, COLOR_DIM, 0);
-            if (wifi_btn_name)
-                lv_label_set_text(wifi_btn_name, LocaleTR::toUpperTR("Gelismis Ayarlar"));
-            if (wifi_btn_desc)
-                lv_label_set_text(wifi_btn_desc, LocaleTR::toUpperTR("Portal Acik"));
+            setWiFiButtonLabel(TXT_PORTAL_ON, COLOR_GOLD_LIGHT);
             break;
         }
     }
@@ -1062,11 +989,6 @@ namespace UiPageSettings
     {
         UiComponents::updateStatusBarMute(sb_handles, muted);
         setVolumeSliderEnabled(!muted);
-    }
-
-    void setWifi(uint8_t bars)
-    {
-        UiComponents::updateStatusBarWifi(sb_handles, bars);
     }
 
 } // namespace UiPageSettings

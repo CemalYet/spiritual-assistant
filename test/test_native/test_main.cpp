@@ -160,7 +160,9 @@ void test_getPrayerName_english(void)
 void test_getPrayerName_turkish(void)
 {
     TEST_ASSERT_EQUAL_STRING("Sabah", std::string(getPrayerName(PrayerType::Fajr, true)).c_str());
-    TEST_ASSERT_EQUAL_STRING("Aksam", std::string(getPrayerName(PrayerType::Maghrib, true)).c_str());
+    TEST_ASSERT_EQUAL_STRING("Ak\xC5\x9F"
+                             "am",
+                             std::string(getPrayerName(PrayerType::Maghrib, true)).c_str());
 }
 
 void test_getJsonKey(void)

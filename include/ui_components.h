@@ -52,7 +52,6 @@ namespace UiComponents
         lv_obj_t *mute_btn;
         lv_obj_t *lbl_mute_icon;
         lv_obj_t *lbl_mute_text;
-        lv_obj_t *lbl_wifi; // WiFi symbol label
     };
 
     using MuteToggleCallback = void (*)();
@@ -92,7 +91,6 @@ namespace UiComponents
     void setMuteToggleCallback(MuteToggleCallback cb);
     void updateStatusBarCity(const StatusBarHandles &h, const char *city, const char *dateAbbrev);
     void updateStatusBarMute(const StatusBarHandles &h, bool muted);
-    void updateStatusBarWifi(const StatusBarHandles &h, uint8_t bars);
 
 } // namespace UiComponents
 

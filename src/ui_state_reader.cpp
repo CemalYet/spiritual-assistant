@@ -138,11 +138,11 @@ namespace UiStateReader
         if (g_state.isDirty(DirtyFlag::HIJRI))
         {
             UiPageClock::setHijriDate(g_state.hijriDate.c_str());
-            // Greeting row removed from Home UI; keep only Ramadan mode detection.
-            const char *hijri = g_state.hijriDate.c_str();
-            const char *ramPos = strstr(hijri, "Ramazan");
             // Auto-detect Ramadan mode from Hijri month
-            g_state.ramadanMode = (ramPos != nullptr);
+            // month 9 = Ramadan, also enable on last day of Sha'ban (month 8, day 29/30) for first sahur
+            bool isRamadan = (g_state.hijriMonth == 9);
+            bool isLastShaban = (g_state.hijriMonth == 8 && g_state.hijriDay >= 29);
+            g_state.ramadanMode = isRamadan || isLastShaban;
             g_state.clearDirty(DirtyFlag::HIJRI);
         }
 
@@ -225,9 +225,7 @@ namespace UiStateReader
         {
             uint8_t bars = g_state.wifiStrength;
 
-            UiPageHome::setWifi(bars);
-            UiPageClock::setWifi(bars);
-            UiPageSettings::setWifi(bars);
+            (void)bars; // WiFi icon removed from status bar
 
             g_state.clearDirty(DirtyFlag::SIGNAL_BATTERY);
         }

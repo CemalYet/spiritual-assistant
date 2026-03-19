@@ -88,11 +88,30 @@ namespace UiComponents
         lv_obj_remove_style_all(h.mute_btn);
         lv_obj_set_size(h.mute_btn, 48, 48);
         lv_obj_set_style_radius(h.mute_btn, 12, 0);
-        lv_obj_set_style_bg_color(h.mute_btn, COLOR_BG2, 0);
+
+        // Raised button: gradient top-to-bottom = convex surface
+        lv_obj_set_style_bg_color(h.mute_btn, COLOR_BTN_HI, 0);
         lv_obj_set_style_bg_opa(h.mute_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_grad_color(h.mute_btn, COLOR_BTN_LO, 0);
+        lv_obj_set_style_bg_grad_dir(h.mute_btn, LV_GRAD_DIR_VER, 0);
+
         lv_obj_set_style_border_width(h.mute_btn, 1, 0);
         lv_obj_set_style_border_color(h.mute_btn, COLOR_BORDER, 0);
-        lv_obj_set_style_border_opa(h.mute_btn, 64, 0);
+        lv_obj_set_style_border_opa(h.mute_btn, 130, 0);
+
+        // Drop shadow below = elevated feel
+        lv_obj_set_style_shadow_color(h.mute_btn, lv_color_black(), 0);
+        lv_obj_set_style_shadow_width(h.mute_btn, 10, 0);
+        lv_obj_set_style_shadow_opa(h.mute_btn, 70, 0);
+        lv_obj_set_style_shadow_ofs_y(h.mute_btn, 3, 0);
+
+        // Pressed: flatten + push down
+        lv_obj_set_style_bg_color(h.mute_btn, COLOR_BTN_LO, LV_STATE_PRESSED);
+        lv_obj_set_style_bg_grad_color(h.mute_btn, COLOR_BTN_LO, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_width(h.mute_btn, 3, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_opa(h.mute_btn, 30, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_ofs_y(h.mute_btn, 1, LV_STATE_PRESSED);
+        lv_obj_set_style_translate_y(h.mute_btn, 2, LV_STATE_PRESSED);
         lv_obj_set_style_pad_left(h.mute_btn, 0, 0);
         lv_obj_set_style_pad_right(h.mute_btn, 0, 0);
         lv_obj_set_style_pad_top(h.mute_btn, 0, 0);
@@ -112,8 +131,6 @@ namespace UiComponents
         lv_obj_center(h.lbl_mute_icon);
 
         h.lbl_mute_text = nullptr;
-
-        h.lbl_wifi = nullptr;
 
         updateStatusBarMute(h, false);
 
@@ -263,41 +280,19 @@ namespace UiComponents
         if (!h.mute_btn || !h.lbl_mute_icon)
             return;
 
-        if (muted)
-        {
-            lv_obj_set_style_bg_color(h.mute_btn, COLOR_BG2, 0);
-            lv_obj_set_style_bg_opa(h.mute_btn, 220, 0);
-            lv_obj_set_style_border_color(h.mute_btn, COLOR_AMBER, 0);
-            lv_obj_set_style_border_opa(h.mute_btn, 96, 0);
-            lv_obj_set_style_opa(h.lbl_mute_icon, UiTheme::ICON_OPA_ACTIVE, 0);
-            UiIcons::drawSpeakerIcon(h.lbl_mute_icon, true, COLOR_AMBER, true);
-        }
-        else
-        {
-            lv_obj_set_style_bg_color(h.mute_btn, COLOR_BG2, 0);
-            lv_obj_set_style_bg_opa(h.mute_btn, 200, 0);
-            lv_obj_set_style_border_color(h.mute_btn, COLOR_BORDER, 0);
-            lv_obj_set_style_border_opa(h.mute_btn, 64, 0);
-            lv_obj_set_style_opa(h.lbl_mute_icon, UiTheme::ICON_OPA_DEFAULT, 0);
-            UiIcons::drawSpeakerIcon(h.lbl_mute_icon, false, COLOR_DIM, true);
-        }
-    }
+        // Restore raised-button baseline (gradient was set at creation but
+        // previous state changes may have overwritten bg_color/grad).
+        lv_obj_set_style_bg_color(h.mute_btn, COLOR_BTN_HI, 0);
+        lv_obj_set_style_bg_opa(h.mute_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_grad_color(h.mute_btn, COLOR_BTN_LO, 0);
+        lv_obj_set_style_border_color(h.mute_btn, COLOR_BORDER, 0);
+        lv_obj_set_style_border_opa(h.mute_btn, 130, 0);
+        lv_obj_set_style_shadow_color(h.mute_btn, lv_color_black(), 0);
+        lv_obj_set_style_shadow_opa(h.mute_btn, 70, 0);
 
-    void updateStatusBarWifi(const StatusBarHandles &h, uint8_t bars)
-    {
-        if (!h.lbl_wifi)
-            return;
-        // Redraw vector icon to avoid font-glyph dependency.
-        if (bars == 0)
-        {
-            UiIcons::drawWiFiIcon(h.lbl_wifi, COLOR_DIM, false);
-            lv_obj_set_style_opa(h.lbl_wifi, 130, 0);
-        }
-        else
-        {
-            UiIcons::drawWiFiIcon(h.lbl_wifi, COLOR_GREEN, true);
-            lv_obj_set_style_opa(h.lbl_wifi, (bars >= 2) ? 255 : 180, 0);
-        }
+        // Only the icon changes between states
+        lv_obj_set_style_opa(h.lbl_mute_icon, UiTheme::ICON_OPA_ACTIVE, 0);
+        UiIcons::drawSpeakerIcon(h.lbl_mute_icon, muted, muted ? COLOR_DIM : COLOR_TEXT, true);
     }
 
     // ── Motif tile generation ────────────────────────────────────────

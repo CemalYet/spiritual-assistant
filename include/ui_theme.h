@@ -14,15 +14,17 @@
 #define COLOR_GREEN lv_color_hex(UiTheme::p().green)
 #define COLOR_AMBER lv_color_hex(UiTheme::p().amber)
 #define COLOR_BORDER lv_color_hex(UiTheme::p().border)
+#define COLOR_BTN_HI lv_color_hex(UiTheme::p().btnHi)
+#define COLOR_BTN_LO lv_color_hex(UiTheme::p().btnLo)
 
 // ── Font declarations ──
-LV_FONT_DECLARE(font_cinzel_8);
-LV_FONT_DECLARE(font_cinzel_10);
-LV_FONT_DECLARE(font_cinzel_11);
-LV_FONT_DECLARE(font_cinzel_12_sb);
-LV_FONT_DECLARE(font_cinzel_13);
-LV_FONT_DECLARE(font_cinzel_14);
-LV_FONT_DECLARE(font_cinzel_20_sb);
+LV_FONT_DECLARE(font_inter_8);
+LV_FONT_DECLARE(font_inter_10);
+LV_FONT_DECLARE(font_inter_11);
+LV_FONT_DECLARE(font_inter_12_sb);
+LV_FONT_DECLARE(font_inter_13);
+LV_FONT_DECLARE(font_inter_14);
+LV_FONT_DECLARE(font_inter_20_sb);
 LV_FONT_DECLARE(font_dmmono_11);
 LV_FONT_DECLARE(font_dmmono_16);
 LV_FONT_DECLARE(font_dmmono_66);
@@ -32,14 +34,14 @@ LV_FONT_DECLARE(font_dmmono_80);
 #define FONT_MONO_60 (&font_dmmono_66)
 #define FONT_MONO_14 (&font_dmmono_16)
 #define FONT_MONO_10 (&font_dmmono_11)
-#define FONT_PRAYER_24 (&font_cinzel_20_sb)
-#define FONT_HIJRI_18 (&font_cinzel_14)
-#define FONT_BODY_14 (&font_cinzel_13)
-#define FONT_GREETING_13 (&font_cinzel_13)
-#define FONT_HEADING_12 (&font_cinzel_12_sb)
-#define FONT_BODY_12 (&font_cinzel_12_sb)
-#define FONT_HEADING_10 (&font_cinzel_11)
-#define FONT_HEADING_8 (&font_cinzel_8)
+#define FONT_PRAYER_24 (&font_inter_20_sb)
+#define FONT_HIJRI_18 (&font_inter_14)
+#define FONT_BODY_14 (&font_inter_13)
+#define FONT_GREETING_13 (&font_inter_13)
+#define FONT_HEADING_12 (&font_inter_12_sb)
+#define FONT_BODY_12 (&font_inter_12_sb)
+#define FONT_HEADING_10 (&font_inter_11)
+#define FONT_HEADING_8 (&font_inter_8)
 #define FONT_LABEL_MIN FONT_HEADING_10
 #define FONT_QIBLA_52 (&font_dmmono_66)
 
@@ -57,13 +59,14 @@ namespace UiTheme
         uint32_t border;
         uint32_t green;
         uint32_t amber;
+        uint32_t btnHi; // raised button gradient top
+        uint32_t btnLo; // raised button gradient bottom / pressed
     };
 
     enum class ThemeMode : uint8_t
     {
         ALTIN_GECE = 0,
         KREM_ALTIN,
-        GECE_KREM,
         COUNT
     };
 

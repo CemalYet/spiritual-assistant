@@ -77,16 +77,16 @@
 extern "C"
 {
 #endif
-  extern const struct _lv_font_t font_cinzel_14;
+  extern const struct _lv_font_t font_inter_14;
 #ifdef __cplusplus
 }
 #endif
-#define LV_FONT_DEFAULT (&font_cinzel_14)
+#define LV_FONT_DEFAULT (&font_inter_14)
 
-/* Subpixel font rendering (horizontal RGB) — needs fonts built with --lcd */
-#define LV_USE_FONT_SUBPX 1
+/* Subpixel disabled — rotated display makes LCD subpx produce shadows */
+#define LV_USE_FONT_SUBPX 0
 #if LV_USE_FONT_SUBPX
-#define LV_FONT_SUBPX_BGR 0 /* 0: RGB; 1: BGR order */
+#define LV_FONT_SUBPX_BGR 0
 #endif
 
 #define LV_TXT_ENC LV_TXT_ENC_UTF8

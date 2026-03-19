@@ -95,7 +95,7 @@ namespace PrayerEngine
         if (!s_nextPrayer)
         {
             s_nextPrayerSeconds = -1;
-            AppStateHelper::setNextPrayer("IMSAK", "Yarin");
+            AppStateHelper::setNextPrayer("İMSAK", "Yarın");
             return;
         }
 
@@ -109,7 +109,7 @@ namespace PrayerEngine
                       s_showingTomorrow ? " (tomorrow)" : "");
 
         const char *nextPrayerLabel = (prayer == PrayerType::Fajr)
-                                          ? "IMSAK"
+                          ? "İMSAK"
                                           : getPrayerName(prayer, true).data();
         AppStateHelper::setNextPrayer(nextPrayerLabel, prayerTime.value.data());
         AppStateHelper::setPrayerTimes(

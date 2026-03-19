@@ -232,9 +232,4 @@ namespace UiPageClock
         UiComponents::updateStatusBarMute(sb_handles, muted);
     }
 
-    void setWifi(uint8_t bars)
-    {
-        UiComponents::updateStatusBarWifi(sb_handles, bars);
-    }
-
 } // namespace UiPageClock
